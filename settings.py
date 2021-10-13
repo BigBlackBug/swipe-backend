@@ -8,9 +8,21 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/v1"
     SECRET_KEY: str = secrets.token_urlsafe(32)
 
+    # set by heroku
+    PORT: int
+    DATABASE_URL: Optional[PostgresDsn] = None
+
     # TODO debug mode
     ENABLE_SQL_ECHO: Optional[bool] = True
-    DATABASE_URI: Optional[PostgresDsn] = None
+    ENABLE_WEB_SERVER_AUTORELOAD: Optional[bool] = True
+
+    @validator("DATABASE_URL")
+    def fix_database_uri_for_heroku(cls, value: Optional[str],
+                                    values: Dict[str, Any]) -> Any:
+        # https://github.com/sqlalchemy/sqlalchemy/issues/6083#issuecomment-801478013
+        if value.startswith("postgres://"):
+            return value.replace("postgres://", "postgresql://", 1)
+        return value
 
     # POSTGRES_SERVER: Optional[str] = None
     # POSTGRES_USER: Optional[str] = None
@@ -19,7 +31,7 @@ class Settings(BaseSettings):
     #
 
     #
-    # @validator("DATABASE_URI", pre=True)
+    # @validator("DATABASE_URL", pre=True)
     # def assemble_db_connection(cls, v: Optional[str],
     #                            values: Dict[str, Any]) -> Any:
     #     if isinstance(v, str):
@@ -35,7 +47,6 @@ class Settings(BaseSettings):
     class Config:
         case_sensitive = True
         env_file = '.env'
-        env_prefix = 'SWIPE_'
 
 
 settings = Settings()

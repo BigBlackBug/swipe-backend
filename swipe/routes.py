@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Query
 
-router = APIRouter(prefix='/swipe', tags=['swipe'])
+from settings import settings
+
+router = APIRouter(prefix=f'{settings.API_V1_PREFIX}/swipe', tags=['swipe'])
 
 
 @router.get('/')

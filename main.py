@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 
+from settings import settings
 from swipe import database, routes
 
 logging.basicConfig(stream=sys.stderr,
@@ -14,8 +15,7 @@ logging.basicConfig(stream=sys.stderr,
                     level=logging.DEBUG)
 
 logger = logging.getLogger(__name__)
-app = FastAPI(docs_url="/docs", redoc_url='/redoc')
-
+app = FastAPI(docs_url=f'/docs', redoc_url=f'/redoc')
 
 app.include_router(routes.router)
 
@@ -28,6 +28,9 @@ async def validation_exception_handler(request, exc):
 
 if __name__ == '__main__':
     logger.info('Creating tables')
+    # TODO run migrations instead lol
     database.Base.metadata.create_all(bind=database.engine)
-    logger.info('Starting app')
-    uvicorn.run('main:app', port=8000, reload=True)
+    logger.info(f'Starting app at port {settings.PORT}')
+    uvicorn.run('main:app', host='0.0.0.0',
+                port=settings.PORT,
+                reload=settings.ENABLE_WEB_SERVER_AUTORELOAD)
