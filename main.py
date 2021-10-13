@@ -27,9 +27,6 @@ async def validation_exception_handler(request, exc):
 
 
 if __name__ == '__main__':
-    logger.info('Creating tables')
-    # TODO run migrations instead lol
-    database.Base.metadata.create_all(bind=database.engine)
     logger.info(f'Starting app at port {settings.PORT}')
     uvicorn.run('main:app', host='0.0.0.0',
                 port=settings.PORT,

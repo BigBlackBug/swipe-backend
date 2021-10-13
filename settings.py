@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = secrets.token_urlsafe(32)
 
     # set by heroku
-    PORT: int
+    PORT: Optional[int] = None
     DATABASE_URL: Optional[PostgresDsn] = None
 
     # TODO debug mode
