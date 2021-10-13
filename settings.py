@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     # TODO debug mode
     ENABLE_SQL_ECHO: Optional[bool] = True
-    ENABLE_WEB_SERVER_AUTORELOAD: Optional[bool] = True
+    ENABLE_WEB_SERVER_AUTORELOAD: Optional[bool] = False
 
     @validator("DATABASE_URL")
     def fix_database_uri_for_heroku(cls, value: Optional[str],

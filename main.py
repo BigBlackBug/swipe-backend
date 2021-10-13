@@ -6,9 +6,11 @@ from fastapi import FastAPI
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 
+import swipe
 from settings import settings
-from swipe import database, routes
+from swipe import users
 
+# TODO proper logging configuration
 logging.basicConfig(stream=sys.stderr,
                     format="[%(asctime)s %(levelname)s|%(processName)s] "
                            "%(name)s %(message)s",
@@ -17,7 +19,8 @@ logging.basicConfig(stream=sys.stderr,
 logger = logging.getLogger(__name__)
 app = FastAPI(docs_url=f'/docs', redoc_url=f'/redoc')
 
-app.include_router(routes.router)
+app.include_router(users.routes.router)
+app.include_router(swipe.routes.router)
 
 
 @app.exception_handler(RequestValidationError)

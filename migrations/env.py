@@ -12,9 +12,10 @@ config.set_main_option('sqlalchemy.url', settings.DATABASE_URL)
 # configure alembic logging
 fileConfig(config.config_file_name)
 
-from swipe.models import *
+from swipe.database import ModelBase  # noqa
+from swipe.users.models import *  # noqa
 
-target_metadata = Base.metadata
+target_metadata = ModelBase.metadata
 
 
 def run_migrations_offline():

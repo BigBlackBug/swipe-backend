@@ -14,4 +14,4 @@ engine = create_engine(settings.DATABASE_URL, future=True,
 SessionLocal = sessionmaker(autocommit=False, autoflush=False,
                             future=True, bind=engine)
 
-Base = declarative_base()
+ModelBase = declarative_base()
