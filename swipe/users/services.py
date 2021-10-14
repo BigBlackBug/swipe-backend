@@ -4,16 +4,24 @@ from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from swipe import dependencies
+import swipe.database
 from swipe.users import schemas, models
+from swipe.users.models import AuthInfo
 
 
 class UserService:
-    def __init__(self, db: Session = Depends(dependencies.db)):
+    def __init__(self, db: Session = Depends(swipe.database.db)):
         self.db = db
 
-    def create_user(self, name: str) -> models.User:
-        user_object = models.User(name=name)
+    def create_user(self,
+                    user_payload: schemas.CreateUserIn) -> models.User:
+        auth_info = AuthInfo(
+            auth_provider=user_payload.auth_provider,
+            payload={'provider_token': user_payload.provider_token})
+        user_object = models.User()
+        user_object.auth_info = auth_info
+
+        self.db.add(auth_info)
         self.db.add(user_object)
         self.db.commit()
         self.db.refresh(user_object)

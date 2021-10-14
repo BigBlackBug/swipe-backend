@@ -3,10 +3,7 @@ import sys
 
 import uvicorn
 from fastapi import FastAPI
-from fastapi.exception_handlers import request_validation_exception_handler
-from fastapi.exceptions import RequestValidationError
 
-import swipe
 from settings import settings
 from swipe import users
 
@@ -19,15 +16,8 @@ logging.basicConfig(stream=sys.stderr,
 logger = logging.getLogger(__name__)
 app = FastAPI(docs_url=f'/docs', redoc_url=f'/redoc')
 
-app.include_router(users.endpoints.router)
-app.include_router(swipe.endpoints.router)
-
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request, exc):
-    logger.exception(f"OMG! The client sent invalid data!: {exc}")
-    return await request_validation_exception_handler(request, exc)
-
+app.include_router(users.endpoints.me_router)
+app.include_router(users.endpoints.users_router)
 
 if __name__ == '__main__':
     logger.info(f'Starting app at port {settings.PORT}')

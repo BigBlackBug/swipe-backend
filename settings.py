@@ -1,4 +1,3 @@
-import secrets
 from typing import Any, Dict, Optional
 
 from pydantic import BaseSettings, PostgresDsn, validator
@@ -6,8 +5,8 @@ from pydantic import BaseSettings, PostgresDsn, validator
 
 class Settings(BaseSettings):
     API_V1_PREFIX: str = "/v1"
-    SECRET_KEY: str = secrets.token_urlsafe(32)
-
+    # SECRET_KEY: str = secrets.token_urlsafe(32)
+    SECRET_KEY: str = 'oEA5LF15Kh84fS3KmQWxB3PXkmJrkwRZ88zAkGC2v4c'
     # set by heroku
     PORT: Optional[int] = None
     DATABASE_URL: Optional[PostgresDsn] = None
