@@ -36,21 +36,6 @@ async def fetch_user(
     return user
 
 
-@users_router.post('/', response_model=CreateUserOut,
-                   status_code=status.HTTP_201_CREATED, )
-async def create_user(user_payload: schemas.CreateUserIn,
-                      user_service: UserService = Depends()):
-    """
-    Create a new user.
-
-    This endpoint is used as a first step of registering a user.
-    """
-    user = user_service.create_user(user_payload)
-    access_token = security.create_access_token(user_payload, user.id)
-
-    return CreateUserOut(user_id=user.id, access_token=access_token)
-
-
 # ----------------------------------------------------------------------------
 @me_router.get('/', name='Get current user profile',
                response_model=schemas.UserOut)

@@ -1,3 +1,4 @@
+import datetime
 from typing import Optional, Any
 from uuid import UUID
 
@@ -35,6 +36,7 @@ class UserIn(UserBase):
 class CreateUserIn(BaseModel):
     auth_provider: str
     provider_token: str
+    provider_user_id: str
 
 
 class CreateUserOut(BaseModel):
@@ -44,6 +46,7 @@ class CreateUserOut(BaseModel):
 
 class JWTPayload(CreateUserIn):
     user_id: UUID
+    created_at: int
 
     @validator("user_id")
     def cast_user_id(cls, value: UUID,

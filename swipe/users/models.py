@@ -99,8 +99,10 @@ class AuthInfo(ModelBase):
     __tablename__ = 'auth_info'
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    auth_provider = Column(Enum(AuthProvider), nullable=False)
-    # TODO maybe get away with just a single token
-    payload = Column(JSON, nullable=False)
+    access_token = Column(String)
 
-    user = relationship('User', back_populates='auth_info')
+    auth_provider = Column(Enum(AuthProvider), nullable=False)
+    provider_token = Column(String, nullable=False)
+    provider_user_id = Column(String, nullable=False)
+
+    user = relationship('User', back_populates='auth_info', uselist=False)

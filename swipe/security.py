@@ -1,4 +1,5 @@
 import logging
+import time
 from uuid import UUID
 
 from fastapi import Depends, HTTPException
@@ -31,15 +32,14 @@ def get_auth_token(request: Request) -> str:
 
 
 def get_current_user(user_service: UserService = Depends(),
-                     token: str = Depends(get_auth_token)
-                     ) -> models.User:
+                     token: str = Depends(get_auth_token)) -> models.User:
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[ALGORITHMS.HS256, ]
         )
         token_payload = schemas.JWTPayload(**payload)
     except (jwt.JWTError, ValidationError) as e:
-        logger.exception("Could not validate token")
+        logger.exception("Error validating token")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail='Could not validate token',
@@ -48,19 +48,10 @@ def get_current_user(user_service: UserService = Depends(),
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # TODO payload.provider_token is most likely temporary
-    if token_payload.provider_token != user.auth_info.payload['provider_token']:
+    if user.auth_info.access_token != token:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail='Invalid token, user_ids on the auth provider do not match')
-    logger.debug(f'{user.id} has successfully authorized')
+            detail='Token has been invalidated')
+
+    logger.debug(f'{user.id} has successfully authenticated')
     return user
-
-
-def create_access_token(payload: schemas.CreateUserIn,
-                        user_id: UUID) -> str:
-    encoded_jwt = jwt.encode(
-        schemas.JWTPayload(**payload.dict(), user_id=user_id).dict(),
-        settings.SECRET_KEY,
-        algorithm=ALGORITHMS.HS256)
-    return encoded_jwt
