@@ -1,8 +1,9 @@
 import time
+import uuid
 from typing import Optional
 from uuid import UUID
 
-from fastapi import Depends
+from fastapi import Depends, UploadFile
 from jose import jwt
 from jose.constants import ALGORITHMS
 from sqlalchemy import select
@@ -10,12 +11,14 @@ from sqlalchemy.orm import Session
 
 import swipe.database
 from settings import settings
+from swipe.storage import CloudStorage
 from swipe.users import schemas, models
 
 
 class UserService:
     def __init__(self, db: Session = Depends(swipe.database.db)):
         self.db = db
+        self._storage = CloudStorage()
 
     def create_user(self,
                     user_payload: schemas.CreateUserIn) -> models.User:
@@ -48,14 +51,21 @@ class UserService:
         self.db.refresh(user_object)
         return user_object
 
-    def add_photo(self, user_object: models.User, photo_name: str):
-        user_object.photos = user_object.photos + [photo_name]
-        self.db.commit()
+    def add_photo(self, user_object: models.User, file: UploadFile):
+        _, _, extension = file.content_type.partition('/')
+        image_id = f'{uuid.uuid4()}.{extension}'
+        self._storage.upload_image(image_id, file.file)
 
-    def delete_photo(self, user_object: models.User, photo_index: int):
+        user_object.photos = user_object.photos + [image_id]
+        self.db.commit()
+        return image_id
+
+    def delete_photo(self, user_object: models.User, photo_id: UUID):
         new_list = list(user_object.photos)
-        new_list.pop(photo_index)
+        new_list.remove(photo_id)
         user_object.photos = new_list
+
+        self._storage.delete_image(photo_id)
         self.db.commit()
 
     def find_user_by_auth(

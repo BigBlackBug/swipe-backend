@@ -9,8 +9,8 @@ from settings import settings
 from swipe import security
 from . import schemas
 from .models import User
-from .schemas import CreateUserOut
 from .services import UserService
+from ..storage import CloudStorage
 
 IMAGE_CONTENT_TYPE_REGEXP = 'image/(png|jpe?g)'
 
@@ -36,6 +36,14 @@ async def fetch_user(
     return user
 
 
+@users_router.get("/photos/{photo_id}")
+async def get_photo(photo_id: str):
+    # TODO make it a dependency or smth
+    storage = CloudStorage()
+    url = storage.get_image_url(photo_id)
+    return RedirectResponse(url=url)
+
+
 # ----------------------------------------------------------------------------
 @me_router.get('/', name='Get current user profile',
                response_model=schemas.UserOut)
@@ -55,50 +63,39 @@ async def patch_user(
     if user_body.name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail='Updating the username is prohibited')
-    if user_body.photos:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail='Please use {user_id}/photos endpoints '
-                                   'to manage photos')
+
     user_object = user_service.update_user(current_user, user_body)
     return user_object
 
 
-@me_router.post("/photos")
+@me_router.post("/photos", status_code=status.HTTP_201_CREATED)
 async def add_photo(
-        user_id: UUID,
         file: UploadFile = File(...),
         user_service: UserService = Depends(UserService),
         current_user: User = Depends(security.get_current_user)):
     """ Add a new photo to the specified user """
-    user_object = user_service.get_user(user_id)
-    if not user_object:
+    if not current_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     if not re.match(IMAGE_CONTENT_TYPE_REGEXP, file.content_type):
         raise HTTPException(status_code=400, detail='Unsupported image type')
 
-    if len(user_object.photos) == User.MAX_ALLOWED_PHOTOS:
+    if len(current_user.photos) == User.MAX_ALLOWED_PHOTOS:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f'Can not add more than {User.MAX_ALLOWED_PHOTOS} photos')
 
-    user_service.add_photo(user_object, file.filename)
+    image_id = user_service.add_photo(current_user, file)
 
-    return {"id": user_id}
+    return {'image_id': image_id}
 
 
-@me_router.delete("/photos/{photo_index}")
+@me_router.delete("/photos/{photo_id}")
 async def delete_photo(
-        photo_index: int,
+        photo_id: UUID,
         user_service: UserService = Depends(UserService),
         current_user: User = Depends(security.get_current_user)):
     """ Delete a user's photo """
-    if photo_index > len(current_user.photos):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f'Invalid photo index '
-                   f'{photo_index}>{len(current_user.photos)}')
-
-    user_service.delete_photo(current_user, photo_index)
+    user_service.delete_photo(current_user, photo_id)
 
     return {"id": str(current_user.id)}

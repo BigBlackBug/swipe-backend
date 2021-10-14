@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     PORT: Optional[int] = None
     DATABASE_URL: Optional[PostgresDsn] = None
 
+    STORAGE_ACCESS_KEY: str
+    STORAGE_SECRET_KEY: str
     # TODO debug mode
     ENABLE_SQL_ECHO: Optional[bool] = True
     ENABLE_WEB_SERVER_AUTORELOAD: Optional[bool] = False

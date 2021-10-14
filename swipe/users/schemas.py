@@ -1,4 +1,3 @@
-import datetime
 from typing import Optional, Any
 from uuid import UUID
 
@@ -14,13 +13,16 @@ class UserBase(BaseModel):
     )
     height: Optional[int]
 
-    photos: list[str] = []
     interests: list[UserInterests] = []
     gender: Optional[Gender] = None
 
 
 class UserOut(UserBase):
     id: UUID
+    # TODO add a validator which fetches proper image urls
+    # TODO or a separate endpoint which redirects to S3
+    photos: list[str] = []
+
     rating: int
     is_premium: bool
 
