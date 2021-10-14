@@ -35,7 +35,7 @@ def get_current_user(user_service: UserService = Depends(),
                      token: str = Depends(get_auth_token)) -> models.User:
     try:
         payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[ALGORITHMS.HS256, ]
+            token, settings.SWIPE_SECRET_KEY, algorithms=[ALGORITHMS.HS256, ]
         )
         token_payload = schemas.JWTPayload(**payload)
     except (jwt.JWTError, ValidationError) as e:

@@ -87,7 +87,7 @@ class UserService:
             schemas.JWTPayload(
                 **payload.dict(),
                 user_id=user_object.id, created_at=time.time_ns()).dict(),
-            settings.SECRET_KEY,
+            settings.SWIPE_SECRET_KEY,
             algorithm=ALGORITHMS.HS256)
         user_object.auth_info.access_token = access_token
         self.db.commit()
