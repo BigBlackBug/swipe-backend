@@ -19,8 +19,8 @@ logging.basicConfig(stream=sys.stderr,
 logger = logging.getLogger(__name__)
 app = FastAPI(docs_url=f'/docs', redoc_url=f'/redoc')
 
-app.include_router(users.routes.router)
-app.include_router(swipe.routes.router)
+app.include_router(users.endpoints.router)
+app.include_router(swipe.endpoints.router)
 
 
 @app.exception_handler(RequestValidationError)

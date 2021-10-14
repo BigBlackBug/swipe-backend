@@ -12,8 +12,8 @@ class UserService:
     def __init__(self, db: Session = Depends(dependencies.db)):
         self.db = db
 
-    def create_user(self, user_name: str) -> models.User:
-        user_object = models.User(name=user_name)
+    def create_user(self, name: str) -> models.User:
+        user_object = models.User(name=name)
         self.db.add(user_object)
         self.db.commit()
         self.db.refresh(user_object)
@@ -37,4 +37,10 @@ class UserService:
 
     def add_photo(self, user_object: models.User, photo_name: str):
         user_object.photos = user_object.photos + [photo_name]
+        self.db.commit()
+
+    def delete_photo(self, user_object: models.User, photo_index: int):
+        new_list = list(user_object.photos)
+        new_list.pop(photo_index)
+        user_object.photos = new_list
         self.db.commit()
