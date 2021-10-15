@@ -40,8 +40,8 @@ async def fetch_user(
 @me_router.get('/', name='Get current user profile',
                response_model=schemas.UserOut)
 async def fetch_user(current_user: User = Depends(security.get_current_user)):
-    # TODO use a urljoin or smth
-    return RedirectResponse(url=f'{users_router.prefix}/{current_user.id}')
+    user_out: schemas.UserOut = schemas.UserOut.patched_from_orm(current_user)
+    return user_out
 
 
 @me_router.patch('/',
