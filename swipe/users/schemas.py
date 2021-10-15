@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 from typing import Optional, Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field, validator
 
 from .models import UserInterests, Gender
+from ..storage import CloudStorage
 
 
 class UserBase(BaseModel):
@@ -19,12 +22,22 @@ class UserBase(BaseModel):
 
 class UserOut(UserBase):
     id: UUID
-    # TODO add a validator which fetches proper image urls
-    # TODO or a separate endpoint which redirects to S3
     photos: list[str] = []
 
     rating: int
     is_premium: bool
+
+    @classmethod
+    def patched_from_orm(cls: UserOut, obj: Any) -> UserOut:
+        schema_obj = cls.from_orm(obj)
+        storage = CloudStorage()
+        patched_photos = []
+        for photo_id in schema_obj.photos:
+            # TODO add a url shortener cuz these urls a freaking looong
+            # and include auth info
+            patched_photos.append(storage.get_image_url(photo_id))
+        schema_obj.photos = patched_photos
+        return schema_obj
 
     class Config:
         # allows Pydantic to read orm models and not just dicts

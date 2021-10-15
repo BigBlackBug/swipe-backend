@@ -10,7 +10,6 @@ from swipe import security
 from . import schemas
 from .models import User
 from .services import UserService
-from ..storage import CloudStorage
 
 IMAGE_CONTENT_TYPE_REGEXP = 'image/(png|jpe?g)'
 
@@ -33,15 +32,8 @@ async def fetch_user(
         user_service: UserService = Depends(),
         current_user: User = Depends(security.get_current_user)):
     user = user_service.get_user(user_id)
-    return user
-
-
-@users_router.get("/photos/{photo_id}")
-async def get_photo(photo_id: str):
-    # TODO make it a dependency or smth
-    storage = CloudStorage()
-    url = storage.get_image_url(photo_id)
-    return RedirectResponse(url=url)
+    user_out: schemas.UserOut = schemas.UserOut.patched_from_orm(user)
+    return user_out
 
 
 # ----------------------------------------------------------------------------
@@ -52,7 +44,9 @@ async def fetch_user(current_user: User = Depends(security.get_current_user)):
     return RedirectResponse(url=f'{users_router.prefix}/{current_user.id}')
 
 
-@me_router.patch('/', response_model=schemas.UserOut)
+@me_router.patch('/',
+                 response_model=schemas.UserOut,
+                 response_model_exclude={'photos', })
 async def patch_user(
         user_body: schemas.UserIn = Body(...),
         user_service: UserService = Depends(),

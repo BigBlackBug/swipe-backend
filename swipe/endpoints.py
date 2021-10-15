@@ -8,12 +8,12 @@ from settings import settings
 from swipe.users import schemas
 from swipe.users.services import UserService
 
-auth_router = APIRouter(prefix=f'{settings.API_V1_PREFIX}/auth', tags=['auth'])
+router = APIRouter(prefix=f'{settings.API_V1_PREFIX}', tags=['misc'])
 logger = logging.getLogger(__name__)
 
 
 # TODO docs for different status codes
-@auth_router.post("/", response_model=schemas.CreateUserOut)
+@router.post("/auth", response_model=schemas.CreateUserOut)
 async def authenticate_user(user_payload: schemas.CreateUserIn,
                             response: Response,
                             user_service: UserService = Depends()):
