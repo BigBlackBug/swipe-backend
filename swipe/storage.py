@@ -1,8 +1,11 @@
+import logging
 from typing import IO
 from uuid import UUID
 
 import boto3
+import botocore.exceptions
 from botocore.config import Config
+from starlette import status
 
 from settings import settings
 
@@ -10,6 +13,8 @@ LINK_EXPIRATION_TIME_SEC = 60
 STORAGE_IMAGE_BUCKET = 'account-images'
 STORAGE_ENDPOINT = 'https://storage.yandexcloud.net'
 STORAGE_REGION = "ru-central1"
+
+logger = logging.getLogger(__name__)
 
 
 class CloudStorage:
@@ -22,8 +27,18 @@ class CloudStorage:
             endpoint_url=STORAGE_ENDPOINT,
             config=Config(signature_version="s3v4")
         )
-        # TODO check if bucket exists
-        # self._client.create_bucket(Bucket=STORAGE_IMAGE_BUCKET)
+
+    def initialize_storage(self):
+        logger.info(f"Validating cloud storage bucket {STORAGE_IMAGE_BUCKET}")
+        try:
+            self._client.head_bucket(Bucket=STORAGE_IMAGE_BUCKET)
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == status.HTTP_404_NOT_FOUND:
+                logger.info(f"Bucket {STORAGE_IMAGE_BUCKET} "
+                            f"was not found, creating")
+                self._client.create_bucket(Bucket=STORAGE_IMAGE_BUCKET)
+            else:
+                raise
 
     # TODO all sorts of error handling
     def upload_image(self, image_id: str, file_content: IO):
