@@ -12,11 +12,26 @@ router = APIRouter(prefix=f'{settings.API_V1_PREFIX}', tags=['misc'])
 logger = logging.getLogger(__name__)
 
 
-# TODO docs for different status codes
-@router.post("/auth", response_model=schemas.AuthenticationOut)
+@router.post(
+    "/auth",
+    responses={
+        200: {
+            "description": "An existing user has been authenticated",
+            "model": schemas.AuthenticationOut
+        },
+        201: {
+            "description": "A new user has been created",
+            "model": schemas.AuthenticationOut
+        }
+    })
 async def authenticate_user(auth_payload: schemas.AuthenticationIn,
                             response: Response,
                             user_service: UserService = Depends()):
+    """
+    Returns a jwt access token either for an existing user
+    or for a new one, in case no match has been found for the supplied
+    auth_provider and the provider_user_id
+    """
     user = user_service.find_user_by_auth(auth_payload)
 
     if user:

@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Body, HTTPException, UploadFile, File
 from starlette import status
-from starlette.responses import RedirectResponse
+from starlette.responses import Response
 
 from settings import settings
 from swipe import security
@@ -25,7 +25,8 @@ me_router = APIRouter(
 )
 
 
-@users_router.get('/{user_id}', name='Get a single user',
+@users_router.get('/{user_id}',
+                  name='Get a single user',
                   response_model=schemas.UserOut)
 async def fetch_user(
         user_id: UUID,
@@ -37,7 +38,8 @@ async def fetch_user(
 
 
 # ----------------------------------------------------------------------------
-@me_router.get('/', name='Get current user profile',
+@me_router.get('/',
+               name="Get current users profile",
                response_model=schemas.UserOut)
 async def fetch_user(current_user: User = Depends(security.get_current_user)):
     user_out: schemas.UserOut = schemas.UserOut.patched_from_orm(current_user)
@@ -45,15 +47,13 @@ async def fetch_user(current_user: User = Depends(security.get_current_user)):
 
 
 @me_router.patch('/',
+                 name="Update the authenticated users fields",
                  response_model=schemas.UserOut,
                  response_model_exclude={'photos', })
 async def patch_user(
         user_body: schemas.UserUpdate = Body(...),
         user_service: UserService = Depends(),
         current_user: User = Depends(security.get_current_user)):
-    """
-    Update a current user's fields
-    """
     if user_body.name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail='Updating the username is prohibited')
@@ -62,12 +62,13 @@ async def patch_user(
     return user_object
 
 
-@me_router.post("/photos", status_code=status.HTTP_201_CREATED)
+@me_router.post("/photos",
+                name='Add a photo to the authenticated user',
+                status_code=status.HTTP_201_CREATED)
 async def add_photo(
         file: UploadFile = File(...),
         user_service: UserService = Depends(UserService),
         current_user: User = Depends(security.get_current_user)):
-    """ Add a new photo to the specified user """
     if not current_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
@@ -84,7 +85,9 @@ async def add_photo(
     return {'image_id': image_id}
 
 
-@me_router.delete("/photos/{photo_id}")
+@me_router.delete("/photos/{photo_id}",
+                  name='Delete an authenticated users photo',
+                  status_code=status.HTTP_204_NO_CONTENT)
 async def delete_photo(
         photo_id: UUID,
         user_service: UserService = Depends(UserService),
