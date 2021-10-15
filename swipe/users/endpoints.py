@@ -89,10 +89,12 @@ async def add_photo(
                   name='Delete an authenticated users photo',
                   status_code=status.HTTP_204_NO_CONTENT)
 async def delete_photo(
-        photo_id: UUID,
+        photo_id: str,
         user_service: UserService = Depends(UserService),
         current_user: User = Depends(security.get_current_user)):
-    """ Delete a user's photo """
-    user_service.delete_photo(current_user, photo_id)
+    try:
+        user_service.delete_photo(current_user, photo_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail='Photo not found')
 
-    return {"id": str(current_user.id)}
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

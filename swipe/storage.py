@@ -53,8 +53,8 @@ class CloudStorage:
             ExpiresIn=LINK_EXPIRATION_TIME_SEC,
         )
 
-    def delete_image(self, image_id: UUID):
+    def delete_image(self, image_id: str):
         # TODO any validations that objects were actually deleted?
         self._client.delete_objects(
             Bucket=STORAGE_IMAGE_BUCKET,
-            Delete={'Objects': [{'Key': str(image_id)}]})
+            Delete={'Objects': [{'Key': image_id}]})

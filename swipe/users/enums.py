@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import Tuple, Union
+from typing import Tuple, Union, Type
 
 
 class UserInterests(str, enum.Enum):
@@ -54,7 +54,8 @@ class ZodiacSign(str, enum.Enum):
         return obj
 
     @classmethod
-    def from_date(cls, birth_date: Union[str, datetime.date]) -> ZodiacSign:
+    def from_date(cls: Type[ZodiacSign],
+                  birth_date: Union[str, datetime.date]) -> ZodiacSign:
         if isinstance(birth_date, str):
             birth_date = datetime.strptime(birth_date, '%Y-%M-%d').date()
 

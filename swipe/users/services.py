@@ -60,7 +60,7 @@ class UserService:
         self.db.commit()
         return image_id
 
-    def delete_photo(self, user_object: models.User, photo_id: UUID):
+    def delete_photo(self, user_object: models.User, photo_id: str):
         new_list = list(user_object.photos)
         new_list.remove(photo_id)
         user_object.photos = new_list

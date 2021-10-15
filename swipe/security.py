@@ -6,7 +6,6 @@ from jose import jwt
 from jose.constants import ALGORITHMS
 from pydantic import ValidationError
 from starlette import status
-from starlette.requests import Request
 
 from settings import settings
 from swipe.users import models, schemas

@@ -32,6 +32,7 @@ class UserBase(BaseModel):
 class UserOut(UserBase):
     id: UUID
     photos: list[str] = []
+    photo_urls: Optional[list[str]] = []
 
     rating: int
     is_premium: bool
@@ -48,7 +49,7 @@ class UserOut(UserBase):
             # TODO add a url shortener cuz these urls a freaking looong
             # and include auth info
             patched_photos.append(storage.get_image_url(photo_id))
-        schema_obj.photos = patched_photos
+        schema_obj.photo_urls = patched_photos
         return schema_obj
 
     class Config:
