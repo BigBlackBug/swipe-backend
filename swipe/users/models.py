@@ -6,42 +6,6 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from swipe.database import ModelBase
-#
-# class MessageStatus(str, enum.Enum):
-#     SENT = 'sent'
-#     RECEIVED = 'received'
-#     READ = 'read'
-#
-#
-# class Chat(ModelBase):
-#     __tablename__ = 'chats'
-#     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-#
-#     # TODO lazy mode comparison - immediate/joined/subquery/selectin
-#     messages = relationship('ChatMessage', back_populates='chat')
-#
-#     initiator_id = Column(UUID(as_uuid=True), ForeignKey('users.id'))
-#     initiator = relationship('User', foreign_keys=[initiator_id])
-#
-#     interlocutor_id = Column(UUID(as_uuid=True), ForeignKey('users.id'))
-#     interlocutor = relationship('User', foreign_keys=[interlocutor_id])
-#
-#
-# class ChatMessage(ModelBase):
-#     __tablename__ = 'chat_messages'
-#     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-#
-#     index = Column(Integer, unique=True)
-#
-#     status = Column(Enum(MessageStatus), default=MessageStatus.SENT)
-#     message = Column(String(100))
-#
-#     sender_id = Column(UUID(as_uuid=True), ForeignKey('users.id'))
-#     sender = relationship('User')
-#
-#     chat_id = Column(UUID(as_uuid=True), ForeignKey('chats.id'))
-#     chat = relationship('Chat', back_populates='messages')
-#
 from swipe.users.enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
     RecurrenceRate
 
@@ -71,6 +35,9 @@ class User(ModelBase):
     interests = Column(ARRAY(Enum(UserInterests)), nullable=False, default=[])
     photos = Column(ARRAY(String(50)), nullable=False, default=[])
 
+    instagram_profile = Column(String)
+    tiktok_profile = Column(String)
+    snapchat_profile = Column(String)
     # TODO there is a better way to store coordinates
     coordinates = Column(JSON)
     rating = Column(Integer, nullable=False, default=0)

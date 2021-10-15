@@ -24,6 +24,10 @@ class UserBase(BaseModel):
     smoking: Optional[RecurrenceRate] = None
     drinking: Optional[RecurrenceRate] = None
 
+    instagram_profile: Optional[str] = None
+    tiktok_profile: Optional[str] = None
+    snapchat_profile: Optional[str] = None
+
 
 class UserOut(UserBase):
     id: UUID
