@@ -7,7 +7,8 @@ from uuid import UUID
 from pydantic import BaseModel, Field, validator, root_validator
 
 from swipe.storage import CloudStorage
-from .enums import UserInterests, Gender, AuthProvider, ZodiacSign
+from .enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
+    RecurrenceRate
 
 
 class UserBase(BaseModel):
@@ -19,6 +20,9 @@ class UserBase(BaseModel):
 
     interests: list[UserInterests] = []
     gender: Optional[Gender] = None
+
+    smoking: Optional[RecurrenceRate] = None
+    drinking: Optional[RecurrenceRate] = None
 
 
 class UserOut(UserBase):

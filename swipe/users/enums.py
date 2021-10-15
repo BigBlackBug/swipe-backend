@@ -27,6 +27,12 @@ class AuthProvider(str, enum.Enum):
     APPLE_ID = 'apple_id'
 
 
+class RecurrenceRate(str, enum.Enum):
+    NEVER = 'never'
+    SOMETIMES = 'sometimes'
+    REGULARLY = 'regularly'
+
+
 class ZodiacSign(str, enum.Enum):
     ARIES = ('овен', ((20, 3), (19, 4)))
     TAURUS = ('телец', ((20, 4), (20, 5)))

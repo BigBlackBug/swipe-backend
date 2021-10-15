@@ -42,7 +42,8 @@ from swipe.database import ModelBase
 #     chat_id = Column(UUID(as_uuid=True), ForeignKey('chats.id'))
 #     chat = relationship('Chat', back_populates='messages')
 #
-from swipe.users.enums import UserInterests, Gender, AuthProvider, ZodiacSign
+from swipe.users.enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
+    RecurrenceRate
 
 
 class User(ModelBase):
@@ -59,8 +60,13 @@ class User(ModelBase):
     gender = Column(Enum(Gender), nullable=False,
                     default=Gender.ATTACK_HELICOPTER)
 
-    zodiac_sign = Column(Enum(ZodiacSign))
     date_of_birth = Column(Date)
+    zodiac_sign = Column(Enum(ZodiacSign))
+
+    smoking = Column(Enum(RecurrenceRate), nullable=False,
+                     default=RecurrenceRate.NEVER)
+    drinking = Column(Enum(RecurrenceRate), nullable=False,
+                      default=RecurrenceRate.NEVER)
 
     interests = Column(ARRAY(Enum(UserInterests)), nullable=False, default=[])
     photos = Column(ARRAY(String(50)), nullable=False, default=[])
