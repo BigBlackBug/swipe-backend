@@ -21,9 +21,9 @@ logging.basicConfig(stream=sys.stderr,
 logger = logging.getLogger(__name__)
 
 app = FastAPI(docs_url=f'/docs', redoc_url=f'/redoc')
+app.include_router(swipe.endpoints.router)
 app.include_router(users.endpoints.me_router)
 app.include_router(users.endpoints.users_router)
-app.include_router(swipe.endpoints.router)
 
 if __name__ == '__main__':
     migrations_dir = str(Path('migrations').absolute())

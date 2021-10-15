@@ -5,8 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, validator
 
-from .models import UserInterests, Gender
-from ..storage import CloudStorage
+from swipe.storage import CloudStorage
+from .enums import UserInterests, Gender, AuthProvider
 
 
 class UserBase(BaseModel):
@@ -30,6 +30,7 @@ class UserOut(UserBase):
     @classmethod
     def patched_from_orm(cls: UserOut, obj: Any) -> UserOut:
         schema_obj = cls.from_orm(obj)
+        # TODO make it a dependency or smth
         storage = CloudStorage()
         patched_photos = []
         for photo_id in schema_obj.photos:
@@ -49,7 +50,7 @@ class UserIn(UserBase):
 
 
 class CreateUserIn(BaseModel):
-    auth_provider: str
+    auth_provider: AuthProvider
     provider_token: str
     provider_user_id: str
 

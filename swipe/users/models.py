@@ -1,4 +1,3 @@
-import enum
 import uuid
 
 from sqlalchemy import Column, String, Boolean, Integer, Enum, ARRAY, JSON, \
@@ -7,8 +6,6 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from swipe.database import ModelBase
-
-
 #
 # class MessageStatus(str, enum.Enum):
 #     SENT = 'sent'
@@ -45,27 +42,7 @@ from swipe.database import ModelBase
 #     chat_id = Column(UUID(as_uuid=True), ForeignKey('chats.id'))
 #     chat = relationship('Chat', back_populates='messages')
 #
-
-class UserInterests(str, enum.Enum):
-    WORK = 'work'
-    FRIENDSHIP = 'friendship'
-    FLIRTING = 'flirting'
-    NETWORKING = 'networking'
-    CHAT = 'chat'
-    LOVE = 'love'
-
-
-class Gender(str, enum.Enum):
-    MALE = 'male'
-    FEMALE = 'female'
-    ATTACK_HELICOPTER = 'attack_helicopter'
-
-
-class AuthProvider(str, enum.Enum):
-    GOOGLE = 'google'
-    VK = 'vk'
-    SNAPCHAT = 'snapchat'
-    APPLE_ID = 'apple_id'
+from swipe.users.enums import UserInterests, Gender, AuthProvider
 
 
 class User(ModelBase):
