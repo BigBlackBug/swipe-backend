@@ -48,7 +48,7 @@ async def fetch_user(current_user: User = Depends(security.get_current_user)):
                  response_model=schemas.UserOut,
                  response_model_exclude={'photos', })
 async def patch_user(
-        user_body: schemas.UserIn = Body(...),
+        user_body: schemas.UserUpdate = Body(...),
         user_service: UserService = Depends(),
         current_user: User = Depends(security.get_current_user)):
     """

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import datetime
 from typing import Optional, Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, root_validator
 
 from swipe.storage import CloudStorage
-from .enums import UserInterests, Gender, AuthProvider
+from .enums import UserInterests, Gender, AuthProvider, ZodiacSign
 
 
 class UserBase(BaseModel):
@@ -26,6 +27,8 @@ class UserOut(UserBase):
 
     rating: int
     is_premium: bool
+    date_of_birth: Optional[datetime.date] = None
+    zodiac_sign: Optional[ZodiacSign] = None
 
     @classmethod
     def patched_from_orm(cls: UserOut, obj: Any) -> UserOut:
@@ -45,22 +48,30 @@ class UserOut(UserBase):
         orm_mode = True
 
 
-class UserIn(UserBase):
-    pass
+class UserUpdate(UserBase):
+    date_of_birth: Optional[datetime.date] = None
+    zodiac_sign: Optional[ZodiacSign] = None
+
+    @root_validator(pre=True)
+    def set_zodiac_sign(cls, values: dict[str, Any]):
+        if 'date_of_birth' in values:
+            values['zodiac_sign'] = \
+                ZodiacSign.from_date(values['date_of_birth'])
+        return values
 
 
-class CreateUserIn(BaseModel):
+class AuthenticationIn(BaseModel):
     auth_provider: AuthProvider
     provider_token: str
     provider_user_id: str
 
 
-class CreateUserOut(BaseModel):
+class AuthenticationOut(BaseModel):
     user_id: UUID
     access_token: str
 
 
-class JWTPayload(CreateUserIn):
+class JWTPayload(AuthenticationIn):
     user_id: UUID
     created_at: int
 

@@ -21,7 +21,7 @@ class UserService:
         self._storage = CloudStorage()
 
     def create_user(self,
-                    user_payload: schemas.CreateUserIn) -> models.User:
+                    user_payload: schemas.AuthenticationIn) -> models.User:
         auth_info = models.AuthInfo(**user_payload.dict())
         user_object = models.User()
         user_object.auth_info = auth_info
@@ -43,7 +43,7 @@ class UserService:
     def update_user(
             self,
             user_object: models.User,
-            user: schemas.UserIn) -> models.User:
+            user: schemas.UserUpdate) -> models.User:
         # TODO think of a way to update photos EZ
         for k, v in user.dict(exclude_unset=True).items():
             setattr(user_object, k, v)
@@ -70,7 +70,7 @@ class UserService:
 
     def find_user_by_auth(
             self,
-            user_payload: schemas.CreateUserIn) -> Optional[models.User]:
+            user_payload: schemas.AuthenticationIn) -> Optional[models.User]:
         auth_info = self.db.execute(
             select(models.AuthInfo)
                 .where(models.AuthInfo.auth_provider
@@ -82,13 +82,15 @@ class UserService:
         return auth_info.user if auth_info else None
 
     def create_access_token(self, user_object: models.User,
-                            payload: schemas.CreateUserIn) -> str:
+                            payload: schemas.AuthenticationIn) -> str:
         access_token = jwt.encode(
             schemas.JWTPayload(
                 **payload.dict(),
-                user_id=user_object.id, created_at=time.time_ns()).dict(),
-            settings.SWIPE_SECRET_KEY,
-            algorithm=ALGORITHMS.HS256)
+                user_id=user_object.id,
+                created_at=time.time_ns()
+            ).dict(),
+            settings.SWIPE_SECRET_KEY, algorithm=ALGORITHMS.HS256)
+
         user_object.auth_info.access_token = access_token
         self.db.commit()
         return access_token

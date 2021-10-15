@@ -1,7 +1,7 @@
 import uuid
 
 from sqlalchemy import Column, String, Boolean, Integer, Enum, ARRAY, JSON, \
-    ForeignKey
+    ForeignKey, Date
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -42,7 +42,7 @@ from swipe.database import ModelBase
 #     chat_id = Column(UUID(as_uuid=True), ForeignKey('chats.id'))
 #     chat = relationship('Chat', back_populates='messages')
 #
-from swipe.users.enums import UserInterests, Gender, AuthProvider
+from swipe.users.enums import UserInterests, Gender, AuthProvider, ZodiacSign
 
 
 class User(ModelBase):
@@ -50,17 +50,20 @@ class User(ModelBase):
 
     MAX_ALLOWED_PHOTOS = 6
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     # can not be updated
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(20), nullable=False, default='')
+
     bio = Column(String(200), nullable=False, default='')
     height = Column(Integer(), nullable=False, default=0)
-
-    interests = Column(ARRAY(Enum(UserInterests)), nullable=False, default=[])
-    # TODO obviously proper image handling
-    photos = Column(ARRAY(String(50)), nullable=False, default=[])
     gender = Column(Enum(Gender), nullable=False,
                     default=Gender.ATTACK_HELICOPTER)
+
+    zodiac_sign = Column(Enum(ZodiacSign))
+    date_of_birth = Column(Date)
+
+    interests = Column(ARRAY(Enum(UserInterests)), nullable=False, default=[])
+    photos = Column(ARRAY(String(50)), nullable=False, default=[])
 
     # TODO there is a better way to store coordinates
     coordinates = Column(JSON)

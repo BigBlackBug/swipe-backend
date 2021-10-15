@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 
 # TODO docs for different status codes
-@router.post("/auth", response_model=schemas.CreateUserOut)
-async def authenticate_user(user_payload: schemas.CreateUserIn,
+@router.post("/auth", response_model=schemas.AuthenticationOut)
+async def authenticate_user(user_payload: schemas.AuthenticationIn,
                             response: Response,
                             user_service: UserService = Depends()):
     user = user_service.find_user_by_auth(user_payload)
@@ -27,7 +27,7 @@ async def authenticate_user(user_payload: schemas.CreateUserIn,
         new_token = user_service.create_access_token(user, user_payload)
 
         response.status_code = status.HTTP_200_OK
-        return schemas.CreateUserOut(user_id=user.id, access_token=new_token)
+        return schemas.AuthenticationOut(user_id=user.id, access_token=new_token)
     else:
         logger.info(
             f"Unable to find a user id:'{user_payload.provider_user_id}' "
@@ -36,4 +36,4 @@ async def authenticate_user(user_payload: schemas.CreateUserIn,
         new_token = user_service.create_access_token(user, user_payload)
 
         response.status_code = status.HTTP_201_CREATED
-        return schemas.CreateUserOut(user_id=user.id, access_token=new_token)
+        return schemas.AuthenticationOut(user_id=user.id, access_token=new_token)
