@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, Optional
 
 from pydantic import BaseSettings, PostgresDsn, validator
@@ -27,7 +28,7 @@ class Settings(BaseSettings):
 
     class Config:
         case_sensitive = True
-        env_file = '.env'
+        env_file = os.environ.get('SWIPE_ENV_FILE', '.env')
 
 
 settings = Settings()
