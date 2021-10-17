@@ -1,7 +1,7 @@
 import uuid
 
-from sqlalchemy import Column, String, Boolean, Integer, Enum, ARRAY, JSON, \
-    ForeignKey, Date
+from sqlalchemy import Column, String, Boolean, Integer, Enum, ARRAY, \
+    ForeignKey, Date, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -9,6 +9,8 @@ from swipe.database import ModelBase
 from swipe.users.enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
     RecurrenceRate
 
+
+# TODO add a shit ton of indices
 
 class User(ModelBase):
     __tablename__ = 'users'
@@ -38,14 +40,28 @@ class User(ModelBase):
     instagram_profile = Column(String)
     tiktok_profile = Column(String)
     snapchat_profile = Column(String)
-    # TODO there is a better way to store coordinates
-    coordinates = Column(JSON)
+
+    location = relationship('Location', uselist=False)
+    location_id = Column(UUID(as_uuid=True), ForeignKey('location.id'))
+
     rating = Column(Integer, nullable=False, default=0)
 
     auth_info_id = Column(UUID(as_uuid=True), ForeignKey('auth_info.id'))
     auth_info = relationship('AuthInfo', back_populates='user', uselist=False)
 
     is_premium = Column(Boolean, nullable=False, default=False)
+
+
+class Location(ModelBase):
+    __table_args__ = (
+        UniqueConstraint('city', 'country', name='_location'),
+    )
+    __tablename__ = 'location'
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    city = Column(String, nullable=False)
+    country = Column(String, nullable=False)
+    flag = Column(String, nullable=False)
 
 
 class AuthInfo(ModelBase):

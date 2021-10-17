@@ -11,6 +11,15 @@ from .enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
     RecurrenceRate
 
 
+class LocationSchema(BaseModel):
+    city: str
+    country: str
+    flag: str
+
+    class Config:
+        orm_mode = True
+
+
 class UserBase(BaseModel):
     name: Optional[str] = None
     bio: Optional[str] = Field(
@@ -27,6 +36,8 @@ class UserBase(BaseModel):
     instagram_profile: Optional[str] = None
     tiktok_profile: Optional[str] = None
     snapchat_profile: Optional[str] = None
+
+    location: Optional[LocationSchema] = None
 
 
 class UserOut(UserBase):
@@ -46,7 +57,7 @@ class UserOut(UserBase):
         storage = CloudStorage()
         patched_photos = []
         for photo_id in schema_obj.photos:
-            # TODO add a url shortener cuz these urls a freaking looong
+            # TODO add a url shortener cuz these urls are freaking looong
             # and include auth info
             patched_photos.append(storage.get_image_url(photo_id))
         schema_obj.photo_urls = patched_photos

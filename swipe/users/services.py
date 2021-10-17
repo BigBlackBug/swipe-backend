@@ -40,13 +40,32 @@ class UserService:
     def get_users(self) -> list[models.User]:
         return self.db.execute(select(models.User)).scalars().all()
 
+    def _update_location(self,
+                         user_object: models.User,
+                         location: dict[str, str]):
+        # location rows are unique with regards to city/country
+        location_in_db = \
+            self.db.execute(
+                select(models.Location).
+                    where(models.Location.city == location['city']).
+                    where(models.Location.country == location['country'])). \
+                scalar_one_or_none()
+
+        if not location_in_db:
+            location_in_db = models.Location(**location)
+            self.db.add(location_in_db)
+
+        user_object.location = location_in_db
+
     def update_user(
             self,
             user_object: models.User,
             user: schemas.UserUpdate) -> models.User:
-        # TODO think of a way to update photos EZ
         for k, v in user.dict(exclude_unset=True).items():
-            setattr(user_object, k, v)
+            if k == 'location':
+                self._update_location(user_object, v)
+            else:
+                setattr(user_object, k, v)
         self.db.commit()
         self.db.refresh(user_object)
         return user_object
@@ -90,7 +109,6 @@ class UserService:
                 created_at=time.time_ns()
             ).dict(),
             settings.SWIPE_SECRET_KEY, algorithm=ALGORITHMS.HS256)
-
         user_object.auth_info.access_token = access_token
         self.db.commit()
         return access_token
