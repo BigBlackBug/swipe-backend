@@ -3,33 +3,36 @@ import os
 import secrets
 import sys
 import time
-from typing import Dict, Generator
+from typing import Generator
 
 import docker
 import pytest
 import sqlalchemy.event
+from aioredis import Redis
 from docker.models.containers import Container
-from fastapi.testclient import TestClient
+from fakeredis._aioredis2 import FakeRedis
+from httpx import AsyncClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 
 import main
+import swipe.dependencies
 from settings import settings
-from swipe import database
 from swipe.database import ModelBase
-from swipe.users import schemas
+from swipe.users import schemas, models
 from swipe.users.enums import AuthProvider
-
-default_test_user = schemas.AuthenticationIn(
-    auth_provider=AuthProvider.GOOGLE,
-    provider_token=secrets.token_urlsafe(16),
-    provider_user_id=secrets.token_urlsafe(16))
+from swipe.users.services import UserService, RedisService
 
 logging.basicConfig(stream=sys.stderr,
                     format="[%(asctime)s %(levelname)s|%(processName)s] "
                            "%(name)s %(message)s",
                     level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+default_user_payload = schemas.AuthenticationIn(
+    auth_provider=AuthProvider.GOOGLE,
+    provider_token=secrets.token_urlsafe(16),
+    provider_user_id=secrets.token_urlsafe(16))
 
 
 @pytest.fixture(scope='session')
@@ -82,6 +85,13 @@ def test_app():
 
 
 @pytest.fixture
+async def fake_redis():
+    redis = FakeRedis()
+    yield redis
+    await redis.close()
+
+
+@pytest.fixture
 def session(db_setup) -> Generator:
     logger.info("Starting a database session")
     engine, SessionClass = db_setup
@@ -111,21 +121,45 @@ def session(db_setup) -> Generator:
 
 
 @pytest.fixture
-def client(session, test_app) -> Generator:
-    def test_database():
-        yield session
-
-    # database.db is a dependency used by the app
-    test_app.dependency_overrides[database.db] = test_database
-    # base_url is mandatory because starlette devs can be dumb sometimes
-    yield TestClient(test_app, base_url='http://localhost')
-    del test_app.dependency_overrides[database.db]
+def anyio_backend():
+    # we don't need trio
+    return 'asyncio'
 
 
 @pytest.fixture
-def test_user_auth_headers(client: TestClient) -> Dict[str, str]:
-    resp = client.post(f"{settings.API_V1_PREFIX}/auth",
-                       json=default_test_user.dict())
-    assert resp.status_code == 200 or resp.status_code == 201
-    token = resp.json()['access_token']
+def client(session, fake_redis, test_app) -> Generator:
+    def test_database():
+        yield session
+
+    def patched_redis():
+        yield fake_redis
+
+    # database.db is a dependency used by the app
+    test_app.dependency_overrides[swipe.dependencies.db] = test_database
+    test_app.dependency_overrides[swipe.dependencies.redis] = patched_redis
+    # base_url is mandatory because starlette devs can be dumb sometimes
+    yield AsyncClient(app=test_app, base_url='http://localhost')
+    del test_app.dependency_overrides[swipe.dependencies.db]
+    del test_app.dependency_overrides[swipe.dependencies.redis]
+
+
+@pytest.fixture
+def default_user(user_service: UserService) -> models.User:
+    return user_service.create_user(default_user_payload)
+
+
+@pytest.fixture
+def user_service(session: Session) -> UserService:
+    return UserService(session)
+
+
+@pytest.fixture
+def redis_service(fake_redis: Redis) -> RedisService:
+    return RedisService(fake_redis)
+
+
+@pytest.fixture
+def default_user_auth_headers(
+        user_service: UserService, default_user: models.User) -> dict[str, str]:
+    token = user_service.create_access_token(default_user, default_user_payload)
     return {'Authorization': f'Bearer {token}'}

@@ -4,6 +4,15 @@ from typing import Any, Dict, Optional
 from pydantic import BaseSettings, PostgresDsn, validator
 
 
+class Constants(BaseSettings):
+    FREE_SWIPES_PER_TIME_PERIOD = 50
+    # TODO change in production
+    # FREE_SWIPES_COOLDOWN_SEC = 30 * 60
+    FREE_SWIPES_COOLDOWN_SEC = 10
+
+    FREE_SWIPES_REDIS_PREFIX = f'free_swipes_cooldown_'
+
+
 class Settings(BaseSettings):
     API_V1_PREFIX: str = "/v1"
     SWIPE_SECRET_KEY: str
@@ -17,6 +26,8 @@ class Settings(BaseSettings):
     # TODO debug mode
     ENABLE_SQL_ECHO: Optional[bool] = True
     ENABLE_WEB_SERVER_AUTORELOAD: Optional[bool] = False
+
+    REDIS_URL: str
 
     @validator("DATABASE_URL")
     def fix_database_uri_for_heroku(
@@ -32,3 +43,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+constants = Constants()

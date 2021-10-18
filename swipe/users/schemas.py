@@ -45,10 +45,12 @@ class UserOut(UserBase):
     photos: list[str] = []
     photo_urls: Optional[list[str]] = []
 
-    rating: int
-    is_premium: bool
     date_of_birth: Optional[datetime.date] = None
     zodiac_sign: Optional[ZodiacSign] = None
+
+    is_premium: bool
+    rating: int
+    swipes: int
 
     @classmethod
     def patched_from_orm(cls: UserOut, obj: Any) -> UserOut:

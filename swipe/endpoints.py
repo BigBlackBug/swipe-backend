@@ -6,7 +6,7 @@ from starlette.responses import Response
 
 from settings import settings
 from swipe.users import schemas
-from swipe.users.services import UserService
+from swipe.users.services import UserService, RedisService
 
 router = APIRouter(prefix=f'{settings.API_V1_PREFIX}', tags=['misc'])
 logger = logging.getLogger(__name__)
@@ -26,7 +26,8 @@ logger = logging.getLogger(__name__)
     })
 async def authenticate_user(auth_payload: schemas.AuthenticationIn,
                             response: Response,
-                            user_service: UserService = Depends()):
+                            user_service: UserService = Depends(),
+                            redis_service: RedisService = Depends()):
     """
     Returns a jwt access token either for an existing user
     or for a new one, in case no match has been found for the supplied
@@ -42,8 +43,6 @@ async def authenticate_user(auth_payload: schemas.AuthenticationIn,
         new_token = user_service.create_access_token(user, auth_payload)
 
         response.status_code = status.HTTP_200_OK
-        return schemas.AuthenticationOut(
-            user_id=user.id, access_token=new_token)
     else:
         logger.info(
             f"Unable to find a user id:'{auth_payload.provider_user_id}' "
@@ -52,5 +51,7 @@ async def authenticate_user(auth_payload: schemas.AuthenticationIn,
         new_token = user_service.create_access_token(user, auth_payload)
 
         response.status_code = status.HTTP_201_CREATED
-        return schemas.AuthenticationOut(
-            user_id=user.id, access_token=new_token)
+
+    await redis_service.reset_swipe_reap_timestamp(user)
+    return schemas.AuthenticationOut(
+        user_id=user.id, access_token=new_token)

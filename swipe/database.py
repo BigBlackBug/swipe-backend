@@ -1,11 +1,7 @@
-import logging
-
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from sqlalchemy.orm import sessionmaker, declarative_base
 
 from settings import settings
-
-logging = logging.getLogger(__name__)
 
 # https://docs.sqlalchemy.org/en/14/core/pooling.html
 # maintains a connection pool
@@ -19,12 +15,3 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False,
                             future=True, bind=engine)
 
 ModelBase = declarative_base()
-
-
-def db() -> Session:
-    logging.info(f'Connecting to a database@{settings.DATABASE_URL}')
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()

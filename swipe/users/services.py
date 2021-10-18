@@ -3,20 +3,52 @@ import uuid
 from typing import Optional
 from uuid import UUID
 
+from aioredis import Redis
 from fastapi import Depends, UploadFile
 from jose import jwt
 from jose.constants import ALGORITHMS
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-import swipe.database
-from settings import settings
+import swipe.dependencies
+from settings import settings, constants
 from swipe.storage import CloudStorage
 from swipe.users import schemas, models
 
 
+class RedisService:
+    def __init__(self,
+                 redis: Redis = Depends(swipe.dependencies.redis)):
+        self.redis = redis
+
+    async def reset_swipe_reap_timestamp(
+            self, user_object: models.User) -> int:
+        """
+        Sets the timestamp for when the free swipes can be reaped
+        for the specified user
+
+        :param user_object:
+        :return: new timestamp
+        """
+        reap_timestamp = int(time.time() + constants.FREE_SWIPES_COOLDOWN_SEC)
+        await self.redis.set(
+            f'{constants.FREE_SWIPES_REDIS_PREFIX}{user_object.id}',
+            reap_timestamp)
+        return reap_timestamp
+
+    async def get_swipe_reap_timestamp(self, user_object: models.User) \
+            -> Optional[int]:
+        """
+        Returns the timestamp for when the free swipes can be reaped
+        """
+        reap_timestamp = await self.redis.get(
+            f'{constants.FREE_SWIPES_REDIS_PREFIX}{user_object.id}')
+        return int(reap_timestamp) if reap_timestamp else None
+
+
 class UserService:
-    def __init__(self, db: Session = Depends(swipe.database.db)):
+    def __init__(self,
+                 db: Session = Depends(swipe.dependencies.db)):
         self.db = db
         self._storage = CloudStorage()
 
@@ -32,7 +64,7 @@ class UserService:
         self.db.refresh(user_object)
         return user_object
 
-    def get_user(self, user_id: UUID) -> models.User:
+    def get_user(self, user_id: UUID) -> Optional[models.User]:
         return self.db.execute(
             select(models.User).where(models.User.id == user_id)) \
             .scalar_one_or_none()
@@ -112,3 +144,12 @@ class UserService:
         user_object.auth_info.access_token = access_token
         self.db.commit()
         return access_token
+
+    def add_swipes(self, user_object: models.User, swipe_number: int):
+        if swipe_number < 0:
+            raise ValueError("swipe_number must be positive")
+
+        user_object.swipes += swipe_number
+        self.db.commit()
+        self.db.refresh(user_object)
+        return user_object

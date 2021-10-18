@@ -44,11 +44,12 @@ class User(ModelBase):
     location = relationship('Location', uselist=False)
     location_id = Column(UUID(as_uuid=True), ForeignKey('location.id'))
 
-    rating = Column(Integer, nullable=False, default=0)
-
     auth_info_id = Column(UUID(as_uuid=True), ForeignKey('auth_info.id'))
     auth_info = relationship('AuthInfo', back_populates='user', uselist=False)
 
+    # variables
+    rating = Column(Integer, nullable=False, default=0)
+    swipes = Column(Integer, nullable=False, default=0)
     is_premium = Column(Boolean, nullable=False, default=False)
 
 

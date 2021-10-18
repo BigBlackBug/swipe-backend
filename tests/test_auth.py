@@ -1,13 +1,16 @@
-from requests import Response
+import pytest
+from aioredis import Redis
+from httpx import AsyncClient, Response
 from sqlalchemy.orm import Session
-from starlette.testclient import TestClient
 
-from settings import settings
-from swipe.users import models, enums
+from settings import settings, constants
+from swipe.users import models
 
 
-def test_auth_new_user(client: TestClient) -> None:
-    response: Response = client.post(
+@pytest.mark.anyio
+async def test_auth_new_user(client: AsyncClient,
+                             fake_redis: Redis) -> None:
+    response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/auth", json={
             'auth_provider': 'google',
             'provider_token': 'supertoken',
@@ -18,22 +21,29 @@ def test_auth_new_user(client: TestClient) -> None:
     assert response.json().get('access_token')
     assert response.json().get('user_id')
 
+    # free swipes cache is set
+    user_id = response.json().get('user_id')
+    assert await fake_redis.get(
+        f'{constants.FREE_SWIPES_REDIS_PREFIX}{user_id}')
 
-def test_auth_existing_user(client: TestClient, session: Session) -> None:
-    auth_info = models.AuthInfo(auth_provider=enums.AuthProvider.SNAPCHAT,
-                                provider_token='token',
-                                provider_user_id='userid')
-    user = models.User(auth_info=auth_info)
-    session.add(user)
-    session.commit()
 
-    response: Response = client.post(
+@pytest.mark.anyio
+async def test_auth_existing_user(client: AsyncClient,
+                                  session: Session,
+                                  fake_redis: Redis,
+                                  default_user: models.User) -> None:
+    response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/auth", json={
-            'auth_provider': 'snapchat',
-            'provider_token': 'token',
-            'provider_user_id': 'userid'
+            'auth_provider': default_user.auth_info.auth_provider,
+            'provider_token': default_user.auth_info.provider_token,
+            'provider_user_id': default_user.auth_info.provider_user_id
         }
     )
     assert response.status_code == 200
     assert response.json().get('access_token')
     assert response.json().get('user_id')
+
+    # free swipes cache is set
+    user_id = response.json().get('user_id')
+    assert await fake_redis.get(
+        f'{constants.FREE_SWIPES_REDIS_PREFIX}{user_id}')
