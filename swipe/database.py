@@ -1,7 +1,7 @@
 import logging
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker, declarative_base, Session
 
 from settings import settings
 
@@ -21,7 +21,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False,
 ModelBase = declarative_base()
 
 
-def db():
+def db() -> Session:
     logging.info(f'Connecting to a database@{settings.DATABASE_URL}')
     session = SessionLocal()
     try:
