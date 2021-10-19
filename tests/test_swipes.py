@@ -15,22 +15,14 @@ async def test_free_swipes_can_be_reaped(
         default_user: models.User,
         default_user_auth_headers: dict[str, str]):
     """
-    Test must succeed when the reap time is behind current time
+    Test must succeed when there is no key
     """
-    time_in_the_past = datetime.datetime.now() - datetime.timedelta(hours=1)
-    reap_key = f'{constants.FREE_SWIPES_REDIS_PREFIX}{default_user.id}'
-    await fake_redis.set(reap_key, int(time_in_the_past.timestamp()))
-
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/me/swipes/reap",
         headers=default_user_auth_headers
     )
     assert response.status_code == 200
     assert response.json()['swipes'] == default_user.swipes
-    assert response.json()['reap_timestamp'] > time.time()
-
-    assert int(await fake_redis.get(reap_key)) \
-           == response.json()['reap_timestamp']
 
 
 @pytest.mark.anyio
@@ -60,21 +52,14 @@ async def test_disallow_double_reaping(
     """
     Test must succeed when the second reap call fails
     """
-    time_in_the_past = datetime.datetime.now() - datetime.timedelta(hours=1)
-    reap_key = f'{constants.FREE_SWIPES_REDIS_PREFIX}{default_user.id}'
-    await fake_redis.set(reap_key, int(time_in_the_past.timestamp()))
-
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/me/swipes/reap",
         headers=default_user_auth_headers
     )
     assert response.status_code == 200
     response: Response = await client.post(
-        f"{settings.API_V1_PREFIX}/me/swipes/reap", json={
-            'auth_provider': default_user.auth_info.auth_provider,
-            'provider_token': default_user.auth_info.provider_token,
-            'provider_user_id': default_user.auth_info.provider_user_id
-        }, headers=default_user_auth_headers
+        f"{settings.API_V1_PREFIX}/me/swipes/reap",
+        headers=default_user_auth_headers
     )
     assert response.status_code == 409
 
@@ -93,7 +78,7 @@ async def test_add_swipes(
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/me/swipes",
         json={
-            'swipe_number': swipes_added,
+            'swipes': swipes_added,
             'reason': 'whatever'
         },
         headers=default_user_auth_headers

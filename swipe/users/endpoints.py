@@ -127,12 +127,8 @@ async def delete_photo(
 async def get_free_swipe_status(
         current_user: User = Depends(security.get_current_user),
         redis_service: RedisService = Depends()):
-    reap_timestamp = await redis_service.get_swipe_reap_timestamp(current_user)
-    if not reap_timestamp:
-        logger.warning(f"No reap timestamp found. Resetting the timestamp")
-        reap_timestamp = await redis_service.reset_swipe_reap_timestamp(
-            current_user)
-
+    reap_timestamp = \
+        await redis_service.get_swipe_reap_timestamp(current_user) or -1
     return {
         'reap_timestamp': reap_timestamp
     }
@@ -162,24 +158,19 @@ async def get_free_swipes(
         current_user: User = Depends(security.get_current_user),
         user_service: UserService = Depends(UserService),
         redis_service: RedisService = Depends()):
-    reap_timestamp: int = await redis_service.get_swipe_reap_timestamp(
-        current_user)
+    reap_timestamp: int = \
+        await redis_service.get_swipe_reap_timestamp(current_user)
 
     if reap_timestamp:
-        if (diff := reap_timestamp - int(time.time())) > 0:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Free swipes will be available "
-                       f"in {diff} seconds")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Free swipes will be available "
+                   f"in {reap_timestamp - int(time.time())} seconds")
 
-        current_user = user_service.add_swipes(
-            current_user, constants.FREE_SWIPES_PER_TIME_PERIOD)
-        reap_timestamp = \
-            await redis_service.reset_swipe_reap_timestamp(current_user)
-    else:
-        logger.warning(f"No reap timestamp found. Resetting the timestamp")
-        reap_timestamp = await redis_service.reset_swipe_reap_timestamp(
-            current_user)
+    current_user = user_service.add_swipes(
+        current_user, constants.FREE_SWIPES_PER_TIME_PERIOD)
+    reap_timestamp = \
+        await redis_service.reset_swipe_reap_timestamp(current_user)
 
     return {
         'swipes': current_user.swipes,

@@ -19,8 +19,8 @@ import main
 import swipe.dependencies
 from settings import settings
 from swipe.database import ModelBase
-from swipe.users import schemas, models
-from swipe.users.enums import AuthProvider
+from swipe.users import models
+from swipe.users.schemas import AuthenticationIn
 from swipe.users.services import UserService, RedisService
 
 logging.basicConfig(stream=sys.stderr,
@@ -28,11 +28,6 @@ logging.basicConfig(stream=sys.stderr,
                            "%(name)s %(message)s",
                     level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-
-default_user_payload = schemas.AuthenticationIn(
-    auth_provider=AuthProvider.GOOGLE,
-    provider_token=secrets.token_urlsafe(16),
-    provider_user_id=secrets.token_urlsafe(16))
 
 
 @pytest.fixture(scope='session')
@@ -144,8 +139,9 @@ def client(session, fake_redis, test_app) -> Generator:
 
 
 @pytest.fixture
-def default_user(user_service: UserService) -> models.User:
-    return user_service.create_user(default_user_payload)
+def default_user(user_service: UserService,
+                 session: Session) -> models.User:
+    return user_service.generate_random_user()
 
 
 @pytest.fixture
@@ -161,5 +157,10 @@ def redis_service(fake_redis: Redis) -> RedisService:
 @pytest.fixture
 def default_user_auth_headers(
         user_service: UserService, default_user: models.User) -> dict[str, str]:
-    token = user_service.create_access_token(default_user, default_user_payload)
+    token = user_service.create_access_token(
+        default_user, AuthenticationIn(
+            auth_provider=default_user.auth_info.auth_provider,
+            provider_token=default_user.auth_info.provider_token,
+            provider_user_id=default_user.auth_info.provider_user_id,
+        ))
     return {'Authorization': f'Bearer {token}'}

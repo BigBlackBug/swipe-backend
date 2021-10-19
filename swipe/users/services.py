@@ -31,9 +31,10 @@ class RedisService:
         :return: new timestamp
         """
         reap_timestamp = int(time.time() + constants.FREE_SWIPES_COOLDOWN_SEC)
-        await self.redis.set(
+        await self.redis.setex(
             f'{constants.FREE_SWIPES_REDIS_PREFIX}{user_object.id}',
-            reap_timestamp)
+            time=constants.FREE_SWIPES_COOLDOWN_SEC,
+            value=reap_timestamp)
         return reap_timestamp
 
     async def get_swipe_reap_timestamp(self, user_object: models.User) \
@@ -63,6 +64,28 @@ class UserService:
         self.db.commit()
         self.db.refresh(user_object)
         return user_object
+
+    def generate_random_user(self):
+        new_user = self.create_user(AuthenticationIn(
+            auth_provider=AuthProvider.SNAPCHAT,
+            provider_token=secrets.token_urlsafe(16),
+            provider_user_id=secrets.token_urlsafe(16)))
+        self._update_location(new_user, {
+            'city': 'Moscow',
+            'country': 'Russia',
+            'flag': '🇷🇺'
+        })
+        birth_date = datetime.date.today().replace(
+            year=random.randint(1985, 2003),
+            month=random.randint(1, 12),
+            day=random.randint(1, 25))
+        new_user.date_of_birth = birth_date
+        new_user.zodiac_sign = ZodiacSign.from_date(birth_date)
+        new_user.rating = random.randint(5, 150)
+
+        self.db.add(new_user)
+        self.db.commit()
+        return new_user
 
     def get_user(self, user_id: UUID) -> Optional[models.User]:
         return self.db.execute(
