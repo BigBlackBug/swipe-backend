@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, validator, root_validator
 
 from swipe.storage import CloudStorage
 from .enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
-    RecurrenceRate
+    RecurrenceRate, NotificationTypes
 
 
 class LocationSchema(BaseModel):
@@ -38,6 +38,7 @@ class UserBase(BaseModel):
     snapchat_profile: Optional[str] = None
 
     location: Optional[LocationSchema] = None
+    enabled_notifications: Optional[NotificationTypes] = None
 
 
 class UserOut(UserBase):

@@ -196,7 +196,6 @@ async def add_swipes(
         current_user: User = Depends(security.get_current_user),
         user_service: UserService = Depends(UserService)
 ):
-    # TODO validation
     user_service.add_swipes(current_user, swipes)
     logger.info(f'{swipes} swipes have been added. Reason {reason}')
     return Response(status_code=status.HTTP_201_CREATED)

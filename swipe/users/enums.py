@@ -33,6 +33,11 @@ class RecurrenceRate(str, enum.Enum):
     REGULARLY = 'regularly'
 
 
+class NotificationTypes(str, enum.Enum):
+    FRIENDS_MESSAGES = 'friends_messages'
+    ALL = 'all'
+
+
 class ZodiacSign(str, enum.Enum):
     ARIES = ('овен', ((20, 3), (19, 4)))
     TAURUS = ('телец', ((20, 4), (20, 5)))

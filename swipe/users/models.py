@@ -7,7 +7,7 @@ from sqlalchemy.orm import relationship
 
 from swipe.database import ModelBase
 from swipe.users.enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
-    RecurrenceRate
+    RecurrenceRate, NotificationTypes
 
 
 # TODO add a shit ton of indices
@@ -37,6 +37,8 @@ class User(ModelBase):
     interests = Column(ARRAY(Enum(UserInterests)), nullable=False, default=[])
     photos = Column(ARRAY(String(50)), nullable=False, default=[])
 
+    enabled_notifications = Column(Enum(NotificationTypes), nullable=False,
+                                   default=NotificationTypes.FRIENDS_MESSAGES)
     instagram_profile = Column(String)
     tiktok_profile = Column(String)
     snapchat_profile = Column(String)
