@@ -133,7 +133,7 @@ class JWTPayload(AuthenticationIn):
 
 class SortType(str, enum.Enum):
     RATING = 'rating'
-    AGE_DIFF = 'age_diff'
+    AGE_DIFFERENCE = 'age_difference'
 
 
 class FilterBody(BaseModel):
@@ -144,4 +144,4 @@ class FilterBody(BaseModel):
     ignore_users: Optional[list[UUID]] = []
     max_age_difference: Optional[int] = 5
 
-    sort: Optional[SortType] = SortType.AGE_DIFF
+    sort: Optional[SortType] = SortType.AGE_DIFFERENCE

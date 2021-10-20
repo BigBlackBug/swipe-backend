@@ -132,7 +132,6 @@ class UserService:
         :param ignore_users: user ids to exclude from query
         :return:
         """
-        # TODO fetch_restricted: bool = False
         ignore_users = ignore_users if ignore_users else []
         city_clause = True if not city else Location.city == city
         gender_clause = True if not gender else User.gender == gender
@@ -148,7 +147,8 @@ class UserService:
             where(gender_clause). \
             where(User.date_of_birth.between(min_age, max_age)). \
             where(User.id != current_user.id). \
-            where(~User.id.in_(ignore_users))
+            where(~User.id.in_(ignore_users)). \
+            where(~User.blocked_by.any(id=current_user.id))
         return self.db.execute(query).scalars().all()
 
     def get_user(self, user_id: UUID) -> Optional[User]:

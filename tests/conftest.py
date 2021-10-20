@@ -141,7 +141,10 @@ def client(session, fake_redis, test_app) -> Generator:
 @pytest.fixture
 def default_user(user_service: UserService,
                  session: Session) -> models.User:
-    return user_service.generate_random_user()
+    new_user = user_service.generate_random_user()
+    new_user.name = 'default_user'
+    session.commit()
+    return new_user
 
 
 @pytest.fixture

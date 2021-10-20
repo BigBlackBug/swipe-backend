@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import uuid
 
 from sqlalchemy import Column, String, Boolean, Integer, Enum, ARRAY, \
-    ForeignKey, Date, UniqueConstraint, select
+    ForeignKey, Date, UniqueConstraint, select, Table
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, object_session
 
@@ -11,8 +13,16 @@ from swipe.users.enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
 
 IDList = list[UUID]
 
-
 # TODO add a shit ton of indices
+blacklist_table = Table(
+    "blacklist",
+    ModelBase.metadata,
+    Column("blocked_by_id", UUID(as_uuid=True),
+           ForeignKey("users.id"), primary_key=True),
+    Column("blocked_user_id", UUID(as_uuid=True),
+           ForeignKey("users.id"), primary_key=True),
+)
+
 
 class User(ModelBase):
     __tablename__ = 'users'
@@ -56,6 +66,13 @@ class User(ModelBase):
     swipes = Column(Integer, nullable=False, default=0)
     is_premium = Column(Boolean, nullable=False, default=False)
 
+    blacklist = relationship(
+        "User",
+        secondary=blacklist_table,
+        backref="blocked_by",
+        primaryjoin=id == blacklist_table.c.blocked_by_id,  # noqa
+        secondaryjoin=id == blacklist_table.c.blocked_user_id)  # noqa
+
     def set_location(self, location: dict[str, str]):
         # location rows are unique with regards to city/country
         session = object_session(self)
@@ -71,6 +88,10 @@ class User(ModelBase):
             session.add(location_in_db)
 
         self.location = location_in_db
+
+    def block_user(self, target_user: User):
+        if target_user not in self.blacklist:
+            self.blacklist.append(target_user)
 
     def __str__(self):
         return f'User {self.id}, name: {self.name}'

@@ -91,7 +91,7 @@ async def test_user_fetch_offline_limit_sort_age(
         json={
             'online': False,
             'limit': 3,
-            'sort': 'age_diff'
+            'sort': 'age_difference'
         }
     )
 
@@ -231,3 +231,76 @@ async def test_user_fetch_online_city(
     resp_data = response.json()
     assert {user['id'] for user in resp_data} == {str(user_3.id),
                                                   str(user_4.id)}
+
+
+@pytest.mark.anyio
+async def test_user_fetch_blacklist(
+        client: AsyncClient,
+        default_user: models.User,
+        user_service: UserService,
+        redis_service: RedisService,
+        session: Session,
+        default_user_auth_headers: dict[str, str]):
+    default_user.date_of_birth = datetime.date.today().replace(year=2000)
+
+    # --------------------------------------------------------------------------
+    user_1 = user_service.generate_random_user()
+    user_1.name = 'user1'
+    user_1.date_of_birth = datetime.date.today().replace(year=2000)
+    user_1.gender = Gender.FEMALE
+    user_1.set_location({
+        'country': 'Russia', 'city': 'Moscow', 'flag': 'F'
+    })
+
+    user_2 = user_service.generate_random_user()
+    user_2.name = 'user2'
+    user_2.date_of_birth = datetime.date.today().replace(year=2000)
+    user_2.gender = Gender.FEMALE
+    user_2.set_location({
+        'country': 'Russia', 'city': 'Moscow', 'flag': 'F'
+    })
+
+    user_3 = user_service.generate_random_user()
+    user_3.name = 'user3'
+    user_3.date_of_birth = datetime.date.today().replace(year=2001)
+    user_3.gender = Gender.MALE
+    user_3.set_location({
+        'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
+    })
+
+    user_4 = user_service.generate_random_user()
+    user_4.name = 'user4'
+    user_4.date_of_birth = datetime.date.today().replace(year=2005)
+    user_4.gender = Gender.MALE
+    user_4.set_location({
+        'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
+    })
+
+    user_5 = user_service.generate_random_user()
+    user_5.name = 'user5'
+    user_5.date_of_birth = datetime.date.today().replace(year=2002)
+    user_5.gender = Gender.ATTACK_HELICOPTER
+    user_5.set_location({
+        'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
+    })
+
+    default_user.block_user(user_1)
+    default_user.block_user(user_2)
+    default_user.block_user(user_3)
+
+    session.commit()
+    # --------------------------------------------------------------------------
+
+    # offline
+    response: Response = await client.post(
+        f"{settings.API_V1_PREFIX}/users/fetch",
+        headers=default_user_auth_headers,
+        json={
+            'online': False
+        }
+    )
+
+    assert response.status_code == 200
+    resp_data = response.json()
+    assert {user['id'] for user in resp_data} == {str(user_4.id),
+                                                  str(user_5.id)}

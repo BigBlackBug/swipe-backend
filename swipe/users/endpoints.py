@@ -45,23 +45,19 @@ async def fetch_list_of_users(
     # I need to use a set here (linear searching takes a shit ton of time)
     # but I'm afraid adding __hash__ will fuck something up
     collected_user_ids: IDList = []
-    ignored_user_ids = filter_params.ignore_users
+    ignored_user_ids = list(filter_params.ignore_users)
     age_difference = 0
 
     # FEED filtered by same country by default)
     # premium filtered by gender
     # premium filtered by location(whole country/my city)
-    while len(collected_user_ids) <= filter_params.limit \
-            and age_difference <= filter_params.max_age_difference:
+    while len(collected_user_ids) <= filter_params.limit:
         # TODO cache similar requests?
         current_user_ids = user_service.find_user_ids(
             current_user, gender=filter_params.gender,
             age_difference=age_difference,
             city=filter_params.city,
             ignore_users=ignored_user_ids)
-        if collected_user_ids and not current_user_ids:
-            # exiting when there is at least something
-            break
 
         if filter_params.online:
             current_user_ids = await redis_service.filter_online_users(
@@ -69,11 +65,15 @@ async def fetch_list_of_users(
 
         collected_user_ids.extend(current_user_ids)
         ignored_user_ids.extend(current_user_ids)
+
+        if age_difference >= filter_params.max_age_difference:
+            break
+
         # increasing search boundaries
-        age_difference += 1
+        age_difference += 2
 
     collected_users = user_service.get_users(user_ids=collected_user_ids)
-    if filter_params.sort == SortType.AGE_DIFF:
+    if filter_params.sort == SortType.AGE_DIFFERENCE:
         # online - sort against age difference
         collected_users = sorted(collected_users,
                                  key=lambda user: abs(relativedelta(
