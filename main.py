@@ -36,6 +36,15 @@ async def validation_exception_handler(
     }, status_code=status.HTTP_400_BAD_REQUEST)
 
 
+@fast_api.exception_handler(Exception)
+async def validation_exception_handler(
+        request: Request, exc: Exception):
+    logger.exception("Something wrong", exc_info=sys.exc_info())
+    return JSONResponse({
+        'detail': str(exc)
+    }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 # TODO add operation logging
 # TODO proper logging configuration
 # TODO add current user to context
