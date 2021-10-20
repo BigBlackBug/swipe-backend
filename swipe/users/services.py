@@ -1,9 +1,14 @@
+import datetime
+import logging
+import random
+import secrets
 import time
 import uuid
 from typing import Optional
 from uuid import UUID
 
 from aioredis import Redis
+from dateutil.relativedelta import relativedelta
 from fastapi import Depends, UploadFile
 from jose import jwt
 from jose.constants import ALGORITHMS
@@ -13,7 +18,12 @@ from sqlalchemy.orm import Session
 import swipe.dependencies
 from settings import settings, constants
 from swipe.storage import CloudStorage
-from swipe.users import schemas, models
+from swipe.users import schemas
+from swipe.users.enums import AuthProvider, ZodiacSign, Gender
+from swipe.users.models import IDList, User, AuthInfo, Location
+from swipe.users.schemas import AuthenticationIn
+
+logger = logging.getLogger(__name__)
 
 
 class RedisService:
@@ -22,7 +32,7 @@ class RedisService:
         self.redis = redis
 
     async def reset_swipe_reap_timestamp(
-            self, user_object: models.User) -> int:
+            self, user_object: User) -> int:
         """
         Sets the timestamp for when the free swipes can be reaped
         for the specified user
@@ -37,7 +47,7 @@ class RedisService:
             value=reap_timestamp)
         return reap_timestamp
 
-    async def get_swipe_reap_timestamp(self, user_object: models.User) \
+    async def get_swipe_reap_timestamp(self, user_object: User) \
             -> Optional[int]:
         """
         Returns the timestamp for when the free swipes can be reaped
@@ -45,6 +55,26 @@ class RedisService:
         reap_timestamp = await self.redis.get(
             f'{constants.FREE_SWIPES_REDIS_PREFIX}{user_object.id}')
         return int(reap_timestamp) if reap_timestamp else None
+
+    async def filter_online_users(self, user_ids: IDList) -> IDList:
+        result: IDList = []
+        for user_id in user_ids:
+            is_online = await self.redis.get(
+                f'{constants.ONLINE_USER_PREFIX}{user_id}')
+            if is_online:
+                result.append(user_id)
+        return result
+
+    async def is_online(self, user_id: UUID) -> IDList:
+        return await self.redis.get(
+            f'{constants.ONLINE_USER_PREFIX}{user_id}')
+
+    async def refresh_online_status(
+            self, user: User,
+            ttl: int = constants.ONLINE_USER_COOLDOWN_SEC):
+        await self.redis.setex(
+            f'{constants.ONLINE_USER_PREFIX}{user.id}',
+            time=ttl, value=1)
 
 
 class UserService:
@@ -54,9 +84,9 @@ class UserService:
         self._storage = CloudStorage()
 
     def create_user(self,
-                    user_payload: schemas.AuthenticationIn) -> models.User:
-        auth_info = models.AuthInfo(**user_payload.dict())
-        user_object = models.User()
+                    user_payload: schemas.AuthenticationIn) -> User:
+        auth_info = AuthInfo(**user_payload.dict())
+        user_object = User()
         user_object.auth_info = auth_info
 
         self.db.add(auth_info)
@@ -70,7 +100,7 @@ class UserService:
             auth_provider=AuthProvider.SNAPCHAT,
             provider_token=secrets.token_urlsafe(16),
             provider_user_id=secrets.token_urlsafe(16)))
-        self._update_location(new_user, {
+        new_user.set_location({
             'city': 'Moscow',
             'country': 'Russia',
             'flag': '🇷🇺'
@@ -87,45 +117,64 @@ class UserService:
         self.db.commit()
         return new_user
 
-    def get_user(self, user_id: UUID) -> Optional[models.User]:
+    def find_user_ids(self, current_user: User,
+                      gender: Optional[Gender] = None,
+                      age_difference: int = 0,
+                      city: Optional[str] = None,
+                      ignore_users: Optional[IDList] = None) -> IDList:
+        """
+        Return a list of user ids with regards to supplied filters
+
+        :param current_user:
+        :param gender: ignore if None
+        :param age_difference:
+        :param city: ignore if None
+        :param ignore_users: user ids to exclude from query
+        :return:
+        """
+        # TODO fetch_restricted: bool = False
+        ignore_users = ignore_users if ignore_users else []
+        city_clause = True if not city else Location.city == city
+        gender_clause = True if not gender else User.gender == gender
+        min_age = current_user.date_of_birth - relativedelta(
+            years=age_difference)
+        max_age = current_user.date_of_birth + relativedelta(
+            years=age_difference)
+
+        # all users are filtered by country
+        query = select(User.id).join(User.location). \
+            where(Location.country == current_user.location.country). \
+            where(city_clause). \
+            where(gender_clause). \
+            where(User.date_of_birth.between(min_age, max_age)). \
+            where(User.id != current_user.id). \
+            where(~User.id.in_(ignore_users))
+        return self.db.execute(query).scalars().all()
+
+    def get_user(self, user_id: UUID) -> Optional[User]:
         return self.db.execute(
-            select(models.User).where(models.User.id == user_id)) \
+            select(User).where(User.id == user_id)) \
             .scalar_one_or_none()
 
-    def get_users(self) -> list[models.User]:
-        return self.db.execute(select(models.User)).scalars().all()
-
-    def _update_location(self,
-                         user_object: models.User,
-                         location: dict[str, str]):
-        # location rows are unique with regards to city/country
-        location_in_db = \
-            self.db.execute(
-                select(models.Location).
-                    where(models.Location.city == location['city']).
-                    where(models.Location.country == location['country'])). \
-                scalar_one_or_none()
-
-        if not location_in_db:
-            location_in_db = models.Location(**location)
-            self.db.add(location_in_db)
-
-        user_object.location = location_in_db
+    def get_users(self, user_ids: Optional[IDList] = None) -> list[User]:
+        clause = True if user_ids is None else User.id.in_(user_ids)
+        return self.db.execute(select(User).where(clause)). \
+            scalars().all()
 
     def update_user(
             self,
-            user_object: models.User,
-            user: schemas.UserUpdate) -> models.User:
-        for k, v in user.dict(exclude_unset=True).items():
+            user_object: User,
+            user_update: schemas.UserUpdate) -> User:
+        for k, v in user_update.dict(exclude_unset=True).items():
             if k == 'location':
-                self._update_location(user_object, v)
+                user_object.set_location(v)
             else:
                 setattr(user_object, k, v)
         self.db.commit()
         self.db.refresh(user_object)
         return user_object
 
-    def add_photo(self, user_object: models.User, file: UploadFile):
+    def add_photo(self, user_object: User, file: UploadFile) -> str:
         _, _, extension = file.content_type.partition('/')
         image_id = f'{uuid.uuid4()}.{extension}'
         self._storage.upload_image(image_id, file.file)
@@ -134,7 +183,7 @@ class UserService:
         self.db.commit()
         return image_id
 
-    def delete_photo(self, user_object: models.User, photo_id: str):
+    def delete_photo(self, user_object: User, photo_id: str):
         new_list = list(user_object.photos)
         new_list.remove(photo_id)
         user_object.photos = new_list
@@ -144,18 +193,18 @@ class UserService:
 
     def find_user_by_auth(
             self,
-            user_payload: schemas.AuthenticationIn) -> Optional[models.User]:
+            user_payload: schemas.AuthenticationIn) -> Optional[User]:
         auth_info = self.db.execute(
-            select(models.AuthInfo)
-                .where(models.AuthInfo.auth_provider
+            select(AuthInfo)
+                .where(AuthInfo.auth_provider
                        == user_payload.auth_provider)
-                .where(models.AuthInfo.provider_user_id
+                .where(AuthInfo.provider_user_id
                        == user_payload.provider_user_id)) \
             .scalar_one_or_none()
         # TODO check queries for extra joins
         return auth_info.user if auth_info else None
 
-    def create_access_token(self, user_object: models.User,
+    def create_access_token(self, user_object: User,
                             payload: schemas.AuthenticationIn) -> str:
         access_token = jwt.encode(
             schemas.JWTPayload(
@@ -168,9 +217,10 @@ class UserService:
         self.db.commit()
         return access_token
 
-    def add_swipes(self, user_object: models.User, swipe_number: int):
+    def add_swipes(self, user_object: User, swipe_number: int) -> User:
         if swipe_number < 0:
             raise ValueError("swipe_number must be positive")
+        logger.info(f"Adding {swipe_number} swipes")
 
         user_object.swipes += swipe_number
         self.db.commit()

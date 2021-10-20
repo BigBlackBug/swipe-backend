@@ -1,6 +1,5 @@
 import logging
 import os
-import secrets
 import sys
 import time
 from typing import Generator
@@ -40,6 +39,7 @@ def db_setup(request):
     if not containers:
         pg_container: Container = client.containers.run(
             'postgres:latest', name='test_pg', detach=True,
+            auto_remove=True,
             ports={'5432/tcp': 5432}, environment={
                 'POSTGRES_PASSWORD': 'postgres'
             })

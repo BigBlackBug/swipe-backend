@@ -10,6 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
+from sqlalchemy.dialects import postgresql
+
 revision = '986e52eaf84f'
 down_revision = 'e52bc1909b94'
 branch_labels = None

@@ -8,12 +8,13 @@ from settings import settings
 from swipe.users import schemas
 from swipe.users.services import UserService, RedisService
 
-router = APIRouter(prefix=f'{settings.API_V1_PREFIX}', tags=['misc'])
+router = APIRouter(prefix=f'{settings.API_V1_PREFIX}')
 logger = logging.getLogger(__name__)
 
 
 @router.post(
     "/auth",
+    tags=['auth'],
     responses={
         200: {
             "description": "An existing user has been authenticated",
@@ -55,3 +56,10 @@ async def authenticate_user(auth_payload: schemas.AuthenticationIn,
     await redis_service.reset_swipe_reap_timestamp(user)
     return schemas.AuthenticationOut(
         user_id=user.id, access_token=new_token)
+
+
+@router.get('/generate_user',
+            tags=['misc'],
+            response_model=schemas.UserOut)
+async def generate_random_user(user_service: UserService = Depends()):
+    return user_service.generate_random_user()

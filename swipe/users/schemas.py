@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import enum
 from typing import Optional, Any
 from uuid import UUID
 
@@ -39,6 +40,32 @@ class UserBase(BaseModel):
 
     location: Optional[LocationSchema] = None
     enabled_notifications: Optional[NotificationTypes] = None
+
+
+class UserOutSmall(BaseModel):
+    id: UUID
+    name: str
+    date_of_birth: datetime.date
+    location: LocationSchema
+    photos: Optional[list[str]] = []
+    photo_urls: Optional[list[str]] = []
+
+    @classmethod
+    def patched_from_orm(cls: UserOut, obj: Any) -> UserOut:
+        schema_obj = cls.from_orm(obj)
+        # TODO make it a dependency or smth
+        storage = CloudStorage()
+        patched_photos = []
+        for photo_id in schema_obj.photos:
+            # TODO add a url shortener cuz these urls are freaking looong
+            # and include auth info
+            patched_photos.append(storage.get_image_url(photo_id))
+        schema_obj.photo_urls = patched_photos
+        return schema_obj
+
+    class Config:
+        # allows Pydantic to read orm models and not just dicts
+        orm_mode = True
 
 
 class UserOut(UserBase):
@@ -102,3 +129,19 @@ class JWTPayload(AuthenticationIn):
     def cast_user_id(cls, value: UUID,
                      values: dict[str, Any]) -> Any:
         return str(value)
+
+
+class SortType(str, enum.Enum):
+    RATING = 'rating'
+    AGE_DIFF = 'age_diff'
+
+
+class FilterBody(BaseModel):
+    limit: Optional[int] = 15
+    gender: Optional[Gender] = None
+    city: Optional[str] = None
+    online: Optional[bool] = True
+    ignore_users: Optional[list[UUID]] = []
+    max_age_difference: Optional[int] = 5
+
+    sort: Optional[SortType] = SortType.AGE_DIFF

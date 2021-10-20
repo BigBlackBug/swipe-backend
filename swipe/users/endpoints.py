@@ -3,6 +3,7 @@ import re
 import time
 from uuid import UUID
 
+from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, Body, HTTPException, UploadFile, File
 from starlette import status
 from starlette.responses import Response
@@ -10,7 +11,8 @@ from starlette.responses import Response
 from settings import settings, constants
 from swipe import security
 from . import schemas
-from .models import User
+from .models import User, IDList
+from .schemas import SortType
 from .services import UserService, RedisService
 
 IMAGE_CONTENT_TYPE_REGEXP = 'image/(png|jpe?g)'
@@ -27,6 +29,61 @@ me_router = APIRouter(
 )
 
 logger = logging.getLogger(__name__)
+
+
+@users_router.post(
+    '/fetch',
+    name='Fetch users according to the filter',
+    description='All fields are optional. Check default values',
+    response_model=list[schemas.UserOutSmall])
+async def fetch_list_of_users(
+        filter_params: schemas.FilterBody = Body(...),
+        user_service: UserService = Depends(),
+        redis_service: RedisService = Depends(),
+        current_user: User = Depends(security.get_current_user)):
+    # TODO how does sqlalchemy check equality?
+    # I need to use a set here (linear searching takes a shit ton of time)
+    # but I'm afraid adding __hash__ will fuck something up
+    collected_user_ids: IDList = []
+    ignored_user_ids = filter_params.ignore_users
+    age_difference = 0
+
+    # FEED filtered by same country by default)
+    # premium filtered by gender
+    # premium filtered by location(whole country/my city)
+    while len(collected_user_ids) <= filter_params.limit \
+            and age_difference <= filter_params.max_age_difference:
+        # TODO cache similar requests?
+        current_user_ids = user_service.find_user_ids(
+            current_user, gender=filter_params.gender,
+            age_difference=age_difference,
+            city=filter_params.city,
+            ignore_users=ignored_user_ids)
+        if collected_user_ids and not current_user_ids:
+            # exiting when there is at least something
+            break
+
+        if filter_params.online:
+            current_user_ids = await redis_service.filter_online_users(
+                current_user_ids)
+
+        collected_user_ids.extend(current_user_ids)
+        ignored_user_ids.extend(current_user_ids)
+        # increasing search boundaries
+        age_difference += 1
+
+    collected_users = user_service.get_users(user_ids=collected_user_ids)
+    if filter_params.sort == SortType.AGE_DIFF:
+        # online - sort against age difference
+        collected_users = sorted(collected_users,
+                                 key=lambda user: abs(relativedelta(
+                                     current_user.date_of_birth,
+                                     user.date_of_birth).years))
+    else:
+        # popular - sort against rating
+        collected_users = sorted(collected_users,
+                                 key=lambda user: user.rating, reverse=True)
+    return collected_users[:filter_params.limit]
 
 
 @users_router.get('/{user_id}',
@@ -111,10 +168,10 @@ async def delete_photo(
 
 @me_router.get(
     "/swipes/status",
-    name='Returns timestamp for when the free swipes can be reaped',
+    name='Returns timestamp for when the free swipes can be reaped.',
     responses={
         200: {
-            'description': '',
+            'description': '-1 in case the swipes can be reaped right now',
             "content": {
                 "application/json": {
                     "example": {
@@ -190,3 +247,14 @@ async def add_swipes(
     user_service.add_swipes(current_user, swipes)
     logger.info(f'{swipes} swipes have been added. Reason {reason}')
     return Response(status_code=status.HTTP_201_CREATED)
+
+
+@me_router.post("/online",
+                name='Refresh the online status',
+                status_code=status.HTTP_204_NO_CONTENT)
+async def refresh_online_status(
+        current_user: User = Depends(security.get_current_user),
+        redis_service: RedisService = Depends()
+):
+    await redis_service.refresh_online_status(current_user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

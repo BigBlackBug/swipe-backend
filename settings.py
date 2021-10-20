@@ -10,7 +10,10 @@ class Constants(BaseSettings):
     # FREE_SWIPES_COOLDOWN_SEC = 30 * 60
     FREE_SWIPES_COOLDOWN_SEC = 10
 
+    ONLINE_USER_COOLDOWN_SEC = 60
     FREE_SWIPES_REDIS_PREFIX = f'free_swipes_cooldown_'
+    ONLINE_USER_PREFIX = f'online_'
+
 
 
 class Settings(BaseSettings):

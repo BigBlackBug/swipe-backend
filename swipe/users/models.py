@@ -1,13 +1,15 @@
 import uuid
 
 from sqlalchemy import Column, String, Boolean, Integer, Enum, ARRAY, \
-    ForeignKey, Date, UniqueConstraint
+    ForeignKey, Date, UniqueConstraint, select
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, object_session
 
 from swipe.database import ModelBase
 from swipe.users.enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
     RecurrenceRate, NotificationTypes
+
+IDList = list[UUID]
 
 
 # TODO add a shit ton of indices
@@ -53,6 +55,25 @@ class User(ModelBase):
     rating = Column(Integer, nullable=False, default=0)
     swipes = Column(Integer, nullable=False, default=0)
     is_premium = Column(Boolean, nullable=False, default=False)
+
+    def set_location(self, location: dict[str, str]):
+        # location rows are unique with regards to city/country
+        session = object_session(self)
+        location_in_db = \
+            session.execute(
+                select(Location). \
+                    where(Location.city == location['city']). \
+                    where(Location.country == location['country'])). \
+                scalar_one_or_none()
+
+        if not location_in_db:
+            location_in_db = Location(**location)
+            session.add(location_in_db)
+
+        self.location = location_in_db
+
+    def __str__(self):
+        return f'User {self.id}, name: {self.name}'
 
 
 class Location(ModelBase):
