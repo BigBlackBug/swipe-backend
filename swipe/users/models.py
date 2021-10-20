@@ -116,7 +116,6 @@ class AuthInfo(ModelBase):
     access_token = Column(String)
 
     auth_provider = Column(Enum(AuthProvider), nullable=False)
-    provider_token = Column(String, nullable=False)
     provider_user_id = Column(String, nullable=False)
 
     user = relationship('User', back_populates='auth_info', uselist=False)

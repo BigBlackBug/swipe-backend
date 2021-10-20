@@ -112,7 +112,6 @@ class UserUpdate(UserBase):
 
 class AuthenticationIn(BaseModel):
     auth_provider: AuthProvider
-    provider_token: str
     provider_user_id: str
 
 

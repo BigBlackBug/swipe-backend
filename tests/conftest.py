@@ -163,7 +163,6 @@ def default_user_auth_headers(
     token = user_service.create_access_token(
         default_user, AuthenticationIn(
             auth_provider=default_user.auth_info.auth_provider,
-            provider_token=default_user.auth_info.provider_token,
             provider_user_id=default_user.auth_info.provider_user_id,
         ))
     return {'Authorization': f'Bearer {token}'}

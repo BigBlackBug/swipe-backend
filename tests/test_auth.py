@@ -13,7 +13,6 @@ async def test_auth_new_user(client: AsyncClient,
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/auth", json={
             'auth_provider': 'google',
-            'provider_token': 'supertoken',
             'provider_user_id': 'superid'
         }
     )
@@ -35,12 +34,12 @@ async def test_auth_existing_user(client: AsyncClient,
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/auth", json={
             'auth_provider': default_user.auth_info.auth_provider,
-            'provider_token': default_user.auth_info.provider_token,
             'provider_user_id': default_user.auth_info.provider_user_id
         }
     )
     assert response.status_code == 200
-    assert response.json().get('access_token')
+    assert response.json().get('access_token') \
+           == default_user.auth_info.access_token
     assert response.json().get('user_id')
 
     # free swipes cache is set

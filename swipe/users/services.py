@@ -98,7 +98,6 @@ class UserService:
     def generate_random_user(self):
         new_user = self.create_user(AuthenticationIn(
             auth_provider=AuthProvider.SNAPCHAT,
-            provider_token=secrets.token_urlsafe(16),
             provider_user_id=secrets.token_urlsafe(16)))
         new_user.set_location({
             'city': 'Moscow',
