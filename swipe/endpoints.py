@@ -4,11 +4,10 @@ from fastapi import APIRouter, Depends
 from starlette import status
 from starlette.responses import Response
 
-from settings import settings
 from swipe.users import schemas
 from swipe.users.services import UserService, RedisService
 
-router = APIRouter(prefix=f'{settings.API_V1_PREFIX}')
+router = APIRouter()
 logger = logging.getLogger(__name__)
 
 

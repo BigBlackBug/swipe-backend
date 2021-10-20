@@ -10,17 +10,22 @@ from starlette import status
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-import swipe
 from settings import settings
-from swipe import users
+from swipe import endpoints as misc_endpoints
 from swipe.storage import CloudStorage
+from swipe.users.endpoints import me, users, swipes
 
 
 def init_app() -> FastAPI:
     app = FastAPI(docs_url=f'/docs', redoc_url=f'/redoc')
-    app.include_router(swipe.endpoints.router)
-    app.include_router(users.endpoints.me_router)
-    app.include_router(users.endpoints.users_router)
+    app.include_router(misc_endpoints.router,
+                       prefix=f'{settings.API_V1_PREFIX}')
+    app.include_router(users.router,
+                       prefix=f'{settings.API_V1_PREFIX}/users')
+    app.include_router(me.router,
+                       prefix=f'{settings.API_V1_PREFIX}/me')
+    app.include_router(swipes.router,
+                       prefix=f'{settings.API_V1_PREFIX}/me/swipes')
     return app
 
 
