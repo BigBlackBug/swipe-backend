@@ -1,4 +1,5 @@
 import datetime
+import io
 import logging
 import random
 import secrets
@@ -7,9 +8,11 @@ import uuid
 from typing import Optional
 from uuid import UUID
 
+import lorem
+import names
 from aioredis import Redis
 from dateutil.relativedelta import relativedelta
-from fastapi import Depends, UploadFile
+from fastapi import Depends
 from jose import jwt
 from jose.constants import ALGORITHMS
 from sqlalchemy import select
@@ -17,9 +20,11 @@ from sqlalchemy.orm import Session
 
 import swipe.dependencies
 from settings import settings, constants
+from swipe import images
 from swipe.storage import CloudStorage
 from swipe.users import schemas
-from swipe.users.enums import AuthProvider, ZodiacSign, Gender
+from swipe.users.enums import AuthProvider, ZodiacSign, Gender, UserInterests, \
+    RecurrenceRate
 from swipe.users.models import IDList, User, AuthInfo, Location
 from swipe.users.schemas import AuthenticationIn
 
@@ -96,15 +101,21 @@ class UserService:
         self.db.refresh(user_object)
         return user_object
 
-    def generate_random_user(self):
+    def generate_random_user(self,
+                             generate_images: bool = False):
         new_user = self.create_user(AuthenticationIn(
             auth_provider=AuthProvider.SNAPCHAT,
             provider_user_id=secrets.token_urlsafe(16)))
-        new_user.set_location({
-            'city': 'Moscow',
-            'country': 'Russia',
-            'flag': '🇷🇺'
-        })
+        new_user.name = names.get_full_name()
+        new_user.bio = lorem.paragraph()[:200]
+        new_user.height = random.randint(150, 195)
+        new_user.interests = list({
+            random.choice(list(UserInterests)) for _ in range(6)
+        })[:3]
+        new_user.gender = random.choice(list(Gender))
+        new_user.smoking = random.choice(list(RecurrenceRate))
+        new_user.drinking = random.choice(list(RecurrenceRate))
+
         birth_date = datetime.date.today().replace(
             year=random.randint(1985, 2003),
             month=random.randint(1, 12),
@@ -112,9 +123,24 @@ class UserService:
         new_user.date_of_birth = birth_date
         new_user.zodiac_sign = ZodiacSign.from_date(birth_date)
         new_user.rating = random.randint(5, 150)
-
+        new_user.swipes = random.randint(50, 150)
+        new_user.set_location({
+            'city': 'Moscow',
+            'country': 'Russia',
+            'flag': '🇷🇺'
+        })
         self.db.add(new_user)
         self.db.commit()
+        self.db.refresh(new_user)
+
+        number_of_images = 4 if generate_images else 0
+        for _ in range(number_of_images):
+            image = images.generate_random_avatar(new_user.name)
+            with io.BytesIO() as output:
+                image.save(output, format='png')
+                contents = output.getvalue()
+                self.add_photo(new_user, contents, 'png')
+
         return new_user
 
     def find_user_ids(self, current_user: User,
@@ -174,10 +200,10 @@ class UserService:
         self.db.refresh(user_object)
         return user_object
 
-    def add_photo(self, user_object: User, file: UploadFile) -> str:
-        _, _, extension = file.content_type.partition('/')
+    def add_photo(self, user_object: User, file_content: bytes,
+                  extension: str) -> str:
         image_id = f'{uuid.uuid4()}.{extension}'
-        self._storage.upload_image(image_id, file.file)
+        self._storage.upload_image(image_id, file_content)
 
         user_object.photos = user_object.photos + [image_id]
         self.db.commit()

@@ -66,7 +66,8 @@ async def add_photo(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f'Can not add more than {User.MAX_ALLOWED_PHOTOS} photos')
 
-    image_id = user_service.add_photo(current_user, file)
+    _, _, extension = file.content_type.partition('/')
+    image_id = user_service.add_photo(current_user, file.file, extension)
 
     return {'image_id': image_id}
 

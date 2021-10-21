@@ -14,7 +14,7 @@ from settings import settings
 from swipe import endpoints as misc_endpoints
 from swipe.storage import CloudStorage
 from swipe.users.endpoints import me, users, swipes
-from swipe.users.errors import SwipeError
+from swipe.errors import SwipeError
 
 
 async def swipe_error_handler(request: Request, exc: SwipeError):

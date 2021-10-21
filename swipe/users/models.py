@@ -10,7 +10,7 @@ from sqlalchemy.orm import relationship, object_session
 from swipe.database import ModelBase
 from swipe.users.enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
     RecurrenceRate, NotificationTypes
-from swipe.users.errors import SwipeError
+from swipe.errors import SwipeError
 
 IDList = list[UUID]
 

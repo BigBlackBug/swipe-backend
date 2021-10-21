@@ -41,7 +41,7 @@ class CloudStorage:
                 raise
 
     # TODO all sorts of error handling
-    def upload_image(self, image_id: str, file_content: IO):
+    def upload_image(self, image_id: str, file_content: bytes):
         self._client.put_object(
             Bucket=STORAGE_IMAGE_BUCKET, Key=image_id, Body=file_content)
 

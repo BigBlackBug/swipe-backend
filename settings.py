@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from pydantic import BaseSettings, PostgresDsn, validator
@@ -14,6 +15,7 @@ class Constants(BaseSettings):
     FREE_SWIPES_REDIS_PREFIX = f'free_swipes_cooldown_'
     ONLINE_USER_PREFIX = f'online_'
 
+    BASE_DIR: Path = Path('.')
 
 
 class Settings(BaseSettings):

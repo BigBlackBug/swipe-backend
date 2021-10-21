@@ -18,6 +18,9 @@ python-dotenv = "^0.19.1"
 boto3 = "^1.18.61"
 requests = "^2.26.0"
 aioredis = "^2.0.0"
+names = "^0.3.0"
+lorem = "^0.1.1"
+Pillow = "^8.4.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.5"
