@@ -106,7 +106,7 @@ class UserService:
         new_user = self.create_user(AuthenticationIn(
             auth_provider=AuthProvider.SNAPCHAT,
             provider_user_id=secrets.token_urlsafe(16)))
-        new_user.name = names.get_full_name()
+        new_user.name = names.get_full_name()[:30]
         new_user.bio = lorem.paragraph()[:200]
         new_user.height = random.randint(150, 195)
         new_user.interests = list({

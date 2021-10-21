@@ -32,7 +32,7 @@ class User(ModelBase):
 
     # can not be updated
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(20), nullable=False, default='')
+    name = Column(String(30), nullable=False, default='')
 
     bio = Column(String(200), nullable=False, default='')
     height = Column(Integer(), nullable=False, default=0)
