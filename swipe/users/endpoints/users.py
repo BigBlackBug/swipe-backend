@@ -1,7 +1,6 @@
 import logging
 from uuid import UUID
 
-from dateutil.relativedelta import relativedelta
 from fastapi import Depends, Body, APIRouter, HTTPException
 from sqlalchemy.orm import Session
 from starlette import status
@@ -66,10 +65,11 @@ async def fetch_list_of_users(
     collected_users = user_service.get_users(user_ids=collected_user_ids)
     if filter_params.sort == SortType.AGE_DIFFERENCE:
         # online - sort against age difference
-        collected_users = sorted(collected_users,
-                                 key=lambda user: abs(relativedelta(
-                                     current_user.date_of_birth,
-                                     user.date_of_birth).years))
+        collected_users = sorted(
+            collected_users,
+            key=lambda user: \
+                abs(current_user.date_of_birth - user.date_of_birth).days
+        )
     else:
         # popular - sort against rating
         collected_users = sorted(collected_users,
