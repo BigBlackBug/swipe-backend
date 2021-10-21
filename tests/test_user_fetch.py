@@ -71,15 +71,15 @@ async def test_user_fetch_offline_limit_sort_age(
     user_1.location.country = 'Russia'
 
     user_2 = user_service.generate_random_user()
-    user_2.date_of_birth = datetime.date.today().replace(year=2000)
+    user_2.date_of_birth = datetime.date.today().replace(year=2001)
     user_2.location.country = 'Russia'
 
     user_3 = user_service.generate_random_user()
-    user_3.date_of_birth = datetime.date.today().replace(year=2001)
+    user_3.date_of_birth = datetime.date.today().replace(year=2002)
     user_3.location.country = 'Russia'
 
     user_4 = user_service.generate_random_user()
-    user_4.date_of_birth = datetime.date.today().replace(year=2005)
+    user_4.date_of_birth = datetime.date.today().replace(year=2003)
     user_4.location.country = 'Russia'
     session.commit()
     # --------------------------------------------------------------------------
