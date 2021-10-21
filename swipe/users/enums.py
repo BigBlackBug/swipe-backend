@@ -61,7 +61,7 @@ class ZodiacSign(str, enum.Enum):
     def from_date(cls: Type[ZodiacSign],
                   birth_date: Union[str, datetime.date]) -> ZodiacSign:
         if isinstance(birth_date, str):
-            birth_date = datetime.strptime(birth_date, '%Y-%M-%d').date()
+            birth_date = datetime.strptime(birth_date, '%Y-%m-%d').date()
 
         item: ZodiacSign
         for item in cls:
