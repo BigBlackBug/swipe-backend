@@ -10,6 +10,7 @@ from sqlalchemy.orm import relationship, object_session
 from swipe.database import ModelBase
 from swipe.users.enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
     RecurrenceRate, NotificationTypes
+from swipe.users.errors import SwipeError
 
 IDList = list[UUID]
 
@@ -90,8 +91,11 @@ class User(ModelBase):
         self.location = location_in_db
 
     def block_user(self, target_user: User):
-        if target_user not in self.blacklist:
-            self.blacklist.append(target_user)
+        if target_user in self.blacklist:
+            raise SwipeError(
+                f'{target_user.id} is already blocked by {self.id}')
+
+        self.blacklist.append(target_user)
 
     def __str__(self):
         return f'User {self.id}, name: {self.name}'

@@ -2,7 +2,10 @@ import logging
 from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
-from fastapi import Depends, Body, APIRouter
+from fastapi import Depends, Body, APIRouter, HTTPException
+from sqlalchemy.orm import Session
+from starlette import status
+from starlette.responses import Response
 
 from swipe import security
 from swipe.users import schemas
@@ -74,9 +77,40 @@ async def fetch_list_of_users(
     return collected_users[:filter_params.limit]
 
 
-@router.get('/{user_id}',
-            name='Get a single user',
-            response_model=schemas.UserOut)
+@router.post(
+    '/{user_id}/block',
+    name='Block a user',
+    responses={
+        204: {
+            'description': 'User has been blocked',
+        },
+        404: {
+            'description': 'User not found'
+        },
+        409: {
+            'description': 'User is already blocked by you'
+        }
+    })
+async def block_user(
+        user_id: UUID,
+        user_service: UserService = Depends(),
+        db: Session = Depends(),
+        current_user: User = Depends(security.get_current_user)):
+    target_user = user_service.get_user(user_id)
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail='Not found')
+
+    current_user.block_user(target_user)
+
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    '/{user_id}',
+    name='Get a single user',
+    response_model=schemas.UserOut)
 async def fetch_user(
         user_id: UUID,
         user_service: UserService = Depends(),

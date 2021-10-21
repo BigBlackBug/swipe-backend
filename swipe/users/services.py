@@ -59,6 +59,7 @@ class RedisService:
     async def filter_online_users(self, user_ids: IDList) -> IDList:
         result: IDList = []
         for user_id in user_ids:
+            # TODO cache online users in memory and use set intersections
             is_online = await self.redis.get(
                 f'{constants.ONLINE_USER_PREFIX}{user_id}')
             if is_online:

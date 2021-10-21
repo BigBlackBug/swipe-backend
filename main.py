@@ -14,6 +14,20 @@ from settings import settings
 from swipe import endpoints as misc_endpoints
 from swipe.storage import CloudStorage
 from swipe.users.endpoints import me, users, swipes
+from swipe.users.errors import SwipeError
+
+
+async def swipe_error_handler(request: Request, exc: SwipeError):
+    return JSONResponse({
+        'detail': str(exc)
+    }, status_code=status.HTTP_409_CONFLICT)
+
+
+async def global_error_handler(request: Request, exc: Exception):
+    logger.exception("Something wrong", exc_info=sys.exc_info())
+    return JSONResponse({
+        'detail': str(exc)
+    }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def init_app() -> FastAPI:
@@ -26,29 +40,13 @@ def init_app() -> FastAPI:
                        prefix=f'{settings.API_V1_PREFIX}/me')
     app.include_router(swipes.router,
                        prefix=f'{settings.API_V1_PREFIX}/me/swipes')
+
+    app.add_exception_handler(SwipeError, swipe_error_handler)
+    app.add_exception_handler(Exception, global_error_handler)
     return app
 
 
 fast_api = init_app()
-
-
-# TODO introduce a validation error
-@fast_api.exception_handler(ValueError)
-async def validation_exception_handler(
-        request: Request, exc: ValueError):
-    return JSONResponse({
-        'detail': str(exc)
-    }, status_code=status.HTTP_400_BAD_REQUEST)
-
-
-@fast_api.exception_handler(Exception)
-async def validation_exception_handler(
-        request: Request, exc: Exception):
-    logger.exception("Something wrong", exc_info=sys.exc_info())
-    return JSONResponse({
-        'detail': str(exc)
-    }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 # TODO add operation logging
 # TODO proper logging configuration

@@ -1,0 +1,2 @@
+class SwipeError(Exception):
+    pass
