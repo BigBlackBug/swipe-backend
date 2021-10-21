@@ -46,6 +46,7 @@ class UserOutSmall(BaseModel):
     id: UUID
     name: str
     date_of_birth: datetime.date
+    rating: int
     location: LocationSchema
     photos: Optional[list[str]] = []
     photo_urls: Optional[list[str]] = []
