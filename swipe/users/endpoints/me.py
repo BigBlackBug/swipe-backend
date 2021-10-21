@@ -38,11 +38,6 @@ async def patch_user(
     # TODO This is bs, this field should not be in the docs
     # but the solutions are ugly AF
     # https://github.com/tiangolo/fastapi/issues/1357
-    if user_body.zodiac_sign:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail='zodiac_sign is updated whenever birth_date is updated')
-
     user_object = user_service.update_user(current_user, user_body)
     return user_object
 
