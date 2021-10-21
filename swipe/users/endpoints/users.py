@@ -74,7 +74,10 @@ async def fetch_list_of_users(
         # popular - sort against rating
         collected_users = sorted(collected_users,
                                  key=lambda user: user.rating, reverse=True)
-    return collected_users[:filter_params.limit]
+    return [
+        schemas.UserOutSmall.patched_from_orm(user)
+        for user in collected_users[:filter_params.limit]
+    ]
 
 
 @router.post(
