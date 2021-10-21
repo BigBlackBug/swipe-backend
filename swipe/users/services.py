@@ -125,7 +125,9 @@ class UserService:
         new_user.rating = random.randint(5, 150)
         new_user.swipes = random.randint(50, 150)
         new_user.set_location({
-            'city': 'Moscow',
+            'city': random.choice([
+                'Moscow', 'Saint Petersburg', 'Magadan', 'Surgut', 'Cherepovets'
+            ]),
             'country': 'Russia',
             'flag': '🇷🇺'
         })

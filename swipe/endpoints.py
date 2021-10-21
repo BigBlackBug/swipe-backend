@@ -61,5 +61,10 @@ async def authenticate_user(auth_payload: schemas.AuthenticationIn,
             tags=['misc'],
             response_model=schemas.UserOut)
 async def generate_random_user(user_service: UserService = Depends()):
+    """
+    All fields are generated randomly from respective enums or within reasonable
+    limits except city, which is picked from the following list:
+    'Moscow', 'Saint Petersburg', 'Magadan', 'Surgut', 'Cherepovets'
+    """
     new_user = user_service.generate_random_user(generate_images=True)
     return schemas.UserOut.patched_from_orm(new_user)
