@@ -1,14 +1,65 @@
 import logging
+from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Body, HTTPException
 from starlette import status
 from starlette.responses import Response
 
-from swipe.users import schemas
+from swipe.chats import schemas as chat_schemas
+from swipe.chats.schemas import ChatORMSchema
+from swipe.chats.services import ChatService
+from swipe.users import schemas as user_schemas
 from swipe.users.services import UserService, RedisService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+@router.get('/generate_user',
+            tags=['misc'],
+            response_model=user_schemas.UserOut)
+async def generate_random_user(user_service: UserService = Depends()):
+    """
+    All fields are generated randomly from respective enums or within reasonable
+    limits except city, which is picked from the following list:
+    'Moscow', 'Saint Petersburg', 'Magadan', 'Surgut', 'Cherepovets'
+    """
+    new_user = user_service.generate_random_user(generate_images=True)
+    return user_schemas.UserOut.patched_from_orm(new_user)
+
+
+@router.post('/generate_chat',
+             tags=['misc'],
+             response_model=chat_schemas.ChatOut,
+             response_model_exclude_none=True)
+async def generate_random_chat(chat_service: ChatService = Depends(),
+                               user_service: UserService = Depends(),
+                               user_a_id: UUID = Body(...),
+                               user_b_id: UUID = Body(...),
+                               n_messages: int = Body(default=10)):
+    if user_a_id == user_b_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="You can't create a chat with yourself")
+
+    user_a = user_service.get_user(user_a_id)
+    if not user_a:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"User with id:{user_a_id} doesn't exist")
+
+    user_b = user_service.get_user(user_b_id)
+    if not user_b:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"User with id:{user_b_id} doesn't exist")
+
+    chat = chat_service.generate_random_chat(
+        user_a=user_a, user_b=user_b,
+        n_messages=n_messages
+    )
+
+    resp_data = ChatORMSchema.parse_chat(chat, user_a_id)
+    return resp_data
 
 
 @router.post(
@@ -17,14 +68,14 @@ logger = logging.getLogger(__name__)
     responses={
         200: {
             "description": "An existing user has been authenticated",
-            "model": schemas.AuthenticationOut
+            "model": user_schemas.AuthenticationOut
         },
         201: {
             "description": "A new user has been created",
-            "model": schemas.AuthenticationOut
+            "model": user_schemas.AuthenticationOut
         }
     })
-async def authenticate_user(auth_payload: schemas.AuthenticationIn,
+async def authenticate_user(auth_payload: user_schemas.AuthenticationIn,
                             response: Response,
                             user_service: UserService = Depends(),
                             redis_service: RedisService = Depends()):
@@ -53,18 +104,5 @@ async def authenticate_user(auth_payload: schemas.AuthenticationIn,
         response.status_code = status.HTTP_201_CREATED
 
     await redis_service.reset_swipe_reap_timestamp(user)
-    return schemas.AuthenticationOut(
+    return user_schemas.AuthenticationOut(
         user_id=user.id, access_token=new_token)
-
-
-@router.get('/generate_user',
-            tags=['misc'],
-            response_model=schemas.UserOut)
-async def generate_random_user(user_service: UserService = Depends()):
-    """
-    All fields are generated randomly from respective enums or within reasonable
-    limits except city, which is picked from the following list:
-    'Moscow', 'Saint Petersburg', 'Magadan', 'Surgut', 'Cherepovets'
-    """
-    new_user = user_service.generate_random_user(generate_images=True)
-    return schemas.UserOut.patched_from_orm(new_user)

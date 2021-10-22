@@ -1,6 +1,4 @@
 import logging
-from typing import IO
-from uuid import UUID
 
 import boto3
 import botocore.exceptions
@@ -45,7 +43,7 @@ class CloudStorage:
         self._client.put_object(
             Bucket=STORAGE_IMAGE_BUCKET, Key=image_id, Body=file_content)
 
-    def get_image_url(self, image_id):
+    def get_image_url(self, image_id: str):
         # TODO add a check for file existence
         return self._client.generate_presigned_url(
             "get_object",

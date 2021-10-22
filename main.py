@@ -11,7 +11,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from settings import settings
-from swipe import endpoints as misc_endpoints
+from swipe import endpoints as misc_endpoints, chats
 from swipe.storage import CloudStorage
 from swipe.users.endpoints import me, users, swipes
 from swipe.errors import SwipeError
@@ -40,7 +40,8 @@ def init_app() -> FastAPI:
                        prefix=f'{settings.API_V1_PREFIX}/me')
     app.include_router(swipes.router,
                        prefix=f'{settings.API_V1_PREFIX}/me/swipes')
-
+    app.include_router(chats.router,
+                       prefix=f'{settings.API_V1_PREFIX}/me/chats')
     app.add_exception_handler(SwipeError, swipe_error_handler)
     app.add_exception_handler(Exception, global_error_handler)
     return app

@@ -3,6 +3,7 @@ import random
 from PIL import Image, ImageDraw, ImageFont
 
 from settings import constants
+from swipe.errors import SwipeError
 
 AVATAR_WIDTH = 640
 AVATAR_HEIGHT = 1024
@@ -10,15 +11,25 @@ CIRCLE_SIZE = 40
 
 
 def generate_random_avatar(username: str) -> Image:
+    if not username.strip():
+        raise SwipeError("Username should not be empty")
+
+    username_pieces = username.split()
+    if len(username_pieces) == 1:
+        username_pieces = [username_pieces[0]] * 2
+    elif len(username_pieces) > 1:
+        username_pieces = username_pieces[:2]
+    text = "{}\n{}".format(*username_pieces)
+
     img = Image.new(mode="RGB", size=(AVATAR_WIDTH, AVATAR_HEIGHT),
                     color=(145, 219, random.randint(150, 250)))
+    draw = ImageDraw.Draw(img)
+
     font = ImageFont.truetype(str(
         constants.BASE_DIR.joinpath('content', 'Herculanum.ttf').absolute()),
         size=70)
     stroke_width = 2
-    text = "{}\n{}".format(*username.split())
 
-    draw = ImageDraw.Draw(img)
     text_width, text_height = \
         draw.multiline_textsize(text, font, stroke_width=stroke_width)
 
