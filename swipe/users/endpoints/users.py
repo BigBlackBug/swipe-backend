@@ -14,7 +14,7 @@ from swipe.users.services import UserService, RedisService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["users"])
+router = APIRouter()
 
 
 @router.post(

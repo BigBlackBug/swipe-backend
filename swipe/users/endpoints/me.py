@@ -14,7 +14,7 @@ IMAGE_CONTENT_TYPE_REGEXP = 'image/(png|jpe?g)'
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["me"])
+router = APIRouter()
 
 
 @router.get(

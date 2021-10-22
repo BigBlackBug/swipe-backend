@@ -12,7 +12,7 @@ from swipe.users.services import UserService, RedisService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=['swipes'])
+router = APIRouter()
 
 
 @router.post(

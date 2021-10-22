@@ -35,13 +35,17 @@ def init_app() -> FastAPI:
     app.include_router(misc_endpoints.router,
                        prefix=f'{settings.API_V1_PREFIX}')
     app.include_router(users.router,
-                       prefix=f'{settings.API_V1_PREFIX}/users')
+                       prefix=f'{settings.API_V1_PREFIX}/users',
+                       tags=["users"])
     app.include_router(me.router,
-                       prefix=f'{settings.API_V1_PREFIX}/me')
+                       prefix=f'{settings.API_V1_PREFIX}/me',
+                       tags=["me"])
     app.include_router(swipes.router,
-                       prefix=f'{settings.API_V1_PREFIX}/me/swipes')
+                       prefix=f'{settings.API_V1_PREFIX}/me/swipes',
+                       tags=['my swipes'])
     app.include_router(chats.router,
-                       prefix=f'{settings.API_V1_PREFIX}/me/chats')
+                       prefix=f'{settings.API_V1_PREFIX}/me/chats',
+                       tags=['my chats'])
     app.add_exception_handler(SwipeError, swipe_error_handler)
     app.add_exception_handler(Exception, global_error_handler)
     return app

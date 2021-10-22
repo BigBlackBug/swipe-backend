@@ -8,7 +8,7 @@ from swipe.chats.schemas import ChatOut, MultipleChatsOut, ChatORMSchema
 from swipe.chats.services import ChatService
 from swipe.users.models import User
 
-router = APIRouter(tags=['chats'])
+router = APIRouter()
 
 
 @router.get(
