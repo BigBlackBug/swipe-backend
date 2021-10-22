@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from starlette import status
 from starlette.responses import Response
 
+import swipe.dependencies
 from swipe import security
 from swipe.users import schemas
 from swipe.users.models import User, IDList
@@ -97,7 +98,7 @@ async def fetch_list_of_users(
 async def block_user(
         user_id: UUID,
         user_service: UserService = Depends(),
-        db: Session = Depends(),
+        db: Session = Depends(swipe.dependencies.db),
         current_user: User = Depends(security.get_current_user)):
     target_user = user_service.get_user(user_id)
     if not target_user:
@@ -105,8 +106,8 @@ async def block_user(
                             detail='Not found')
 
     current_user.block_user(target_user)
-
     db.commit()
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
