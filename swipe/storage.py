@@ -1,4 +1,5 @@
 import logging
+from typing import IO, Union
 
 import boto3
 import botocore.exceptions
@@ -39,7 +40,7 @@ class CloudStorage:
                 raise
 
     # TODO all sorts of error handling
-    def upload_image(self, image_id: str, file_content: bytes):
+    def upload_image(self, image_id: str, file_content: Union[IO, bytes]):
         self._client.put_object(
             Bucket=STORAGE_IMAGE_BUCKET, Key=image_id, Body=file_content)
 

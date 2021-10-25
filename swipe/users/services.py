@@ -5,7 +5,7 @@ import random
 import secrets
 import time
 import uuid
-from typing import Optional
+from typing import Optional, IO, Union
 from uuid import UUID
 
 import lorem
@@ -202,7 +202,7 @@ class UserService:
         self.db.refresh(user_object)
         return user_object
 
-    def add_photo(self, user_object: User, file_content: bytes,
+    def add_photo(self, user_object: User, file_content: Union[IO, bytes],
                   extension: str) -> str:
         image_id = f'{uuid.uuid4()}.{extension}'
         self._storage.upload_image(image_id, file_content)

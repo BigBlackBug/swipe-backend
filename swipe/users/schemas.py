@@ -102,6 +102,7 @@ class UserOut(UserBase):
 class UserUpdate(UserBase):
     date_of_birth: Optional[datetime.date] = None
     zodiac_sign: Optional[ZodiacSign] = None
+    photos: list[str] = None
 
     @root_validator(pre=True)
     def set_zodiac_sign(cls, values: dict[str, Any]):

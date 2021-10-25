@@ -54,7 +54,9 @@ async def add_photo(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     if not re.match(IMAGE_CONTENT_TYPE_REGEXP, file.content_type):
-        raise HTTPException(status_code=400, detail='Unsupported image type')
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Unsupported image type')
 
     if len(current_user.photos) == User.MAX_ALLOWED_PHOTOS:
         raise HTTPException(
