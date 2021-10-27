@@ -45,6 +45,18 @@ async def patch_user(
 @router.post(
     '/photos',
     name='Add a photo to the authenticated user',
+    responses={
+        200: {
+            "description": "Uploaded photo data",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "photo_id": "", "photo_url": ""
+                    }
+                }
+            },
+        },
+    },
     status_code=status.HTTP_201_CREATED)
 async def add_photo(
         file: UploadFile = File(...),
@@ -64,9 +76,11 @@ async def add_photo(
             detail=f'Can not add more than {User.MAX_ALLOWED_PHOTOS} photos')
 
     _, _, extension = file.content_type.partition('/')
-    image_id = user_service.add_photo(current_user, file.file, extension)
 
-    return {'image_id': image_id}
+    photo_id = user_service.add_photo(current_user, file.file, extension)
+    photo_url = user_service.get_photo_url(photo_id)
+
+    return {'photo_id': photo_id, 'photo_url': photo_url}
 
 
 @router.delete(

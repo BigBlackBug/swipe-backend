@@ -204,12 +204,12 @@ class UserService:
 
     def add_photo(self, user_object: User, file_content: Union[IO, bytes],
                   extension: str) -> str:
-        image_id = f'{uuid.uuid4()}.{extension}'
-        self._storage.upload_image(image_id, file_content)
+        photo_id = f'{uuid.uuid4()}.{extension}'
+        self._storage.upload_image(photo_id, file_content)
 
-        user_object.photos = user_object.photos + [image_id]
+        user_object.photos = user_object.photos + [photo_id]
         self.db.commit()
-        return image_id
+        return photo_id
 
     def delete_photo(self, user_object: User, photo_id: str):
         new_list = list(user_object.photos)
@@ -254,3 +254,6 @@ class UserService:
         self.db.commit()
         self.db.refresh(user_object)
         return user_object
+
+    def get_photo_url(self, image_id: str):
+        return self._storage.get_image_url(image_id)

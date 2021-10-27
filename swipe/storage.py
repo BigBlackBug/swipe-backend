@@ -44,7 +44,7 @@ class CloudStorage:
         self._client.put_object(
             Bucket=STORAGE_IMAGE_BUCKET, Key=image_id, Body=file_content)
 
-    def get_image_url(self, image_id: str):
+    def get_image_url(self, image_id: str) -> str:
         # TODO add a check for file existence
         return self._client.generate_presigned_url(
             "get_object",
