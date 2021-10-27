@@ -46,7 +46,7 @@ async def patch_user(
     '/photos',
     name='Add a photo to the authenticated user',
     responses={
-        200: {
+        201: {
             "description": "Uploaded photo data",
             "content": {
                 "application/json": {
