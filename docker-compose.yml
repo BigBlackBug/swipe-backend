@@ -1,0 +1,31 @@
+version: '3.7'
+
+services:
+  janus-gateway:
+    image: 'canyan/janus-gateway:0.10.7'
+    command: ["/usr/local/bin/janus"]
+#    entrypoint: /bin/bash
+    tty: true
+    ports:
+#      janus main port
+      - "8088:8088"
+#      janus admin port
+      - "7088:7088"
+    volumes:
+      - "./_janus:/usr/local/etc/janus/:ro"
+      - "./_janus_plugins:/usr/local/lib/janus/plugins/:ro"
+      - "demos:/usr/local/share/janus/demos/"
+    restart: always
+    depends_on:
+      - event_handler
+
+  event_handler:
+    build: .
+    command: uvicorn --host 0.0.0.0 --port 15000 event_printer:app
+volumes:
+  demos:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: "/Users/bigblackbug/projects/harddays/swipe-backend/_janus_demo"
