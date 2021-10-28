@@ -1,23 +1,20 @@
 import json
 import logging
-import sys
 from uuid import UUID
 
 import dateutil.parser
 from fastapi import FastAPI, APIRouter, Depends
 from starlette.requests import Request
 
+import config
 from swipe.chats.models import MessageStatus
 from swipe.chats.services import ChatService
 
-logging.basicConfig(stream=sys.stderr,
-                    format="[%(asctime)s %(levelname)s|%(processName)s] "
-                           "%(name)s %(message)s",
-                    level=logging.INFO)
-app = FastAPI()
-
-router = APIRouter()
+config.configure_logging()
 logger = logging.getLogger(__name__)
+
+app = FastAPI()
+router = APIRouter()
 
 
 @router.post('/')

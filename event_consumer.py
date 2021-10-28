@@ -1,16 +1,13 @@
 import json
-import logging
-import sys
 
 from fastapi import FastAPI, APIRouter
 from starlette.requests import Request
 
-logging.basicConfig(stream=sys.stderr,
-                    format="[%(asctime)s %(levelname)s|%(processName)s] "
-                           "%(name)s %(message)s",
-                    level=logging.DEBUG)
-app = FastAPI()
+import config
 
+config.configure_logging()
+
+app = FastAPI()
 router = APIRouter()
 
 
@@ -22,6 +19,3 @@ async def consume_event(request: Request):
 
 
 app.include_router(router)
-
-# uvicorn.run('event_consumer:app', host='0.0.0.0',  # noqa
-#             port=15000)

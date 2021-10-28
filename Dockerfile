@@ -11,11 +11,4 @@ COPY pyproject.toml poetry.lock /code/
 RUN poetry config virtualenvs.create false &&\
   poetry install --no-interaction --no-ansi
 
-COPY swipe swipe
-COPY event_consumer.py .
-COPY message_consumer.py .
-COPY settings.py .
-COPY migrations migrations
-COPY alembic.ini .
-COPY main.py .
-COPY content content
+COPY . .
