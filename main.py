@@ -10,11 +10,12 @@ from starlette import status
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+import config
 from settings import settings
 from swipe import endpoints as misc_endpoints, chats
+from swipe.errors import SwipeError
 from swipe.storage import CloudStorage
 from swipe.users.endpoints import me, users, swipes
-from swipe.errors import SwipeError
 
 
 async def swipe_error_handler(request: Request, exc: SwipeError):
@@ -53,14 +54,7 @@ def init_app() -> FastAPI:
 
 fast_api = init_app()
 
-# TODO add operation logging
-# TODO proper logging configuration
-# TODO add current user to context
-logging.basicConfig(stream=sys.stderr,
-                    format="[%(asctime)s %(levelname)s|%(processName)s] "
-                           "%(name)s %(message)s",
-                    level=logging.DEBUG)
-
+config.configure_logging()
 logger = logging.getLogger(__name__)
 
 if __name__ == '__main__':

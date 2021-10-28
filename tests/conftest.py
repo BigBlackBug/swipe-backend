@@ -1,6 +1,5 @@
 import logging
 import os
-import sys
 import time
 from typing import Generator
 
@@ -14,6 +13,7 @@ from httpx import AsyncClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
+import config
 import main
 import swipe.dependencies
 from settings import settings
@@ -22,10 +22,7 @@ from swipe.users import models
 from swipe.users.schemas import AuthenticationIn
 from swipe.users.services import UserService, RedisService
 
-logging.basicConfig(stream=sys.stderr,
-                    format="[%(asctime)s %(levelname)s|%(processName)s] "
-                           "%(name)s %(message)s",
-                    level=logging.DEBUG)
+config.configure_logging()
 logger = logging.getLogger(__name__)
 
 
