@@ -17,11 +17,51 @@ services:
       - "demos:/usr/local/share/janus/demos/"
     restart: always
     depends_on:
-      - event_handler
+      - event_consumer
+      - message_consumer
 
-  event_handler:
+  redis:
+    image: redis
+
+  pg:
+    image: postgres:13
+    volumes:
+      - "./_data:/var/lib/postgresql/data"
+#    ports:
+#      - "25432:5432"
+
+  event_consumer:
     build: .
-    command: uvicorn --host 0.0.0.0 --port 15000 event_printer:app
+    env_file:
+      - env/docker.env
+    command: uvicorn --host 0.0.0.0 --port 15000 event_consumer:app
+    depends_on:
+      - pg
+      - redis
+
+  #    command: python event_consumer.py
+
+  message_consumer:
+    build: .
+    env_file:
+      - env/docker.env
+    command: uvicorn --host 0.0.0.0 --port 16000 message_consumer:app
+    depends_on:
+      - pg
+      - redis
+
+  server:
+    build: .
+    env_file:
+      - env/docker.env
+    ports:
+      - "8000:8000"
+    command: uvicorn --host 0.0.0.0 --port 8000 main:fast_api
+    depends_on:
+      - pg
+      - redis
+#    command: python message_consumer.py
+
 volumes:
   demos:
     driver: local

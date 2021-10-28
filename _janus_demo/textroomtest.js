@@ -153,22 +153,35 @@ $(document).ready(function() {
 									}
 									var what = json["textroom"];
 									if(what === "message") {
-										// Incoming message: public or private?
-										var msg = json["text"];
-										msg = msg.replace(new RegExp('<', 'g'), '&lt');
-										msg = msg.replace(new RegExp('>', 'g'), '&gt');
 										var from = json["from"];
 										var dateString = getDateString(json["date"]);
-										var whisper = json["whisper"];
-										if(whisper === true) {
+										if (json["payload"]["type"] === "event"){
+											var status = json["payload"]["status"];
+											var message_id = json["payload"]["message_id"];
+
+											$('#chatroom').append('<p style="color: purple;">[' + dateString + '] <b>[received '+status+' event from ' + participants[from] +' for message '+message_id +']</b> ');
+											$('#chatroom').get(0).scrollTop = $('#chatroom').get(0).scrollHeight;
+
+											Janus.debug("Received a message, sending READ reply")
+										}else {
+											var msg = json["payload"]["text"];
+											msg = msg.replace(new RegExp('<', 'g'), '&lt');
+											msg = msg.replace(new RegExp('>', 'g'), '&gt');
+
+											// var whisper = json["whisper"];
+											// if(whisper === true) {
 											// Private message
 											$('#chatroom').append('<p style="color: purple;">[' + dateString + '] <b>[whisper from ' + participants[from] + ']</b> ' + msg);
 											$('#chatroom').get(0).scrollTop = $('#chatroom').get(0).scrollHeight;
-										} else {
-											// Public message
-											$('#chatroom').append('<p>[' + dateString + '] <b>' + participants[from] + ':</b> ' + msg);
-											$('#chatroom').get(0).scrollTop = $('#chatroom').get(0).scrollHeight;
+
+											Janus.debug("Received a message, sending READ reply")
+											sendMsgReadEvent(from, json['payload']['message_id'], "READ")
 										}
+										// } else {
+										// 	// Public message
+										// 	$('#chatroom').append('<p>[' + dateString + '] <b>' + participants[from] + ':</b> ' + msg);
+										// 	$('#chatroom').get(0).scrollTop = $('#chatroom').get(0).scrollHeight;
+										// }
 									} else if(what === "announcement") {
 										// Room announcement
 										var msg = json["text"];
@@ -221,6 +234,8 @@ $(document).ready(function() {
 										bootbox.alert("The room has been destroyed", function() {
 											window.location.reload();
 										});
+									} else if (what === "success"){
+										Janus.log("got ack")
 									}
 								},
 								oncleanup: function() {
@@ -274,7 +289,7 @@ function registerUsername() {
 			$('#register').removeAttr('disabled').click(registerUsername);
 			return;
 		}
-		myid = randomString(12);
+		myid = username
 		var transaction = randomString(12);
 		var register = {
 			textroom: "join",
@@ -349,7 +364,11 @@ function sendPrivateMsg(username) {
 				transaction: randomString(12),
 				room: myroom,
 				to: username,
-				text: result
+				payload: {
+					type: "message",
+					message_id: crypto.randomUUID(),
+					text :result
+				}
 			};
 			textroom.data({
 				text: JSON.stringify(message),
@@ -361,6 +380,33 @@ function sendPrivateMsg(username) {
 			});
 		}
 	});
+	return;
+}
+
+function sendMsgReadEvent(username, message_id, status) {
+	var display = participants[username];
+	if(!display)
+		return;
+	var message = {
+		textroom: "message",
+		transaction: randomString(12),
+		room: myroom,
+		to: username,
+		payload: {
+			type: "event",
+			message_id: message_id,
+			status: status
+		}
+	};
+	textroom.data({
+		text: JSON.stringify(message),
+		error: function(reason) { bootbox.alert(reason); },
+		success: function() {
+			$('#chatroom').append('<p style="color: purple;">[' + getDateString() + '] <b>[sent '+status+' event to ' + display + '] for message '+message_id+'</b> ');
+			$('#chatroom').get(0).scrollTop = $('#chatroom').get(0).scrollHeight;
+		}
+	});
+
 	return;
 }
 
