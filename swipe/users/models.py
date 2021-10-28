@@ -35,26 +35,22 @@ class User(ModelBase):
     name = Column(String(30), nullable=False, default='')
 
     bio = Column(String(200), nullable=False, default='')
-    height = Column(Integer(), nullable=False, default=0)
-    gender = Column(Enum(Gender), nullable=False,
-                    default=Gender.ATTACK_HELICOPTER)
+    height = Column(Integer())
+    gender = Column(Enum(Gender))
 
     date_of_birth = Column(Date)
     zodiac_sign = Column(Enum(ZodiacSign))
 
-    smoking = Column(Enum(RecurrenceRate), nullable=False,
-                     default=RecurrenceRate.NEVER)
-    drinking = Column(Enum(RecurrenceRate), nullable=False,
-                      default=RecurrenceRate.NEVER)
+    smoking = Column(Enum(RecurrenceRate))
+    drinking = Column(Enum(RecurrenceRate))
 
     interests = Column(ARRAY(Enum(UserInterests)), nullable=False, default=[])
     photos = Column(ARRAY(String(50)), nullable=False, default=[])
 
-    enabled_notifications = Column(Enum(NotificationTypes), nullable=False,
-                                   default=NotificationTypes.FRIENDS_MESSAGES)
-    instagram_profile = Column(String)
-    tiktok_profile = Column(String)
-    snapchat_profile = Column(String)
+    enabled_notifications = Column(Enum(NotificationTypes))
+    instagram_profile = Column(String, nullable=False, default='')
+    tiktok_profile = Column(String, nullable=False, default='')
+    snapchat_profile = Column(String, nullable=False, default='')
 
     location = relationship('Location', uselist=False)
     location_id = Column(UUID(as_uuid=True), ForeignKey('location.id'))

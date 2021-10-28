@@ -26,7 +26,7 @@ class UserBase(BaseModel):
     bio: Optional[str] = Field(
         None, title="User's bio", max_length=200
     )
-    height: Optional[int]
+    height: Optional[int] = None
 
     interests: list[UserInterests] = []
     gender: Optional[Gender] = None
