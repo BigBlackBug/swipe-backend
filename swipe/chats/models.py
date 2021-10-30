@@ -39,6 +39,7 @@ class Chat(ModelBase):
     messages = relationship('ChatMessage',
                             order_by='desc(ChatMessage.timestamp)',
                             collection_class=ordering_list('timestamp'),
+                            # lazy='noload',
                             back_populates='chat')
 
     initiator_id = Column(UUID(as_uuid=True), ForeignKey('users.id'))

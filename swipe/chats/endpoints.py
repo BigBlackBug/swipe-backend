@@ -37,9 +37,10 @@ async def fetch_global_chat(
     response_model=ChatOut)
 async def fetch_chat(
         chat_id: UUID,
+        only_unread: bool = False,
         chat_service: ChatService = Depends(),
         current_user: User = Depends(security.get_current_user)):
-    chat: Chat = chat_service.fetch_chat(chat_id)
+    chat: Chat = chat_service.fetch_chat(chat_id, only_unread)
     resp_data = ChatORMSchema.parse_chat(chat, current_user.id)
     return resp_data
 
@@ -49,9 +50,14 @@ async def fetch_chat(
     name='Fetch all chats',
     response_model_exclude_none=True,
     response_model=MultipleChatsOut)
-async def fetch_chats(chat_service: ChatService = Depends(),
-                      current_user: User = Depends(security.get_current_user)):
-    chats: list[Chat] = chat_service.fetch_chats(current_user)
+async def fetch_chats(
+        only_unread: bool = False,
+        chat_service: ChatService = Depends(),
+        current_user: User = Depends(security.get_current_user)):
+    """
+    When 'only_unread' is set to true, returns only chats with unread messages
+    """
+    chats: list[Chat] = chat_service.fetch_chats(current_user.id, only_unread)
     resp_data: MultipleChatsOut = \
         MultipleChatsOut.parse_chats(chats, current_user.id)
     return resp_data

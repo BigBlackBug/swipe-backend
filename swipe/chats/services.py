@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 import lorem
 from fastapi import Depends
 from sqlalchemy import select, update, desc
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, selectinload, contains_eager
 
 import swipe.dependencies
 from swipe import images
@@ -26,10 +26,21 @@ class ChatService:
                  db: Session = Depends(swipe.dependencies.db)):
         self.db = db
 
-    def fetch_chat(self, chat_id: UUID) -> Optional[Chat]:
-        return self.db.execute(select(Chat).options(
-            selectinload(Chat.messages)).where(Chat.id == chat_id)) \
-            .scalar_one_or_none()
+    def fetch_chat(self, chat_id: UUID, only_unread: bool = False) \
+            -> Optional[Chat]:
+        if only_unread:
+            return self.db.query(Chat). \
+                join(Chat.messages). \
+                filter(ChatMessage.status != MessageStatus.READ). \
+                where(Chat.id == chat_id). \
+                options(contains_eager(Chat.messages)). \
+                order_by(desc(ChatMessage.timestamp)).\
+                populate_existing().one_or_none()
+        else:
+            return self.db.execute(
+                select(Chat).options(selectinload(Chat.messages)). \
+                    where(Chat.id == chat_id)) \
+                .scalar_one_or_none()
 
     def fetch_chat_by_members(self, user_a_id: UUID,
                               user_b_id: UUID) -> Optional[Chat]:
@@ -136,16 +147,24 @@ class ChatService:
                 (ChatMessage.sender_id == message.sender_id)).values(
                 status=MessageStatus.READ))
 
-    def fetch_chats(self, user_object: User) -> list[Chat]:
+    def fetch_chats(self, user_id: UUID,
+                    only_unread: bool = False) -> list[Chat]:
         """
         Returns all chats for the provided user
         """
-        query = select(Chat). \
-            options(selectinload(Chat.messages)). \
-            where(((Chat.initiator_id == user_object.id) |
-                   (Chat.the_other_person_id == user_object.id)))
-
-        return self.db.execute(query).scalars().all()
+        if only_unread:
+            result = self.db.query(Chat). \
+                join(Chat.messages). \
+                filter(ChatMessage.status != MessageStatus.READ). \
+                options(contains_eager(Chat.messages)). \
+                populate_existing()
+        else:
+            query = select(Chat). \
+                options(selectinload(Chat.messages)). \
+                where(((Chat.initiator_id == user_id) |
+                       (Chat.the_other_person_id == user_id)))
+            result = self.db.execute(query).scalars().all()
+        return result
 
     def fetch_global_chat(self) -> list[GlobalChatMessage]:
         query = select(GlobalChatMessage).order_by(
