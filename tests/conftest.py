@@ -17,6 +17,7 @@ import config
 import main
 import swipe.dependencies
 from settings import settings
+from swipe.chats.services import ChatService
 from swipe.database import ModelBase
 from swipe.users import models
 from swipe.users.schemas import AuthenticationIn
@@ -119,7 +120,7 @@ def anyio_backend():
 
 
 @pytest.fixture
-def client(session, fake_redis, test_app) -> Generator:
+async def client(session, fake_redis, test_app) -> Generator:
     def test_database():
         yield session
 
@@ -130,9 +131,11 @@ def client(session, fake_redis, test_app) -> Generator:
     test_app.dependency_overrides[swipe.dependencies.db] = test_database
     test_app.dependency_overrides[swipe.dependencies.redis] = patched_redis
     # base_url is mandatory because starlette devs can be dumb sometimes
-    yield AsyncClient(app=test_app, base_url='http://localhost')
+    client = AsyncClient(app=test_app, base_url='http://localhost')
+    yield client
     del test_app.dependency_overrides[swipe.dependencies.db]
     del test_app.dependency_overrides[swipe.dependencies.redis]
+    await client.aclose()
 
 
 @pytest.fixture
@@ -147,6 +150,11 @@ def default_user(user_service: UserService,
 @pytest.fixture
 def user_service(session: Session) -> UserService:
     return UserService(session)
+
+
+@pytest.fixture
+def chat_service(session: Session) -> ChatService:
+    return ChatService(session)
 
 
 @pytest.fixture
