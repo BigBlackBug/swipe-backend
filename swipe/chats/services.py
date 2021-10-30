@@ -2,17 +2,18 @@ import datetime
 import io
 import logging
 import random
-import uuid
 from typing import Optional
+from uuid import UUID, uuid4
 
 import lorem
 from fastapi import Depends
-from sqlalchemy import select, update
+from sqlalchemy import select, update, desc
 from sqlalchemy.orm import Session, selectinload
 
 import swipe.dependencies
 from swipe import images
-from swipe.chats.models import Chat, ChatStatus, ChatMessage, MessageStatus
+from swipe.chats.models import Chat, ChatStatus, ChatMessage, MessageStatus, \
+    GlobalChatMessage
 from swipe.storage import CloudStorage
 from swipe.users.models import User
 
@@ -25,13 +26,16 @@ class ChatService:
         self.db = db
         self._storage = CloudStorage()
 
-    def fetch_chat(self, chat_id: uuid.UUID) -> Optional[Chat]:
+    def fetch_chat(self, chat_id: UUID) -> Optional[Chat]:
         return self.db.execute(select(Chat).options(
             selectinload(Chat.messages)).where(Chat.id == chat_id)) \
             .scalar_one_or_none()
 
-    def fetch_chat_by_members(self, user_a_id: uuid.UUID,
-                              user_b_id: uuid.UUID) -> Optional[Chat]:
+    def fetch_chat_by_members(self, user_a_id: UUID,
+                              user_b_id: UUID) -> Optional[Chat]:
+        """
+        :return: Chat between provided users or None
+        """
         # TODO a shitty query, but I don't know how todo union intersections
         # in sqlalchemy
         return self.db.execute(select(Chat).where(
@@ -41,10 +45,21 @@ class ChatService:
                     Chat.the_other_person_id == user_a_id))
         )).scalar_one_or_none()
 
-    def post_message(self, message_id: uuid.UUID,
-                     sender_id: uuid.UUID,
-                     recipient_id: uuid.UUID, message: str,
-                     timestamp: datetime.datetime):
+    def post_message(self, message_id: UUID,
+                     sender_id: UUID,
+                     recipient_id: UUID, message: str,
+                     timestamp: datetime.datetime) -> UUID:
+        """
+        Adds a message to the chat between supplied users.
+        If the chat doesn't exist, creates one.
+
+        :param message_id:
+        :param sender_id:
+        :param recipient_id:
+        :param message:
+        :param timestamp:
+        :return: chat id
+        """
         chat: Chat = self.fetch_chat_by_members(sender_id, recipient_id)
         if not chat:
             logger.info(f"Chat between {sender_id} and {recipient_id} "
@@ -53,31 +68,59 @@ class ChatService:
                         initiator_id=sender_id,
                         the_other_person_id=recipient_id)
             self.db.add(chat)
-        else:
-            logger.info("Found a chat")
-
         self.db.commit()
         self.db.refresh(chat)
 
         logger.info(f"Saving message from {sender_id} to {recipient_id} "
                     f"to chat {chat.id}")
-        message = ChatMessage(
+        chat_message = ChatMessage(
             id=message_id,
             timestamp=timestamp,
             status=MessageStatus.SENT,
             message=message,
             sender_id=sender_id)
-        chat.messages.append(message)
+        chat.messages.append(chat_message)
         self.db.commit()
 
-    def update_message_status(self, message_id: uuid.UUID,
-                              status: MessageStatus):
-        logger.info(f"Updating message {message_id} status to {status}")
+        return chat.id
+
+    def post_message_to_global(self, message_id: UUID,
+                               sender_id: UUID, message: str,
+                               timestamp: datetime.datetime):
+        logger.info(f"Saving message from {sender_id} to global chat")
+        chat_message = GlobalChatMessage(
+            id=message_id, timestamp=timestamp, message=message,
+            sender_id=sender_id)
+        self.db.add(chat_message)
+        self.db.commit()
+
+    def set_received_status(self, message_id: UUID):
+        logger.info(f"Updating message {message_id} status to received")
         self.db.execute(
             update(ChatMessage).where(
                 ChatMessage.id == message_id).values(
-                status=status))
-        self.db.commit()
+                status=MessageStatus.RECEIVED))
+
+    def set_read_status(self, message_id: UUID):
+        """
+        Set status of all messages before and including the one with
+        message_id to MessageStatus.READ
+
+        :param message_id:
+        """
+        logger.info(f"Updating message status to read "
+                    f"starting from {message_id}")
+        message: ChatMessage = self.db.execute(
+            select(ChatMessage).where(ChatMessage.id == message_id)). \
+            scalar_one_or_none()
+
+        # TODO update only received or all?
+        self.db.execute(
+            update(ChatMessage).where(
+                (ChatMessage.timestamp <= message.timestamp) &
+                (ChatMessage.status != MessageStatus.READ) &
+                (ChatMessage.sender_id == message.sender_id)).values(
+                status=MessageStatus.READ))
 
     def fetch_chats(self, user_object: User) -> list[Chat]:
         """
@@ -90,8 +133,33 @@ class ChatService:
 
         return self.db.execute(query).scalars().all()
 
+    def fetch_global_chat(self) -> list[GlobalChatMessage]:
+        query = select(GlobalChatMessage).order_by(
+            desc(GlobalChatMessage.timestamp))
+        return self.db.execute(query).scalars().all()
+
+    def generate_random_global_chat(self, n_messages: int):
+        messages = []
+        message_time = datetime.datetime.utcnow()
+        people = self.db.execute(select(User)).scalars().all()
+        for _ in range(n_messages):
+            message_time -= datetime.timedelta(minutes=random.randint(1, 10))
+            sender = random.choice(people)
+            message = GlobalChatMessage(
+                timestamp=message_time,
+                message=lorem.sentence(),
+                sender=sender)
+
+            messages.append(message)
+            self.db.add(message)
+        self.db.commit()
+        for message in messages:
+            self.db.refresh(message)
+        return messages
+
     def generate_random_chat(
-            self, user_a: User, user_b: User, n_messages: int) -> Chat:
+            self, user_a: User, user_b: User,
+            n_messages: int = 10, generate_images: bool = False) -> Chat:
         chat = Chat(status=ChatStatus.ACCEPTED,
                     initiator=user_a, the_other_person=user_b)
         self.db.add(chat)
@@ -101,17 +169,10 @@ class ChatService:
         for _ in range(n_messages):
             message_time -= datetime.timedelta(minutes=random.randint(1, 10))
             sender = random.choice(people)
-            if random.random() > 0.7:
-                # text
-                message = ChatMessage(
-                    timestamp=message_time,
-                    status=random.choice(list(MessageStatus)),
-                    message=lorem.sentence(),
-                    sender=sender)
-            else:
+            if generate_images and random.random() < 0.3:
                 # image
                 extension = 'png'
-                image_id = f'{uuid.uuid4()}.{extension}'
+                image_id = f'{uuid4()}.{extension}'
                 image = images.generate_random_avatar(sender.name)
                 with io.BytesIO() as output:
                     image.save(output, format=extension)
@@ -123,6 +184,14 @@ class ChatService:
                     status=random.choice(list(MessageStatus)),
                     image_id=image_id,
                     sender=sender)
+            else:
+                # text
+                message = ChatMessage(
+                    timestamp=message_time,
+                    status=random.choice(list(MessageStatus)),
+                    message=lorem.sentence(),
+                    sender=sender)
+
             chat.messages.append(message)
 
         self.db.commit()

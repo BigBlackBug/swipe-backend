@@ -28,6 +28,8 @@ class Chat(ModelBase):
     __table_args__ = (
         UniqueConstraint('initiator_id', 'the_other_person_id',
                          name='one_chat_per_pair'),
+        UniqueConstraint('the_other_person_id', 'initiator_id',
+                         name='one_chat_per_pair_2'),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -62,3 +64,15 @@ class ChatMessage(ModelBase):
 
     chat_id = Column(UUID(as_uuid=True), ForeignKey('chats.id'))
     chat = relationship('Chat', back_populates='messages')
+
+
+class GlobalChatMessage(ModelBase):
+    __tablename__ = 'global_chat_messages'
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    timestamp = Column(DateTime, nullable=False)
+
+    message = Column(String(256))
+
+    sender_id = Column(UUID(as_uuid=True), ForeignKey('users.id'))
+    sender = relationship('User', uselist=False)

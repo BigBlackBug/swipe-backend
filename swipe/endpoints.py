@@ -6,6 +6,7 @@ from starlette import status
 from starlette.responses import Response
 
 from swipe.chats import schemas as chat_schemas
+from swipe.chats.models import GlobalChatMessage
 from swipe.chats.schemas import ChatORMSchema
 from swipe.chats.services import ChatService
 from swipe.users import schemas as user_schemas
@@ -55,11 +56,23 @@ async def generate_random_chat(chat_service: ChatService = Depends(),
 
     chat = chat_service.generate_random_chat(
         user_a=user_a, user_b=user_b,
-        n_messages=n_messages
+        n_messages=n_messages, generate_images=True
     )
 
     resp_data = ChatORMSchema.parse_chat(chat, user_a_id)
     return resp_data
+
+
+@router.post('/generate_global_chat',
+             tags=['misc'],
+             response_model=list[chat_schemas.ChatMessageORMSchema],
+             response_model_exclude_none=True)
+async def generate_random_chat(chat_service: ChatService = Depends(),
+                               n_messages: int = Body(default=10, embed=True)):
+    chat_messages: list[GlobalChatMessage] = \
+        chat_service.generate_random_global_chat(n_messages=n_messages)
+
+    return chat_messages
 
 
 @router.post(

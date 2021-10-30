@@ -13,7 +13,7 @@ from swipe.storage import CloudStorage
 class ChatMessageORMSchema(BaseModel):
     id: UUID
     timestamp: datetime.datetime
-    status: MessageStatus
+    status: Optional[MessageStatus] = None
     message: Optional[str] = None
     image_id: Optional[str] = None
     image_url: Optional[str] = None

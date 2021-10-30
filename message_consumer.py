@@ -1,4 +1,3 @@
-import json
 import logging
 from uuid import UUID
 
@@ -21,36 +20,43 @@ router = APIRouter()
 async def consume_message(request: Request,
                           chat_service: ChatService = Depends()):
     # response = {
-    #     "date": "2021-10-26T17:43:46+0000",
-    #     "from": "user_id",
-    #     "room": 1234,
-    #     "text": "BUT",
-    #     "recipient": "user_id",
-    #     "textroom": "message"
+    #   "timestamp": "2021-10-26T17:43:46+0000",
+    #   "sender": "user_id",
+    #   "recipient": "user_id",
+    #   "payload" : {} # payload
     # }
     json_data = await request.json()
     # TODO timestamps come in UTC
-    if 'recipient' in json_data:
-        payload_type = json_data['payload']['type']
-        logger.info(f"Got payload with type {payload_type}")
-        if payload_type == 'message':
+    message_date = json_data['timestamp']
+    payload = json_data['payload']
+
+    message_id = UUID(hex=payload['message_id'])
+    sender_id = UUID(hex=json_data['sender'])
+    payload_type = payload['type']
+    logger.info(f"Got payload with type {payload_type} from {sender_id}")
+
+    if payload_type == 'message':
+        if 'recipient' in json_data:
             chat_service.post_message(
-                message_id=UUID(hex=json_data['payload']['message_id']),
-                sender_id=UUID(hex=json_data['from']),
+                message_id=message_id,
+                sender_id=sender_id,
                 recipient_id=UUID(hex=json_data['recipient']),
-                message=json_data['payload']['text'],
-                timestamp=dateutil.parser.isoparse(json_data['date'])
+                message=payload['text'],
+                timestamp=dateutil.parser.isoparse(message_date)
             )
-        elif payload_type == 'event':
-            message_id = json_data['payload']['message_id']
-            status = json_data['payload']['status']
-            chat_service.update_message_status(
-                message_id=UUID(hex=message_id),
-                status=MessageStatus.__members__[status.upper()]
+        else:
+            chat_service.post_message_to_global(
+                message_id=message_id,
+                sender_id=sender_id,
+                message=payload['text'],
+                timestamp=dateutil.parser.isoparse(message_date)
             )
-    else:
-        logger.info("Global chat is not supported atm")
-    print(json.dumps(json_data, indent=2, sort_keys=True))
+    elif payload_type == 'event':
+        status = MessageStatus.__members__[payload['status'].upper()]
+        if status == MessageStatus.RECEIVED:
+            chat_service.set_received_status(message_id)
+        elif status == MessageStatus.READ:
+            chat_service.set_read_status(message_id)
 
 
 app.include_router(router)

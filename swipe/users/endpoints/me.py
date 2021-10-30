@@ -98,15 +98,3 @@ async def delete_photo(
         raise HTTPException(status_code=404, detail='Photo not found')
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.post(
-    '/online',
-    name='Refresh the online status',
-    status_code=status.HTTP_204_NO_CONTENT)
-async def refresh_online_status(
-        current_user: User = Depends(security.get_current_user),
-        redis_service: RedisService = Depends()
-):
-    await redis_service.refresh_online_status(current_user)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)

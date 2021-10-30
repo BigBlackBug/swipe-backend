@@ -3,12 +3,25 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 
 from swipe import security
-from swipe.chats.models import Chat
-from swipe.chats.schemas import ChatOut, MultipleChatsOut, ChatORMSchema
+from swipe.chats.models import Chat, GlobalChatMessage
+from swipe.chats.schemas import ChatOut, MultipleChatsOut, ChatORMSchema, \
+    ChatMessageORMSchema
 from swipe.chats.services import ChatService
 from swipe.users.models import User
 
 router = APIRouter()
+
+
+@router.get(
+    '/global',
+    name='Fetch global chat',
+    response_model_exclude_none=True,
+    response_model=list[ChatMessageORMSchema])
+async def fetch_global_chat(
+        chat_service: ChatService = Depends(),
+        current_user: User = Depends(security.get_current_user)):
+    chats: list[GlobalChatMessage] = chat_service.fetch_global_chat()
+    return chats
 
 
 @router.get(
