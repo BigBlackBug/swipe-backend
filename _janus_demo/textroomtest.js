@@ -153,8 +153,8 @@ $(document).ready(function() {
 									}
 									var what = json["textroom"];
 									if(what === "message") {
-										var from = json["from"];
-										var dateString = getDateString(json["date"]);
+										var from = json["sender"];
+										var dateString = getDateString(json["timestamp"]);
 										if (json["payload"]["type"] === "event"){
 											var status = json["payload"]["status"];
 											var message_id = json["payload"]["message_id"];
@@ -165,22 +165,28 @@ $(document).ready(function() {
 											Janus.debug("Received a message, sending READ reply")
 										}else {
 											var msg = json["payload"]["text"];
-											msg = msg.replace(new RegExp('<', 'g'), '&lt');
-											msg = msg.replace(new RegExp('>', 'g'), '&gt');
+											if (json["recipient"]){
+												msg = msg.replace(new RegExp('<', 'g'), '&lt');
+												msg = msg.replace(new RegExp('>', 'g'), '&gt');
 
-											// var whisper = json["whisper"];
-											// if(whisper === true) {
-											// Private message
-											$('#chatroom').append('<p style="color: purple;">[' + dateString + '] <b>[whisper from ' + participants[from] + ']</b> ' + msg);
-											$('#chatroom').get(0).scrollTop = $('#chatroom').get(0).scrollHeight;
 
-											Janus.debug("Received a message, sending READ reply")
-											sendMsgReadEvent(from, json['payload']['message_id'], "READ")
+												// var whisper = json["whisper"];
+												// if(whisper === true) {
+												// Private message
+
+												$('#chatroom').append('<p style="color: purple;">[' + dateString + '] <b>[whisper from ' + participants[from] + ']</b> ' + msg);
+												$('#chatroom').get(0).scrollTop = $('#chatroom').get(0).scrollHeight;
+
+												Janus.debug("Received a message, sending READ reply")
+												sendMsgReadEvent(from, json['payload']['message_id'], "READ")
+											}else{
+												$('#chatroom').append('<p>[' + dateString + '] <b>' + participants[from] + ':</b> ' + msg);
+												$('#chatroom').get(0).scrollTop = $('#chatroom').get(0).scrollHeight;
+											}
 										}
 										// } else {
 										// 	// Public message
-										// 	$('#chatroom').append('<p>[' + dateString + '] <b>' + participants[from] + ':</b> ' + msg);
-										// 	$('#chatroom').get(0).scrollTop = $('#chatroom').get(0).scrollHeight;
+
 										// }
 									} else if(what === "announcement") {
 										// Room announcement
@@ -420,7 +426,11 @@ function sendData() {
 		textroom: "message",
 		transaction: randomString(12),
 		room: myroom,
- 		text: data,
+		payload: {
+			type: "message",
+			message_id: crypto.randomUUID(),
+			text: data
+		}
 	};
 	// Note: messages are always acknowledged by default. This means that you'll
 	// always receive a confirmation back that the message has been received by the

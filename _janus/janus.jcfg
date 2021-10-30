@@ -301,42 +301,6 @@ nat: {
 	#nat_1_1_mapping = "1.2.3.4"
 	#keep_private_host = true
 
-	# You can configure a TURN server in two different ways: specifying a
-	# statically configured TURN server, and thus provide the address of the
-	# TURN server, the transport (udp/tcp/tls) to use, and a set of valid
-	# credentials to authenticate. Notice that you should NEVER configure
-	# a TURN server for Janus unless it's really what you want! If you want
-	# *users* to use TURN, then you need to configure that on the client
-	# side, and NOT in Janus. The following TURN configuration should ONLY
-	# be enabled when Janus itself is sitting behind a restrictive firewall
-	# (e.g., it's part of a service installed on a box in a private home).
-	#turn_server = "myturnserver.com"
-	#turn_port = 3478
-	#turn_type = "udp"
-	#turn_user = "myuser"
-	#turn_pwd = "mypassword"
-
-	# You can also make use of the TURN REST API to get info on one or more
-	# TURN services dynamically. This makes use of the proposed standard of
-	# such an API (https://tools.ietf.org/html/draft-uberti-behave-turn-rest-00)
-	# which is currently available in both rfc5766-turn-server and coturn.
-	# You enable this by specifying the address of your TURN REST API backend,
-	# the HTTP method to use (GET or POST) and, if required, the API key Janus
-	# must provide. The timeout can be configured in seconds, with a default of
-	# 10 seconds and a minimum of 1 second. Notice that the 'opaque_id' provided
-	# via Janus API will be used as the username for a specific PeerConnection
-	# by default; if that one is missing, the 'session_id' will be used as the
-	# username instead.
-	#turn_rest_api = "http://yourbackend.com/path/to/api"
-	#turn_rest_api_key = "anyapikeyyoumayhaveset"
-	#turn_rest_api_method = "GET"
-	#turn_rest_api_timeout = 10
-
-	# In case a TURN server is provided, you can allow applications to force
-	# Janus to use TURN (https://github.com/meetecho/janus-gateway/pull/2774).
-	# This is NOT allowed by default: only enable it if you know what you're doing.
-	#allow_force_relay = true
-
 	# You can also choose which interfaces should be explicitly used by the
 	# gateway for the purpose of ICE candidates gathering, thus excluding
 	# others that may be available. To do so, use the 'ice_enforce_list'
@@ -387,6 +351,7 @@ nat: {
 # plugins are enabled and loaded at startup.
 plugins: {
 	disable = "libjanus_voicemail.so,libjanus_recordplay.so,
+	    libjanus_videoroom.so,libjanus_audiobridge.so,
 	    libjanus_nosip.so,libjanus_voicemail.so,libjanus_videocall.so,
 	    libjanus_sip.so,libjanus_streaming.so,libjanus_echotest.so"
 }
