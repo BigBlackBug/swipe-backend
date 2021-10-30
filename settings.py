@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     ENABLE_WEB_SERVER_AUTORELOAD: Optional[bool] = False
 
     REDIS_URL: str
+    JANUS_GATEWAY_URL: str = None
+    JANUS_GATEWAY_ADMIN_URL: str = None
+    JANUS_GATEWAY_GLOBAL_ROOM_ID: str = 'global_chatroom'
 
     @validator("DATABASE_URL")
     def fix_database_uri_for_heroku(

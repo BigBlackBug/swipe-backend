@@ -54,6 +54,9 @@ services:
     build: .
     env_file:
       - env/docker.env
+    environment:
+      - JANUS_GATEWAY_URL=http://janus-gateway:8088/janus
+      - JANUS_GATEWAY_ADMIN_URL=http://janus-gateway:7088/admin
     ports:
       - "8000:8000"
     command: uvicorn --host 0.0.0.0 --port 8000 main:fast_api

@@ -16,11 +16,11 @@ general: {
 
 	# By default, integers are used as a unique ID for rooms. In case you
 	# want to use strings instead (e.g., a UUID), set string_ids to true.
-	#string_ids = true
+	string_ids = true
 }
 
-room-1234: {
-	description = "Demo Room"
+room-global_chatroom: {
+	description = "Global Chat Room"
 	# is_private = true
 	secret = "adminpwd"
 	# pin = "roompwd"

@@ -1,21 +1,29 @@
 import logging
+import random
+import secrets
 import sys
 from pathlib import Path
+from uuid import UUID
 
 import alembic.command
 import alembic.config
+import requests
 import uvicorn
 from fastapi import FastAPI
+from fastapi_utils import tasks
 from starlette import status
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 import config
+import swipe
+import swipe.dependencies
 from settings import settings
 from swipe import endpoints as misc_endpoints, chats
 from swipe.errors import SwipeError
 from swipe.storage import CloudStorage
 from swipe.users.endpoints import me, users, swipes
+from swipe.users.services import RedisService
 
 
 async def swipe_error_handler(request: Request, exc: SwipeError):
@@ -56,6 +64,44 @@ fast_api = init_app()
 
 config.configure_logging()
 logger = logging.getLogger(__name__)
+
+
+@fast_api.on_event("startup")
+@tasks.repeat_every(seconds=30, logger=logger)
+async def populate_online_users_cache():
+    # TODO there has to be a better way than this
+    # fetching a random handle out of all connections is stupid
+    redis_service = RedisService(await swipe.dependencies.redis())
+
+    resp = requests.post(settings.JANUS_GATEWAY_ADMIN_URL, json={
+        'janus': 'list_sessions',
+        'transaction': secrets.token_urlsafe(16)
+    })
+    session = random.choice(resp.json()['sessions'])
+    resp = requests.post(settings.JANUS_GATEWAY_ADMIN_URL, json={
+        'janus': 'list_handles',
+        'session_id': session,
+        'transaction': secrets.token_urlsafe(16)
+    })
+    handle = random.choice(resp.json()['handles'])
+    resp = requests.post(
+        f'{settings.JANUS_GATEWAY_URL}/{session}/{handle}',
+        json={
+            'body': {
+                'request': 'listparticipants',
+                'room': settings.JANUS_GATEWAY_GLOBAL_ROOM_ID
+            },
+            'janus': 'message',
+            'transaction': secrets.token_urlsafe(16)
+        })
+    response_data = resp.json()
+    participants = response_data['plugindata']['data']['participants']
+    logger.info(f"Got {len(participants)} participants:\n{participants}")
+
+    for participant in participants:
+        await redis_service.refresh_online_status(
+            UUID(hex=participant['username']))
+
 
 if __name__ == '__main__':
     CloudStorage().initialize_storage()
