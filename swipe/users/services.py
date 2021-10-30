@@ -61,13 +61,14 @@ class RedisService:
             f'{constants.FREE_SWIPES_REDIS_PREFIX}{user_object.id}')
         return int(reap_timestamp) if reap_timestamp else None
 
-    async def filter_online_users(self, user_ids: IDList) -> IDList:
+    async def filter_online_users(self, user_ids: IDList,
+                                  status: bool = True) -> IDList:
         result: IDList = []
         for user_id in user_ids:
             # TODO cache online users in memory and use set intersections
             is_online = await self.redis.get(
                 f'{constants.ONLINE_USER_PREFIX}{user_id}')
-            if is_online:
+            if bool(is_online) == status:
                 result.append(user_id)
         return result
 
@@ -76,10 +77,10 @@ class RedisService:
             f'{constants.ONLINE_USER_PREFIX}{user_id}')
 
     async def refresh_online_status(
-            self, user: User,
+            self, user_id: UUID,
             ttl: int = constants.ONLINE_USER_COOLDOWN_SEC):
         await self.redis.setex(
-            f'{constants.ONLINE_USER_PREFIX}{user.id}',
+            f'{constants.ONLINE_USER_PREFIX}{user_id}',
             time=ttl, value=1)
 
 

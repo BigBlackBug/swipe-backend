@@ -50,9 +50,9 @@ async def fetch_list_of_users(
             city=filter_params.city,
             ignore_users=ignored_user_ids)
 
-        if filter_params.online:
+        if filter_params.online is not None:
             current_user_ids = await redis_service.filter_online_users(
-                current_user_ids)
+                current_user_ids, status=filter_params.online)
 
         collected_user_ids.extend(current_user_ids)
         ignored_user_ids.extend(current_user_ids)
