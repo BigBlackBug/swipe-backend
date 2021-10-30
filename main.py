@@ -21,7 +21,7 @@ import swipe.dependencies
 from settings import settings
 from swipe import endpoints as misc_endpoints, chats
 from swipe.errors import SwipeError
-from swipe.storage import CloudStorage
+from swipe.storage import storage_client
 from swipe.users.endpoints import me, users, swipes
 from swipe.users.services import RedisService
 
@@ -77,7 +77,13 @@ async def populate_online_users_cache():
         'janus': 'list_sessions',
         'transaction': secrets.token_urlsafe(16)
     })
-    session = random.choice(resp.json()['sessions'])
+    sessions = resp.json()['sessions']
+    if not sessions:
+        logger.info("No active users detected")
+        return
+
+    session = random.choice(sessions)
+
     resp = requests.post(settings.JANUS_GATEWAY_ADMIN_URL, json={
         'janus': 'list_handles',
         'session_id': session,
