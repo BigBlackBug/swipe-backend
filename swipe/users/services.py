@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 import swipe.dependencies
 from settings import settings, constants
 from swipe import images
-from swipe.storage import CloudStorage
+from swipe.storage import storage_client
 from swipe.users import schemas
 from swipe.users.enums import AuthProvider, ZodiacSign, Gender, UserInterests, \
     RecurrenceRate
@@ -88,7 +88,6 @@ class UserService:
     def __init__(self,
                  db: Session = Depends(swipe.dependencies.db)):
         self.db = db
-        self._storage = CloudStorage()
 
     def create_user(self,
                     user_payload: schemas.AuthenticationIn) -> User:
@@ -206,7 +205,7 @@ class UserService:
     def add_photo(self, user_object: User, file_content: Union[IO, bytes],
                   extension: str) -> str:
         photo_id = f'{uuid.uuid4()}.{extension}'
-        self._storage.upload_image(photo_id, file_content)
+        storage_client.upload_image(photo_id, file_content)
 
         user_object.photos = user_object.photos + [photo_id]
         self.db.commit()
@@ -217,7 +216,7 @@ class UserService:
         new_list.remove(photo_id)
         user_object.photos = new_list
 
-        self._storage.delete_image(photo_id)
+        storage_client.delete_image(photo_id)
         self.db.commit()
 
     def find_user_by_auth(
@@ -257,4 +256,4 @@ class UserService:
         return user_object
 
     def get_photo_url(self, image_id: str):
-        return self._storage.get_image_url(image_id)
+        return storage_client.get_image_url(image_id)

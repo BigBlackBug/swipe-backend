@@ -14,7 +14,8 @@ import swipe.dependencies
 from swipe import images
 from swipe.chats.models import Chat, ChatStatus, ChatMessage, MessageStatus, \
     GlobalChatMessage
-from swipe.storage import CloudStorage
+from swipe.errors import SwipeError
+from swipe.storage import storage_client
 from swipe.users.models import User
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,6 @@ class ChatService:
     def __init__(self,
                  db: Session = Depends(swipe.dependencies.db)):
         self.db = db
-        self._storage = CloudStorage()
 
     def fetch_chat(self, chat_id: UUID) -> Optional[Chat]:
         return self.db.execute(select(Chat).options(
@@ -47,12 +47,15 @@ class ChatService:
 
     def post_message(self, message_id: UUID,
                      sender_id: UUID,
-                     recipient_id: UUID, message: str,
-                     timestamp: datetime.datetime) -> UUID:
+                     recipient_id: UUID,
+                     timestamp: datetime.datetime,
+                     message: Optional[str] = None,
+                     image_id: Optional[UUID] = None) -> UUID:
         """
         Adds a message to the chat between supplied users.
         If the chat doesn't exist, creates one.
 
+        :param image_id:
         :param message_id:
         :param sender_id:
         :param recipient_id:
@@ -72,13 +75,24 @@ class ChatService:
         self.db.refresh(chat)
 
         logger.info(f"Saving message from {sender_id} to {recipient_id} "
-                    f"to chat {chat.id}")
-        chat_message = ChatMessage(
-            id=message_id,
-            timestamp=timestamp,
-            status=MessageStatus.SENT,
-            message=message,
-            sender_id=sender_id)
+                    f"to chat {chat.id}, text:{message}")
+        if message:
+            chat_message = ChatMessage(
+                id=message_id,
+                timestamp=timestamp,
+                status=MessageStatus.SENT,
+                message=message,
+                sender_id=sender_id)
+        elif image_id:
+            chat_message = ChatMessage(
+                id=message_id,
+                timestamp=timestamp,
+                status=MessageStatus.SENT,
+                image_id=image_id,
+                sender_id=sender_id)
+        else:
+            raise SwipeError("Either message or image_id must be provided")
+
         chat.messages.append(chat_message)
         self.db.commit()
 
@@ -177,7 +191,7 @@ class ChatService:
                 with io.BytesIO() as output:
                     image.save(output, format=extension)
                     contents = output.getvalue()
-                self._storage.upload_image(image_id, contents)
+                storage_client.upload_image(image_id, contents)
 
                 message = ChatMessage(
                     timestamp=message_time,

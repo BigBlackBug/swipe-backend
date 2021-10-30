@@ -104,7 +104,7 @@ async def populate_online_users_cache():
 
 
 if __name__ == '__main__':
-    CloudStorage().initialize_storage()
+    storage_client.initialize_buckets()
 
     migrations_dir = str(Path('migrations').absolute())
     logger.info(

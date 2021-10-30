@@ -27,7 +27,7 @@ class CloudStorage:
             config=Config(signature_version="s3v4")
         )
 
-    def initialize_storage(self):
+    def initialize_buckets(self):
         logger.info(f"Validating cloud storage bucket {STORAGE_IMAGE_BUCKET}")
         try:
             self._client.head_bucket(Bucket=STORAGE_IMAGE_BUCKET)
@@ -57,3 +57,6 @@ class CloudStorage:
         self._client.delete_objects(
             Bucket=STORAGE_IMAGE_BUCKET,
             Delete={'Objects': [{'Key': image_id}]})
+
+
+storage_client = CloudStorage()

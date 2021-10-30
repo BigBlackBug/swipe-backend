@@ -7,7 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, validator
 
 from swipe.chats.models import MessageStatus, ChatMessage, Chat, ChatStatus
-from swipe.storage import CloudStorage
+from swipe.storage import storage_client
 
 
 class ChatMessageORMSchema(BaseModel):
@@ -24,9 +24,9 @@ class ChatMessageORMSchema(BaseModel):
     def patched_from_orm(cls: ChatMessageORMSchema,
                          obj: Any) -> ChatMessageORMSchema:
         schema_obj: ChatMessageORMSchema = cls.from_orm(obj)
-        storage = CloudStorage()
         if schema_obj.image_id:
-            schema_obj.image_url = storage.get_image_url(schema_obj.image_id)
+            schema_obj.image_url = \
+                storage_client.get_image_url(schema_obj.image_id)
         return schema_obj
 
     class Config:

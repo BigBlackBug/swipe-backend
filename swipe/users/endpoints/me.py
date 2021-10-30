@@ -8,7 +8,7 @@ from starlette.responses import Response
 from swipe import security
 from swipe.users import schemas
 from swipe.users.models import User
-from swipe.users.services import UserService, RedisService
+from swipe.users.services import UserService
 
 IMAGE_CONTENT_TYPE_REGEXP = 'image/(png|jpe?g)'
 
