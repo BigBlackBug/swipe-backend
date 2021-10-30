@@ -87,7 +87,7 @@ async def upload_image(
     _, _, extension = file.content_type.partition('/')
 
     image_id = f'{uuid.uuid4()}.{extension}'
-    storage_client.upload_image(image_id, file.file)
-    image_url = storage_client.get_image_url(image_id)
+    storage_client.upload_chat_image(image_id, file.file)
+    image_url = storage_client.get_chat_image_url(image_id)
 
     return {'image_id': image_id, 'image_url': image_url}
