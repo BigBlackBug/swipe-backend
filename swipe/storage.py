@@ -37,7 +37,7 @@ class CloudStorage:
         try:
             self._client.head_bucket(Bucket=bucket_name)
         except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] == status.HTTP_404_NOT_FOUND:
+            if int(e.response['Error']['Code']) == status.HTTP_404_NOT_FOUND:
                 logger.info(f"Bucket {bucket_name} "
                             f"was not found, creating")
                 self._client.create_bucket(Bucket=bucket_name)
