@@ -41,7 +41,8 @@ async def consume_message(request: Request,
                 message_id=message_id,
                 sender_id=sender_id,
                 recipient_id=UUID(hex=json_data['recipient']),
-                message=payload['text'],
+                message=payload.get('text'),
+                image_id=payload.get('image_id'),
                 timestamp=dateutil.parser.isoparse(message_date)
             )
         else:
