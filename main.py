@@ -66,7 +66,6 @@ config.configure_logging()
 logger = logging.getLogger(__name__)
 
 
-@fast_api.on_event("startup")
 @tasks.repeat_every(seconds=30, logger=logger)
 async def populate_online_users_cache():
     # TODO there has to be a better way than this
@@ -108,6 +107,9 @@ async def populate_online_users_cache():
         await redis_service.refresh_online_status(
             UUID(hex=participant['username']))
 
+if settings.ENABLE_ONLINE_CACHE_JOB:
+    populate_online_users_cache = \
+        fast_api.on_event("startup")(populate_online_users_cache)
 
 if __name__ == '__main__':
     storage_client.initialize_buckets()

@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     # TODO debug mode
     ENABLE_SQL_ECHO: Optional[bool] = True
     ENABLE_WEB_SERVER_AUTORELOAD: Optional[bool] = False
+    ENABLE_ONLINE_CACHE_JOB: Optional[bool] = True
 
     REDIS_URL: str
     JANUS_GATEWAY_URL: str = None
