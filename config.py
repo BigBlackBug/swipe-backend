@@ -10,4 +10,4 @@ def configure_logging():
                         format="[%(asctime)s %(levelname)s|%(processName)s] "
                                "%(name)s %(message)s",
                         level=logging.DEBUG)
-    logging.getLogger('botocore')
+    logging.getLogger('botocore').setLevel(logging.INFO)
