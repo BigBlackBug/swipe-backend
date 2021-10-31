@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 import lorem
 from fastapi import Depends
-from sqlalchemy import select, update, desc
+from sqlalchemy import select, update, desc, delete
 from sqlalchemy.orm import Session, selectinload, contains_eager
 
 import swipe.dependencies
@@ -251,3 +251,13 @@ class ChatService:
             select(GlobalChatMessage). \
                 where(GlobalChatMessage.id == message_id)). \
             scalar_one_or_none()
+
+    def delete_chat(self, chat_id: UUID, current_user: User):
+        # Why make another query, when we can check rowcount?
+        result = self.db.execute(
+            delete(Chat).where(Chat.id == chat_id).
+                where((Chat.initiator_id == current_user.id) |
+                      (Chat.the_other_person_id == current_user.id)))
+        if result.rowcount != 1:
+            raise SwipeError("You are not allowed to delete this chat "
+                             "because you are not a member")

@@ -40,6 +40,9 @@ class Chat(ModelBase):
                             order_by='desc(ChatMessage.timestamp)',
                             collection_class=ordering_list('timestamp'),
                             # lazy='noload',
+                            # we're using database cascades
+                            # so this setting is due
+                            passive_deletes=True,
                             back_populates='chat')
 
     initiator_id = Column(UUID(as_uuid=True), ForeignKey('users.id'))
@@ -65,7 +68,8 @@ class ChatMessage(ModelBase):
     sender_id = Column(UUID(as_uuid=True), ForeignKey('users.id'))
     sender = relationship('User', uselist=False)
 
-    chat_id = Column(UUID(as_uuid=True), ForeignKey('chats.id'))
+    chat_id = Column(UUID(as_uuid=True), ForeignKey(
+        'chats.id', ondelete="CASCADE"))
     chat = relationship('Chat', back_populates='messages')
 
 

@@ -4,12 +4,13 @@ import uuid
 
 import lorem
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
 
 from swipe.chats.models import Chat, ChatStatus, GlobalChatMessage, ChatMessage, \
     MessageStatus
 from swipe.chats.services import ChatService
+from swipe.errors import SwipeError
 from swipe.users import models
 from swipe.users.services import UserService
 
@@ -222,3 +223,71 @@ async def test_set_like(
         select(ChatMessage.is_liked).where(
             ChatMessage.id == message.id)).scalars().one()
     assert new_like_status is False
+
+
+@pytest.mark.anyio
+async def test_delete_chat(
+        default_user: models.User,
+        session: Session,
+        user_service: UserService,
+        chat_service: ChatService,
+        default_user_auth_headers: dict[str, str]):
+    initiator = user_service.generate_random_user()
+    chat = Chat(
+        status=ChatStatus.ACCEPTED, initiator=default_user,
+        the_other_person=initiator)
+    session.add(chat)
+
+    msg1 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='wtf omg lol', sender=default_user)
+    msg2 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='why dont u answer me???', sender=default_user)
+    msg3 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='fuck off', sender=initiator)
+    msg4 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        image_id='345345.png', sender=initiator)
+    chat.messages.extend([msg1, msg2, msg3, msg4])
+    session.commit()
+
+    session.refresh(chat)
+    chat_service.delete_chat(chat.id, default_user)
+    assert session.query(Chat).count() == 0
+    assert session.query(ChatMessage).count() == 0
+
+@pytest.mark.anyio
+async def test_delete_chat_wrong_user(
+        default_user: models.User,
+        session: Session,
+        user_service: UserService,
+        chat_service: ChatService,
+        default_user_auth_headers: dict[str, str]):
+    initiator = user_service.generate_random_user()
+    initiator2 = user_service.generate_random_user()
+    chat = Chat(
+        status=ChatStatus.ACCEPTED, initiator=initiator,
+        the_other_person=initiator2)
+    session.add(chat)
+
+    msg1 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='wtf omg lol', sender=default_user)
+    msg2 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='why dont u answer me???', sender=default_user)
+    msg3 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='fuck off', sender=initiator)
+    msg4 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        image_id='345345.png', sender=initiator)
+    chat.messages.extend([msg1, msg2, msg3, msg4])
+    session.commit()
+
+    session.refresh(chat)
+    # user is not a member
+    with pytest.raises(SwipeError):
+        chat_service.delete_chat(chat.id, default_user)
