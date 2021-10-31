@@ -52,7 +52,7 @@ async def consume_message(request: Request,
                 message=payload['text'],
                 timestamp=dateutil.parser.isoparse(message_date)
             )
-    elif payload_type == 'event':
+    elif payload_type == 'message_status':
         status = MessageStatus.__members__[payload['status'].upper()]
         if status == MessageStatus.RECEIVED:
             chat_service.set_received_status(message_id)
