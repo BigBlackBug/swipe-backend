@@ -4,7 +4,7 @@ import enum
 import uuid
 
 from sqlalchemy import Column, String, Enum, ForeignKey, DateTime, \
-    UniqueConstraint
+    UniqueConstraint, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm import relationship
@@ -59,6 +59,8 @@ class ChatMessage(ModelBase):
 
     message = Column(String(256))
     image_id = Column(String(50))
+
+    is_liked = Column(Boolean, default=False)
 
     sender_id = Column(UUID(as_uuid=True), ForeignKey('users.id'))
     sender = relationship('User', uselist=False)

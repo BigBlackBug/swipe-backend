@@ -18,6 +18,7 @@ class ChatMessageORMSchema(BaseModel):
     image_id: Optional[str] = None
     image_url: Optional[str] = None
 
+    is_liked: Optional[bool] = None
     sender_id: UUID
 
     @classmethod

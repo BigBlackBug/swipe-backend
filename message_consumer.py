@@ -58,6 +58,8 @@ async def consume_message(request: Request,
             chat_service.set_received_status(message_id)
         elif status == MessageStatus.READ:
             chat_service.set_read_status(message_id)
+    elif payload_type == 'like':
+        chat_service.set_like_status(message_id, payload['status'])
 
 
 app.include_router(router)

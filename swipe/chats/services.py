@@ -34,7 +34,7 @@ class ChatService:
                 filter(ChatMessage.status != MessageStatus.READ). \
                 where(Chat.id == chat_id). \
                 options(contains_eager(Chat.messages)). \
-                order_by(desc(ChatMessage.timestamp)).\
+                order_by(desc(ChatMessage.timestamp)). \
                 populate_existing().one_or_none()
         else:
             return self.db.execute(
@@ -135,9 +135,7 @@ class ChatService:
         """
         logger.info(f"Updating message status to read "
                     f"starting from {message_id}")
-        message: ChatMessage = self.db.execute(
-            select(ChatMessage).where(ChatMessage.id == message_id)). \
-            scalar_one_or_none()
+        message: ChatMessage = self.fetch_message(message_id)
 
         # TODO update only received or all?
         self.db.execute(
@@ -230,3 +228,13 @@ class ChatService:
         self.db.commit()
         self.db.refresh(chat)
         return chat
+
+    def set_like_status(self, message_id: UUID, status: bool = True):
+        self.db.execute(
+            update(ChatMessage).where(
+                ChatMessage.id == message_id).values(is_liked=status))
+
+    def fetch_message(self, message_id: UUID):
+        return self.db.execute(
+            select(ChatMessage).where(ChatMessage.id == message_id)). \
+            scalar_one_or_none()

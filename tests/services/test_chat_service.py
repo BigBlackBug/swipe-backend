@@ -164,3 +164,32 @@ async def test_set_read(
         select(ChatMessage.status).where(
             ChatMessage.id == second_message.id)).scalars().one()
     assert new_status == MessageStatus.READ
+
+@pytest.mark.anyio
+async def test_set_like(
+        default_user: models.User,
+        session: Session,
+        user_service: UserService,
+        chat_service: ChatService):
+    user_1 = user_service.generate_random_user()
+    chat = Chat(status=ChatStatus.ACCEPTED,
+                initiator=user_1, the_other_person=default_user)
+    session.add(chat)
+
+    message = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message=lorem.sentence(), sender=user_1, is_liked=False)
+    chat.messages.append(message)
+    session.commit()
+
+    chat_service.set_like_status(message.id, True)
+    new_like_status = session.execute(
+        select(ChatMessage.is_liked).where(
+            ChatMessage.id == message.id)).scalars().one()
+    assert new_like_status is True
+
+    chat_service.set_like_status(message.id, False)
+    new_like_status = session.execute(
+        select(ChatMessage.is_liked).where(
+            ChatMessage.id == message.id)).scalars().one()
+    assert new_like_status is False
