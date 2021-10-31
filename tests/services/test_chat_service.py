@@ -95,12 +95,40 @@ async def test_post_message_to_global(
         timestamp=datetime.datetime.now(), message='hello')
     chat_service.post_message_to_global(
         message_id=(second_message_id := uuid.uuid4()), sender_id=user_1.id,
-        timestamp=datetime.datetime.now() - datetime.timedelta(minutes=10),
+        timestamp=datetime.datetime.now() + datetime.timedelta(minutes=10),
         message='hello again')
 
     global_messages: list[GlobalChatMessage] = chat_service.fetch_global_chat()
     assert len(global_messages) == 2
-    assert global_messages[0].id == first_message_id
+    assert global_messages[0].id == second_message_id
+    assert global_messages[1].id == first_message_id
+
+
+@pytest.mark.anyio
+async def test_fetch_from_global_from_id(
+        default_user: models.User,
+        session: Session,
+        user_service: UserService,
+        chat_service: ChatService):
+    user_1 = user_service.generate_random_user()
+
+    chat_service.post_message_to_global(
+        message_id=(first_message_id := uuid.uuid4()),
+        sender_id=default_user.id,
+        timestamp=datetime.datetime.now(), message='hello')
+    chat_service.post_message_to_global(
+        message_id=(second_message_id := uuid.uuid4()), sender_id=user_1.id,
+        timestamp=datetime.datetime.now() + datetime.timedelta(minutes=10),
+        message='hello again')
+    chat_service.post_message_to_global(
+        message_id=(third_message_id := uuid.uuid4()), sender_id=user_1.id,
+        timestamp=datetime.datetime.now() + datetime.timedelta(minutes=20),
+        message='hello again again')
+
+    global_messages: list[GlobalChatMessage] = \
+        chat_service.fetch_global_chat(first_message_id)
+    assert len(global_messages) == 2
+    assert global_messages[0].id == third_message_id
     assert global_messages[1].id == second_message_id
 
 
@@ -164,6 +192,7 @@ async def test_set_read(
         select(ChatMessage.status).where(
             ChatMessage.id == second_message.id)).scalars().one()
     assert new_status == MessageStatus.READ
+
 
 @pytest.mark.anyio
 async def test_set_like(

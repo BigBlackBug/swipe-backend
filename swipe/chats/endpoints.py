@@ -24,9 +24,11 @@ IMAGE_CONTENT_TYPE_REGEXP = 'image/(png|jpe?g)'
     response_model_exclude_none=True,
     response_model=list[ChatMessageORMSchema])
 async def fetch_global_chat(
+        last_message_id: UUID = None,
         chat_service: ChatService = Depends(),
         current_user: User = Depends(security.get_current_user)):
-    chats: list[GlobalChatMessage] = chat_service.fetch_global_chat()
+    chats: list[GlobalChatMessage] = \
+        chat_service.fetch_global_chat(last_message_id)
     return chats
 
 

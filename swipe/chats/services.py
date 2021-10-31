@@ -164,9 +164,16 @@ class ChatService:
             result = self.db.execute(query).scalars().all()
         return result
 
-    def fetch_global_chat(self) -> list[GlobalChatMessage]:
-        query = select(GlobalChatMessage).order_by(
-            desc(GlobalChatMessage.timestamp))
+    def fetch_global_chat(self, last_message_id: Optional[UUID] = None) \
+            -> list[GlobalChatMessage]:
+        if last_message_id:
+            last_message = self.fetch_global_message(last_message_id)
+            query = select(GlobalChatMessage). \
+                where(GlobalChatMessage.timestamp > last_message.timestamp). \
+                order_by(desc(GlobalChatMessage.timestamp))
+        else:
+            query = select(GlobalChatMessage). \
+                order_by(desc(GlobalChatMessage.timestamp))
         return self.db.execute(query).scalars().all()
 
     def generate_random_global_chat(self, n_messages: int):
@@ -237,4 +244,10 @@ class ChatService:
     def fetch_message(self, message_id: UUID):
         return self.db.execute(
             select(ChatMessage).where(ChatMessage.id == message_id)). \
+            scalar_one_or_none()
+
+    def fetch_global_message(self, message_id: UUID):
+        return self.db.execute(
+            select(GlobalChatMessage). \
+                where(GlobalChatMessage.id == message_id)). \
             scalar_one_or_none()

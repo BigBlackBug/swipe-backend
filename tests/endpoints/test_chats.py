@@ -192,6 +192,7 @@ async def test_fetch_single_chat(
     assert len(resp_data['messages']) == 4
     assert resp_data['messages'][3]['id'] == str(msg1.id)
 
+
 @pytest.mark.anyio
 async def test_fetch_single_chat_only_unread(
         client: AsyncClient,
