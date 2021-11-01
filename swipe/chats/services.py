@@ -128,6 +128,7 @@ class ChatService:
             update(ChatMessage).where(
                 ChatMessage.id == message_id).values(
                 status=MessageStatus.RECEIVED))
+        self.db.commit()
 
     def set_read_status(self, message_id: UUID):
         """
@@ -141,12 +142,13 @@ class ChatService:
         message: ChatMessage = self.fetch_message(message_id)
 
         # TODO update only received or all?
-        self.db.execute(
+        dself.db.execute(
             update(ChatMessage).where(
                 (ChatMessage.timestamp <= message.timestamp) &
                 (ChatMessage.status != MessageStatus.READ) &
                 (ChatMessage.sender_id == message.sender_id)).values(
                 status=MessageStatus.READ))
+        self.db.commit()
 
     def fetch_chats(self, user_id: UUID,
                     only_unread: bool = False) -> list[Chat]:
@@ -183,6 +185,7 @@ class ChatService:
         self.db.execute(
             update(ChatMessage).where(
                 ChatMessage.id == message_id).values(is_liked=status))
+        self.db.commit()
 
     def fetch_message(self, message_id: UUID):
         return self.db.execute(
@@ -203,22 +206,23 @@ class ChatService:
         :param chat_id:
         :param user_object:
         """
-        if not user_object:
+        if user_object:
+            # Why make another query, when we can check rowcount?
+            result = self.db.execute(
+                delete(Chat).where(Chat.id == chat_id).
+                    where((Chat.initiator_id == user_object.id) |
+                          (Chat.the_other_person_id == user_object.id)))
+            if result.rowcount != 1:
+                raise SwipeError("You are not allowed to delete this chat "
+                                 "because you are not a member")
+        else:
             self.db.execute(delete(Chat).where(Chat.id == chat_id))
-            return
-
-        # Why make another query, when we can check rowcount?
-        result = self.db.execute(
-            delete(Chat).where(Chat.id == chat_id).
-                where((Chat.initiator_id == user_object.id) |
-                      (Chat.the_other_person_id == user_object.id)))
-        if result.rowcount != 1:
-            raise SwipeError("You are not allowed to delete this chat "
-                             "because you are not a member")
+        self.db.commit()
 
     def accept_chat(self, chat_id: UUID):
         result = self.db.execute(update(Chat).where(Chat.id == chat_id).
                                  values(status=ChatStatus.ACCEPTED))
+        self.db.commit()
         if result.rowcount == 0:
             raise SwipeError(f'Chat with id:{chat_id} does not exist')
 
