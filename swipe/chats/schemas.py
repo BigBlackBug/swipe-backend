@@ -27,7 +27,7 @@ class ChatMessageORMSchema(BaseModel):
         schema_obj: ChatMessageORMSchema = cls.from_orm(obj)
         if schema_obj.image_id:
             schema_obj.image_url = \
-                storage_client.get_image_url(schema_obj.image_id)
+                storage_client.get_chat_image_url(schema_obj.image_id)
         return schema_obj
 
     class Config:
