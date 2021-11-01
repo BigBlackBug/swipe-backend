@@ -10,7 +10,7 @@ from swipe.chats.models import GlobalChatMessage
 from swipe.chats.schemas import ChatORMSchema
 from swipe.chats.services import ChatService
 from swipe.users import schemas as user_schemas
-from swipe.users.services import UserService, RedisService
+from swipe.users.services import UserService, RedisUserService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -91,7 +91,7 @@ async def generate_random_chat(chat_service: ChatService = Depends(),
 async def authenticate_user(auth_payload: user_schemas.AuthenticationIn,
                             response: Response,
                             user_service: UserService = Depends(),
-                            redis_service: RedisService = Depends()):
+                            redis_service: RedisUserService = Depends()):
     """
     Returns a jwt access token either for an existing user
     or for a new one, in case no match has been found for the supplied

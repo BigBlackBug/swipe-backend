@@ -1,6 +1,6 @@
 general: {
 	enabled = true		# By default the module is not enabled
-	events = "plugins"		# Comma separated list of the events mask you're interested
+	events = "plugins,sessions,handles"		# Comma separated list of the events mask you're interested
 						# in. Valid values are none, sessions, handles, jsep, webrtc,
 						# media, plugins, transports, core, external and all. By
 						# default we subscribe to everything (all)

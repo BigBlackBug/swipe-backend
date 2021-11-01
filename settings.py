@@ -12,8 +12,9 @@ class Constants(BaseSettings):
     FREE_SWIPES_COOLDOWN_SEC = 10
 
     ONLINE_USER_COOLDOWN_SEC = 60
-    FREE_SWIPES_REDIS_PREFIX = f'free_swipes_cooldown_'
-    ONLINE_USER_PREFIX = f'online_'
+    FREE_SWIPES_REDIS_PREFIX = 'free_swipes_cooldown_'
+    ONLINE_USER_PREFIX = 'online_global_'
+    ONLINE_USER_LOBBY_PREFIX = 'online_lobby_'
 
     BASE_DIR: Path = Path('.')
 
@@ -36,7 +37,8 @@ class Settings(BaseSettings):
     REDIS_URL: str
     JANUS_GATEWAY_URL: str = None
     JANUS_GATEWAY_ADMIN_URL: str = None
-    JANUS_GATEWAY_GLOBAL_ROOM_ID: str = 'global_chatroom'
+    JANUS_GATEWAY_GLOBAL_ROOM_ID: str = 'global'
+    JANUS_GATEWAY_LOBBY_ROOM_ID: str = 'lobby'
 
     @validator("DATABASE_URL")
     def fix_database_uri_for_heroku(

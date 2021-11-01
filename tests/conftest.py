@@ -17,11 +17,11 @@ import config
 import main
 import swipe.dependencies
 from settings import settings
-from swipe.chats.services import ChatService
+from swipe.chats.services import ChatService, RedisChatService
 from swipe.database import ModelBase
 from swipe.users import models
 from swipe.users.schemas import AuthenticationIn
-from swipe.users.services import UserService, RedisService
+from swipe.users.services import UserService, RedisUserService
 
 config.configure_logging()
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ def db_setup(request):
     })
     if not containers:
         pg_container: Container = client.containers.run(
-            'postgres:latest', name='test_pg', detach=True,
+            'postgres:13', name='test_pg', detach=True,
             auto_remove=True,
             ports={'5432/tcp': 5432}, environment={
                 'POSTGRES_PASSWORD': 'postgres'
@@ -153,13 +153,18 @@ def user_service(session: Session) -> UserService:
 
 
 @pytest.fixture
+def redis_service(fake_redis: Redis) -> RedisUserService:
+    return RedisUserService(fake_redis)
+
+
+@pytest.fixture
 def chat_service(session: Session) -> ChatService:
     return ChatService(session)
 
 
 @pytest.fixture
-def redis_service(fake_redis: Redis) -> RedisService:
-    return RedisService(fake_redis)
+def redis_chat_service(fake_redis: Redis) -> RedisChatService:
+    return RedisChatService(fake_redis)
 
 
 @pytest.fixture

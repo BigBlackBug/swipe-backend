@@ -139,6 +139,7 @@ class FilterBody(BaseModel):
     gender: Optional[Gender] = None
     city: Optional[str] = None
     online: Optional[bool] = None
+    lobby: Optional[bool] = None
     ignore_users: Optional[list[UUID]] = []
     max_age_difference: Optional[int] = 5
 

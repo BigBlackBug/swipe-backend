@@ -19,10 +19,18 @@ general: {
 	string_ids = true
 }
 
-room-global_chatroom: {
+room-global: {
 	description = "Global Chat Room"
 	# is_private = true
 	secret = "adminpwd"
 	# pin = "roompwd"
-	post = "http://message_consumer:16000"
+	post = "http://message_consumer:16000/global"
+}
+
+room-lobby: {
+	description = "Audio/Video/Text chat lobby"
+	# is_private = true
+	secret = "adminpwd"
+	# pin = "roompwd"
+	post = "http://message_consumer:16000/lobby"
 }

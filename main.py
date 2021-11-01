@@ -1,13 +1,10 @@
 import logging
-import random
-import secrets
 import sys
 from pathlib import Path
 from uuid import UUID
 
 import alembic.command
 import alembic.config
-import requests
 import uvicorn
 from fastapi import FastAPI
 from fastapi_utils import tasks
@@ -18,12 +15,12 @@ from starlette.responses import JSONResponse
 import config
 import swipe
 import swipe.dependencies
-from settings import settings
-from swipe import endpoints as misc_endpoints, chats
+from settings import settings, constants
+from swipe import endpoints as misc_endpoints, chats, janus_client
 from swipe.errors import SwipeError
 from swipe.storage import storage_client
 from swipe.users.endpoints import me, users, swipes
-from swipe.users.services import RedisService
+from swipe.users.services import RedisUserService
 
 
 async def swipe_error_handler(request: Request, exc: SwipeError):
@@ -66,46 +63,27 @@ config.configure_logging()
 logger = logging.getLogger(__name__)
 
 
-@tasks.repeat_every(seconds=30, logger=logger)
+@tasks.repeat_every(seconds=constants.ONLINE_USER_COOLDOWN_SEC - 5,
+                    logger=logger)
 async def populate_online_users_cache():
-    # TODO there has to be a better way than this
-    # fetching a random handle out of all connections is stupid
-    redis_service = RedisService(await swipe.dependencies.redis())
+    redis_service = RedisUserService(await swipe.dependencies.redis())
 
-    resp = requests.post(settings.JANUS_GATEWAY_ADMIN_URL, json={
-        'janus': 'list_sessions',
-        'transaction': secrets.token_urlsafe(16)
-    })
-    sessions = resp.json()['sessions']
-    if not sessions:
-        logger.info("No active users detected")
-        return
-
-    session = random.choice(sessions)
-
-    resp = requests.post(settings.JANUS_GATEWAY_ADMIN_URL, json={
-        'janus': 'list_handles',
-        'session_id': session,
-        'transaction': secrets.token_urlsafe(16)
-    })
-    handle = random.choice(resp.json()['handles'])
-    resp = requests.post(
-        f'{settings.JANUS_GATEWAY_URL}/{session}/{handle}',
-        json={
-            'body': {
-                'request': 'listparticipants',
-                'room': settings.JANUS_GATEWAY_GLOBAL_ROOM_ID
-            },
-            'janus': 'message',
-            'transaction': secrets.token_urlsafe(16)
-        })
-    response_data = resp.json()
-    participants = response_data['plugindata']['data']['participants']
-    logger.info(f"Got {len(participants)} participants:\n{participants}")
-
-    for participant in participants:
+    for participant in janus_client.fetch_online_users(
+            settings.JANUS_GATEWAY_GLOBAL_ROOM_ID):
         await redis_service.refresh_online_status(
             UUID(hex=participant['username']))
+
+
+@tasks.repeat_every(seconds=constants.ONLINE_USER_COOLDOWN_SEC - 5,
+                    logger=logger)
+async def populate_lobby_users_cache():
+    redis_service = RedisUserService(await swipe.dependencies.redis())
+
+    for participant in janus_client.fetch_online_users(
+            settings.JANUS_GATEWAY_LOBBY_ROOM_ID):
+        await redis_service.refresh_online_lobby_status(
+            UUID(hex=participant['username']))
+
 
 if settings.ENABLE_ONLINE_CACHE_JOB:
     populate_online_users_cache = \

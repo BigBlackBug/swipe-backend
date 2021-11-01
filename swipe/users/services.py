@@ -31,7 +31,7 @@ from swipe.users.schemas import AuthenticationIn
 logger = logging.getLogger(__name__)
 
 
-class RedisService:
+class RedisUserService:
     def __init__(self,
                  redis: Redis = Depends(swipe.dependencies.redis)):
         self.redis = redis
@@ -61,13 +61,13 @@ class RedisService:
             f'{constants.FREE_SWIPES_REDIS_PREFIX}{user_object.id}')
         return int(reap_timestamp) if reap_timestamp else None
 
+    # TODO hello, copy/paste style
     async def filter_online_users(self, user_ids: IDList,
                                   status: bool = True) -> IDList:
         result: IDList = []
         for user_id in user_ids:
             # TODO cache online users in memory and use set intersections
-            is_online = await self.redis.get(
-                f'{constants.ONLINE_USER_PREFIX}{user_id}')
+            is_online = await self.is_online(user_id)
             if bool(is_online) == status:
                 result.append(user_id)
         return result
@@ -81,6 +81,26 @@ class RedisService:
             ttl: int = constants.ONLINE_USER_COOLDOWN_SEC):
         await self.redis.setex(
             f'{constants.ONLINE_USER_PREFIX}{user_id}',
+            time=ttl, value=1)
+
+    async def filter_lobby_users(self, user_ids: IDList):
+        result: IDList = []
+        for user_id in user_ids:
+            # TODO cache online users in memory and use set intersections
+            is_online = await self.is_in_lobby(user_id)
+            if bool(is_online):
+                result.append(user_id)
+        return result
+
+    async def is_in_lobby(self, user_id: UUID) -> IDList:
+        return await self.redis.get(
+            f'{constants.ONLINE_USER_LOBBY_PREFIX}{user_id}')
+
+    async def refresh_online_lobby_status(
+            self, user_id: UUID,
+            ttl: int = constants.ONLINE_USER_COOLDOWN_SEC):
+        await self.redis.setex(
+            f'{constants.ONLINE_USER_LOBBY_PREFIX}{user_id}',
             time=ttl, value=1)
 
 

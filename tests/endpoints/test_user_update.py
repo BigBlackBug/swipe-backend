@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from settings import settings
 from swipe.users import models
 from swipe.users.enums import ZodiacSign
-from swipe.users.services import UserService, RedisService
+from swipe.users.services import UserService, RedisUserService
 
 
 @pytest.mark.anyio
@@ -16,7 +16,7 @@ async def test_user_update_dob_zodiac(
         client: AsyncClient,
         default_user: models.User,
         user_service: UserService,
-        redis_service: RedisService,
+        redis_service: RedisUserService,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     default_user.date_of_birth = datetime.date.today()

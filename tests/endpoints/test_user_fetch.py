@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from settings import settings
 from swipe.users import models
 from swipe.users.enums import Gender
-from swipe.users.services import UserService, RedisService
+from swipe.users.services import UserService, RedisUserService
 
 
 @pytest.mark.anyio
@@ -108,7 +108,7 @@ async def test_user_fetch_online_gender(
         client: AsyncClient,
         default_user: models.User,
         user_service: UserService,
-        redis_service: RedisService,
+        redis_service: RedisUserService,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     default_user.date_of_birth = datetime.date.today().replace(year=2000)
@@ -167,7 +167,7 @@ async def test_user_fetch_online_city(
         client: AsyncClient,
         default_user: models.User,
         user_service: UserService,
-        redis_service: RedisService,
+        redis_service: RedisUserService,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     default_user.date_of_birth = datetime.date.today().replace(year=2000)
@@ -238,7 +238,7 @@ async def test_user_fetch_blacklist(
         client: AsyncClient,
         default_user: models.User,
         user_service: UserService,
-        redis_service: RedisService,
+        redis_service: RedisUserService,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     default_user.date_of_birth = datetime.date.today().replace(year=2000)

@@ -1,11 +1,13 @@
 import datetime
 import io
+import json
 import logging
 import random
-from typing import Optional
+from typing import Optional, Any
 from uuid import UUID, uuid4
 
 import lorem
+from aioredis import Redis
 from fastapi import Depends
 from sqlalchemy import select, update, desc, delete
 from sqlalchemy.orm import Session, selectinload, contains_eager
@@ -14,6 +16,7 @@ import swipe.dependencies
 from swipe import images
 from swipe.chats.models import Chat, ChatStatus, ChatMessage, MessageStatus, \
     GlobalChatMessage
+from swipe.chats.schemas import ChatMessageORMSchema
 from swipe.errors import SwipeError
 from swipe.storage import storage_client
 from swipe.users.models import User
@@ -56,16 +59,21 @@ class ChatService:
                     Chat.the_other_person_id == user_a_id))
         )).scalar_one_or_none()
 
-    def post_message(self, message_id: UUID,
-                     sender_id: UUID,
-                     recipient_id: UUID,
-                     timestamp: datetime.datetime,
-                     message: Optional[str] = None,
-                     image_id: Optional[UUID] = None) -> UUID:
+    def post_message(
+            self, message_id: UUID,
+            sender_id: UUID,
+            recipient_id: UUID,
+            timestamp: datetime.datetime,
+            message: Optional[str] = None,
+            image_id: Optional[UUID] = None,
+            is_liked: Optional[bool] = False,
+            status: Optional[MessageStatus] = MessageStatus.SENT) -> UUID:
         """
         Adds a message to the chat between supplied users.
         If the chat doesn't exist, creates one.
 
+        :param status:
+        :param is_liked:
         :param image_id:
         :param message_id:
         :param sender_id:
@@ -89,16 +97,16 @@ class ChatService:
                     f"to chat {chat.id}, text:{message}")
         if message:
             chat_message = ChatMessage(
-                id=message_id,
+                id=message_id, is_liked=is_liked,
                 timestamp=timestamp,
-                status=MessageStatus.SENT,
+                status=status,
                 message=message,
                 sender_id=sender_id)
         elif image_id:
             chat_message = ChatMessage(
-                id=message_id,
+                id=message_id, is_liked=is_liked,
                 timestamp=timestamp,
-                status=MessageStatus.SENT,
+                status=status,
                 image_id=image_id,
                 sender_id=sender_id)
         else:
@@ -261,3 +269,65 @@ class ChatService:
         if result.rowcount != 1:
             raise SwipeError("You are not allowed to delete this chat "
                              "because you are not a member")
+
+
+class RedisChatService:
+    def __init__(self,
+                 redis: Redis = Depends(swipe.dependencies.redis)):
+        self.redis = redis
+
+    async def save_message(
+            self, sender_id: str, recipient_id: str,
+            timestamp: datetime.datetime,
+            payload: dict[str, Any]):
+        chat_dict = ChatMessageORMSchema(
+            id=payload['message_id'],
+            sender_id=UUID(hex=sender_id),
+            message=payload.get('text'),
+            image_id=payload.get('image_id'),
+            timestamp=timestamp,
+            is_liked=False
+        ).dict(exclude_unset=True)
+        await self.redis.hset(name=self._chat_id_key(sender_id, recipient_id),
+                              key=payload['message_id'],
+                              value=json.dumps(chat_dict))
+
+    def _chat_id_key(self, user_a_id: str, user_b_id):
+        return f"temp_chat_{'|'.join(sorted([user_a_id, user_b_id]))}"
+
+    async def drop_chat(self, sender_id: str, recipient_id: str):
+        await self.redis.delete(self._chat_id_key(sender_id, recipient_id))
+
+    async def fetch_chat(self, sender_id: str, recipient_id: str) \
+            -> dict[str, dict]:
+        result: dict[str, dict] = {}
+        chat_data: dict = await self.redis.hgetall(
+            name=self._chat_id_key(sender_id, recipient_id))
+        for message_id, message_data in chat_data.items():
+            result[str(message_id)] = json.loads(message_data)
+        return result
+
+    async def set_read_status(self, sender_id: str, recipient_id: str):
+        chat_id = self._chat_id_key(sender_id, recipient_id)
+        for message_id in await self.redis.hkeys(chat_id):
+            await self._update_chat_message(
+                chat_id, message_id, {
+                    'status': MessageStatus.READ
+                })
+
+    async def _update_chat_message(
+            self, chat_id: str, message_id: str, values: dict):
+        message_json = await self.redis.hget(chat_id, message_id)
+        message_data: dict = json.loads(message_json)
+        message_data.update(values)
+
+        await self.redis.hset(
+            name=chat_id, key=message_id,
+            value=json.dumps(message_data))
+
+    async def set_like_status(self, sender_id: str, recipient_id: str,
+                              message_id: str, is_liked: bool):
+        chat_id = self._chat_id_key(sender_id, recipient_id)
+        await self._update_chat_message(chat_id, message_id, {
+            'is_liked': is_liked
+        })
