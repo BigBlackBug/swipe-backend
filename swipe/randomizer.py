@@ -17,7 +17,7 @@ from swipe.chats.services import ChatService
 from swipe.errors import SwipeError
 from swipe.storage import storage_client
 from swipe.users.enums import AuthProvider, ZodiacSign, Gender, UserInterests, \
-    RecurrenceRate
+    RecurrenceRate, NotificationTypes
 from swipe.users.models import User
 from swipe.users.schemas import AuthenticationIn
 from swipe.users.services import UserService
@@ -47,6 +47,7 @@ class RandomEntityGenerator:
         new_user.gender = random.choice(list(Gender))
         new_user.smoking = random.choice(list(RecurrenceRate))
         new_user.drinking = random.choice(list(RecurrenceRate))
+        new_user.enabled_notifications = random.choice(list(NotificationTypes))
 
         birth_date = datetime.date.today().replace(
             year=random.randint(1985, 2003),
