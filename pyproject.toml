@@ -35,6 +35,22 @@ pytest-timeout = "^2.0.1"
 [tool.pytest.ini_options]
 timeout = 3
 
+[tool.coverage.run]
+source = ['swipe']
+branch = true
+omit = [
+    '*/models.py',
+    '*/enums.py',
+    'swipe/dependencies.py',
+    'swipe/storage.py'
+]
+
+[tool.coverage.report]
+fail_under = 80
+skip_covered = true
+show_missing = true
+sort = 'cover'
+
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
