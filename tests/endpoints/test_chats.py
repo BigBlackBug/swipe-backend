@@ -1,4 +1,5 @@
 import datetime
+import uuid
 
 import pytest
 from httpx import AsyncClient, Response
@@ -6,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from settings import settings
 from swipe.chats.models import Chat, ChatStatus, ChatMessage, MessageStatus
+from swipe.chats.services import ChatService
 from swipe.randomizer import RandomEntityGenerator
 from swipe.users import models
 
@@ -308,3 +310,48 @@ async def test_fetch_single_chat_only_unread(
     assert resp_data['the_other_person_id'] == str(initiator.id)
     assert len(resp_data['messages']) == 2
     assert resp_data['messages'][0]['id'] == str(msg4.id)
+
+
+@pytest.mark.anyio
+async def test_accept_chat_ok(
+        client: AsyncClient,
+        default_user: models.User,
+        session: Session,
+        randomizer: RandomEntityGenerator,
+        chat_service: ChatService,
+        default_user_auth_headers: dict[str, str]):
+    initiator = randomizer.generate_random_user()
+    chat = Chat(
+        status=ChatStatus.ACCEPTED, initiator=initiator,
+        the_other_person=default_user)
+    session.add(chat)
+
+    msg1 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.READ,
+        message='wtf omg lol', sender=default_user)
+    msg2 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.READ,
+        message='why dont u answer me???', sender=default_user)
+    chat.messages.extend([msg1, msg2])
+    session.commit()
+
+    response: Response = await client.post(
+        f"{settings.API_V1_PREFIX}/me/chats/{chat.id}/accept",
+        headers=default_user_auth_headers
+    )
+    assert response.status_code == 204
+
+    assert chat_service.fetch_chat(chat.id).status == ChatStatus.ACCEPTED
+
+
+@pytest.mark.anyio
+async def test_accept_chat_not_existent(
+        client: AsyncClient,
+        default_user: models.User,
+        chat_service: ChatService,
+        default_user_auth_headers: dict[str, str]):
+    response: Response = await client.post(
+        f"{settings.API_V1_PREFIX}/me/chats/{uuid.uuid4()}/accept",
+        headers=default_user_auth_headers
+    )
+    assert response.status_code == 404

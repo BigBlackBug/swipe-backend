@@ -78,6 +78,7 @@ async def test_post_message_no_chat(
 
     chat = chat_service.fetch_chat(chat_id)
     assert chat is not None
+    assert chat.status == ChatStatus.REQUESTED
     assert len(chat.messages) == 1
     assert chat.messages[0].message == 'hello'
 

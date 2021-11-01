@@ -91,14 +91,14 @@ async def consume_lobby_message(request: Request,
     elif payload_type == 'skip':
         logger.info(f"[{sender_id}->{recipient_id}]. Deleting chat")
         await redis_service.drop_chat(sender_id, recipient_id)
-    elif payload_type == 'befriend':
+    elif payload_type == 'accept_chat':
         logger.info(f"[{sender_id}->{recipient_id}]. Saving chat to DB")
         partners = {sender_id: recipient_id, recipient_id: sender_id}
         # saving this chat to DB
         messages: dict[str, dict] = \
             await redis_service.fetch_chat(sender_id, recipient_id)
         for message_id, message in messages:
-            chat_service.post_message(
+            chat_id: UUID = chat_service.post_message(
                 message_id=message_id,
                 sender_id=message['sender_id'],
                 recipient_id=partners[message['sender_id']],
@@ -108,6 +108,7 @@ async def consume_lobby_message(request: Request,
                 status=MessageStatus.__members__[message['status'].upper()],
                 is_liked=message['is_liked']
             )
+            chat_service.accept_chat(chat_id)
     elif payload_type == 'message_status':
         status = MessageStatus.__members__[payload['status'].upper()]
         if status == MessageStatus.READ:

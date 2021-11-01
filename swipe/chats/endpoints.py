@@ -11,6 +11,7 @@ from swipe.chats.models import Chat, GlobalChatMessage
 from swipe.chats.schemas import ChatOut, MultipleChatsOut, ChatORMSchema, \
     ChatMessageORMSchema
 from swipe.chats.services import ChatService
+from swipe.errors import SwipeError
 from swipe.storage import storage_client
 from swipe.users.models import User
 
@@ -46,6 +47,22 @@ async def fetch_chat(
     chat: Chat = chat_service.fetch_chat(chat_id, only_unread)
     resp_data = ChatORMSchema.parse_chat(chat, current_user.id)
     return resp_data
+
+
+@router.post(
+    '/{chat_id}/accept',
+    name='Accept chat offer',
+    status_code=status.HTTP_204_NO_CONTENT)
+async def accept_chat(
+        chat_id: UUID,
+        chat_service: ChatService = Depends(),
+        current_user: User = Depends(security.get_current_user)):
+    try:
+        chat_service.accept_chat(chat_id)
+    except SwipeError as ex:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=str(ex))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.delete(

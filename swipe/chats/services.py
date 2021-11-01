@@ -65,7 +65,7 @@ class ChatService:
             status: Optional[MessageStatus] = MessageStatus.SENT) -> UUID:
         """
         Adds a message to the chat between supplied users.
-        If the chat doesn't exist, creates one.
+        If the chat doesn't exist, creates one with ChatStatus.REQUESTED
 
         :param status:
         :param is_liked:
@@ -81,7 +81,7 @@ class ChatService:
         if not chat:
             logger.info(f"Chat between {sender_id} and {recipient_id} "
                         f"does not exist, creating")
-            chat = Chat(status=ChatStatus.ACCEPTED,
+            chat = Chat(status=ChatStatus.REQUESTED,
                         initiator_id=sender_id,
                         the_other_person_id=recipient_id)
             self.db.add(chat)
@@ -215,6 +215,12 @@ class ChatService:
         if result.rowcount != 1:
             raise SwipeError("You are not allowed to delete this chat "
                              "because you are not a member")
+
+    def accept_chat(self, chat_id: UUID):
+        result = self.db.execute(update(Chat).where(Chat.id == chat_id).
+                                 values(status=ChatStatus.ACCEPTED))
+        if result.rowcount == 0:
+            raise SwipeError(f'Chat with id:{chat_id} does not exist')
 
 
 class RedisChatService:
