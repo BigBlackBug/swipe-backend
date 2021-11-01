@@ -19,6 +19,7 @@ import swipe.dependencies
 from settings import settings
 from swipe.chats.services import ChatService, RedisChatService
 from swipe.database import ModelBase
+from swipe.randomizer import RandomEntityGenerator
 from swipe.users import models
 from swipe.users.schemas import AuthenticationIn
 from swipe.users.services import UserService, RedisUserService
@@ -139,12 +140,18 @@ async def client(session, fake_redis, test_app) -> Generator:
 
 
 @pytest.fixture
-def default_user(user_service: UserService,
+def default_user(randomizer: RandomEntityGenerator,
                  session: Session) -> models.User:
-    new_user = user_service.generate_random_user()
+    new_user = randomizer.generate_random_user()
     new_user.name = 'default_user'
     session.commit()
     return new_user
+
+
+@pytest.fixture
+def randomizer(user_service: UserService,
+               chat_service: ChatService) -> RandomEntityGenerator:
+    return RandomEntityGenerator(user_service, chat_service)
 
 
 @pytest.fixture

@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 
 from settings import settings
 from swipe.chats.models import GlobalChatMessage
+from swipe.randomizer import RandomEntityGenerator
 from swipe.users import models
-from swipe.users.services import UserService
 
 
 @pytest.mark.anyio
@@ -15,10 +15,10 @@ async def test_fetch_global_chat(
         client: AsyncClient,
         default_user: models.User,
         session: Session,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
-    other_user = user_service.generate_random_user()
-    another_user = user_service.generate_random_user()
+    other_user = randomizer.generate_random_user()
+    another_user = randomizer.generate_random_user()
 
     msg1 = GlobalChatMessage(
         timestamp=datetime.datetime.now(),
@@ -59,10 +59,10 @@ async def test_fetch_global_chat_from_id(
         client: AsyncClient,
         default_user: models.User,
         session: Session,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
-    other_user = user_service.generate_random_user()
-    another_user = user_service.generate_random_user()
+    other_user = randomizer.generate_random_user()
+    another_user = randomizer.generate_random_user()
 
     msg1 = GlobalChatMessage(
         timestamp=datetime.datetime.now(),

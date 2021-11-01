@@ -6,9 +6,8 @@ from sqlalchemy.orm import Session
 
 from settings import settings
 from swipe.chats.models import Chat, ChatStatus, ChatMessage, MessageStatus
-from swipe.chats.services import ChatService
+from swipe.randomizer import RandomEntityGenerator
 from swipe.users import models
-from swipe.users.services import UserService
 
 
 @pytest.mark.anyio
@@ -16,9 +15,9 @@ async def test_fetch_existing_chats(
         client: AsyncClient,
         default_user: models.User,
         session: Session,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
-    other_user = user_service.generate_random_user()
+    other_user = randomizer.generate_random_user()
     chat = Chat(
         status=ChatStatus.ACCEPTED, initiator=other_user,
         the_other_person=default_user)
@@ -39,7 +38,7 @@ async def test_fetch_existing_chats(
     chat.messages.extend([msg1, msg2, msg3, msg4])
 
     # chat with unread messages
-    second_user = user_service.generate_random_user()
+    second_user = randomizer.generate_random_user()
     chat2 = Chat(
         status=ChatStatus.ACCEPTED, initiator=default_user,
         the_other_person=second_user)
@@ -92,9 +91,9 @@ async def test_fetch_existing_and_new_chats(
         client: AsyncClient,
         default_user: models.User,
         session: Session,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
-    other_user = user_service.generate_random_user()
+    other_user = randomizer.generate_random_user()
     chat = Chat(
         status=ChatStatus.ACCEPTED, initiator=other_user,
         the_other_person=default_user)
@@ -115,7 +114,7 @@ async def test_fetch_existing_and_new_chats(
     chat.messages.extend([msg1, msg2, msg3, msg4])
 
     # chat with unread messages
-    second_user = user_service.generate_random_user()
+    second_user = randomizer.generate_random_user()
     chat2 = Chat(
         status=ChatStatus.REQUESTED, initiator=default_user,
         the_other_person=second_user)
@@ -169,10 +168,9 @@ async def test_fetch_existing_chats_only_unread(
         client: AsyncClient,
         default_user: models.User,
         session: Session,
-        user_service: UserService,
-        chat_service: ChatService,
+        randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
-    first_user = user_service.generate_random_user()
+    first_user = randomizer.generate_random_user()
     # chat without unread messages
     chat = Chat(
         status=ChatStatus.ACCEPTED, initiator=first_user,
@@ -194,7 +192,7 @@ async def test_fetch_existing_chats_only_unread(
     chat.messages.extend([msg1, msg2, msg3, msg4])
 
     # chat with unread messages
-    second_user = user_service.generate_random_user()
+    second_user = randomizer.generate_random_user()
     chat2 = Chat(
         status=ChatStatus.ACCEPTED, initiator=default_user,
         the_other_person=second_user)
@@ -236,9 +234,9 @@ async def test_fetch_single_chat(
         client: AsyncClient,
         default_user: models.User,
         session: Session,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
-    initiator = user_service.generate_random_user()
+    initiator = randomizer.generate_random_user()
     chat = Chat(
         status=ChatStatus.ACCEPTED, initiator=initiator,
         the_other_person=default_user)
@@ -275,9 +273,9 @@ async def test_fetch_single_chat_only_unread(
         client: AsyncClient,
         default_user: models.User,
         session: Session,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
-    initiator = user_service.generate_random_user()
+    initiator = randomizer.generate_random_user()
     chat = Chat(
         status=ChatStatus.ACCEPTED, initiator=initiator,
         the_other_person=default_user)

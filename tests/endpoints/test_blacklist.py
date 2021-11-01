@@ -5,21 +5,21 @@ from httpx import Response, AsyncClient
 from sqlalchemy.orm import Session
 
 from settings import settings
+from swipe.randomizer import RandomEntityGenerator
 from swipe.users import models
-from swipe.users.services import UserService
 
 
 @pytest.mark.anyio
 async def test_blacklist(
         session: Session,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         client: AsyncClient,
         default_user: models.User,
         default_user_auth_headers: dict[str, str]):
     # --------------------------------------------------------------------------
-    user_1 = user_service.generate_random_user()
-    user_2 = user_service.generate_random_user()
-    user_3 = user_service.generate_random_user()
+    user_1 = randomizer.generate_random_user()
+    user_2 = randomizer.generate_random_user()
+    user_3 = randomizer.generate_random_user()
     session.commit()
 
     response: Response = await client.post(

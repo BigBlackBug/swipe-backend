@@ -1,10 +1,9 @@
 import datetime
-import io
 import json
 import logging
 import random
 from typing import Optional, Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import lorem
 from aioredis import Redis
@@ -13,12 +12,10 @@ from sqlalchemy import select, update, desc, delete
 from sqlalchemy.orm import Session, selectinload, contains_eager
 
 import swipe.dependencies
-from swipe import images
 from swipe.chats.models import Chat, ChatStatus, ChatMessage, MessageStatus, \
     GlobalChatMessage
 from swipe.chats.schemas import ChatMessageORMSchema
 from swipe.errors import SwipeError
-from swipe.storage import storage_client
 from swipe.users.models import User
 
 logger = logging.getLogger(__name__)
@@ -183,66 +180,6 @@ class ChatService:
             query = select(GlobalChatMessage). \
                 order_by(desc(GlobalChatMessage.timestamp))
         return self.db.execute(query).scalars().all()
-
-    def generate_random_global_chat(self, n_messages: int):
-        messages = []
-        message_time = datetime.datetime.utcnow()
-        people = self.db.execute(select(User)).scalars().all()
-        for _ in range(n_messages):
-            message_time -= datetime.timedelta(minutes=random.randint(1, 10))
-            sender = random.choice(people)
-            message = GlobalChatMessage(
-                timestamp=message_time,
-                message=lorem.sentence(),
-                sender=sender)
-
-            messages.append(message)
-            self.db.add(message)
-        self.db.commit()
-        for message in messages:
-            self.db.refresh(message)
-        return messages
-
-    def generate_random_chat(
-            self, user_a: User, user_b: User,
-            n_messages: int = 10, generate_images: bool = False) -> Chat:
-        chat = Chat(status=ChatStatus.ACCEPTED,
-                    initiator=user_a, the_other_person=user_b)
-        self.db.add(chat)
-
-        people = [user_a, user_b]
-        message_time = datetime.datetime.utcnow()
-        for _ in range(n_messages):
-            message_time -= datetime.timedelta(minutes=random.randint(1, 10))
-            sender = random.choice(people)
-            if generate_images and random.random() < 0.3:
-                # image
-                extension = 'png'
-                image_id = f'{uuid4()}.{extension}'
-                image = images.generate_random_avatar(sender.name)
-                with io.BytesIO() as output:
-                    image.save(output, format=extension)
-                    contents = output.getvalue()
-                storage_client.upload_image(image_id, contents)
-
-                message = ChatMessage(
-                    timestamp=message_time,
-                    status=random.choice(list(MessageStatus)),
-                    image_id=image_id,
-                    sender=sender)
-            else:
-                # text
-                message = ChatMessage(
-                    timestamp=message_time,
-                    status=random.choice(list(MessageStatus)),
-                    message=lorem.sentence(),
-                    sender=sender)
-
-            chat.messages.append(message)
-
-        self.db.commit()
-        self.db.refresh(chat)
-        return chat
 
     def set_like_status(self, message_id: UUID, status: bool = True):
         self.db.execute(

@@ -9,6 +9,7 @@ from swipe.chats import schemas as chat_schemas
 from swipe.chats.models import GlobalChatMessage
 from swipe.chats.schemas import ChatORMSchema
 from swipe.chats.services import ChatService
+from swipe.randomizer import RandomEntityGenerator
 from swipe.users import schemas as user_schemas
 from swipe.users.services import UserService, RedisUserService
 
@@ -25,7 +26,8 @@ async def generate_random_user(user_service: UserService = Depends()):
     limits except city, which is picked from the following list:
     'Moscow', 'Saint Petersburg', 'Magadan', 'Surgut', 'Cherepovets'
     """
-    new_user = user_service.generate_random_user(generate_images=True)
+    randomizer = RandomEntityGenerator(user_service=user_service)
+    new_user = randomizer.generate_random_user(generate_images=True)
     return user_schemas.UserOut.patched_from_orm(new_user)
 
 
@@ -54,7 +56,9 @@ async def generate_random_chat(chat_service: ChatService = Depends(),
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"User with id:{user_b_id} doesn't exist")
 
-    chat = chat_service.generate_random_chat(
+    randomizer = RandomEntityGenerator(user_service=user_service,
+                                       chat_service=chat_service)
+    chat = randomizer.generate_random_chat(
         user_a=user_a, user_b=user_b,
         n_messages=n_messages, generate_images=True
     )
@@ -69,8 +73,9 @@ async def generate_random_chat(chat_service: ChatService = Depends(),
              response_model_exclude_none=True)
 async def generate_random_chat(chat_service: ChatService = Depends(),
                                n_messages: int = Body(default=10, embed=True)):
+    randomizer = RandomEntityGenerator(chat_service=chat_service)
     chat_messages: list[GlobalChatMessage] = \
-        chat_service.generate_random_global_chat(n_messages=n_messages)
+        randomizer.generate_random_global_chat(n_messages=n_messages)
 
     return chat_messages
 

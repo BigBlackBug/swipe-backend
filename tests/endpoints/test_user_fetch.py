@@ -5,6 +5,7 @@ from httpx import AsyncClient, Response
 from sqlalchemy.orm import Session
 
 from settings import settings
+from swipe.randomizer import RandomEntityGenerator
 from swipe.users import models
 from swipe.users.enums import Gender
 from swipe.users.services import UserService, RedisUserService
@@ -14,25 +15,25 @@ from swipe.users.services import UserService, RedisUserService
 async def test_user_fetch_offline_ignore(
         client: AsyncClient,
         default_user: models.User,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     default_user.date_of_birth = datetime.date.today().replace(year=2000)
 
     # --------------------------------------------------------------------------
-    user_1 = user_service.generate_random_user()
+    user_1 = randomizer.generate_random_user()
     user_1.date_of_birth = datetime.date.today().replace(year=2000)
     user_1.location.country = 'Russia'
 
-    user_2 = user_service.generate_random_user()
+    user_2 = randomizer.generate_random_user()
     user_2.date_of_birth = datetime.date.today().replace(year=2000)
     user_2.location.country = 'Russia'
 
-    user_3 = user_service.generate_random_user()
+    user_3 = randomizer.generate_random_user()
     user_3.date_of_birth = datetime.date.today().replace(year=2001)
     user_3.location.country = 'Russia'
 
-    user_4 = user_service.generate_random_user()
+    user_4 = randomizer.generate_random_user()
     user_4.date_of_birth = datetime.date.today().replace(year=2005)
     user_4.location.country = 'Russia'
     session.commit()
@@ -60,25 +61,25 @@ async def test_user_fetch_offline_ignore(
 async def test_user_fetch_offline_limit_sort_age(
         client: AsyncClient,
         default_user: models.User,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     default_user.date_of_birth = datetime.date.today().replace(year=2000)
 
     # --------------------------------------------------------------------------
-    user_1 = user_service.generate_random_user()
+    user_1 = randomizer.generate_random_user()
     user_1.date_of_birth = datetime.date.today().replace(year=2000)
     user_1.location.country = 'Russia'
 
-    user_2 = user_service.generate_random_user()
+    user_2 = randomizer.generate_random_user()
     user_2.date_of_birth = datetime.date.today().replace(year=2001)
     user_2.location.country = 'Russia'
 
-    user_3 = user_service.generate_random_user()
+    user_3 = randomizer.generate_random_user()
     user_3.date_of_birth = datetime.date.today().replace(year=2002)
     user_3.location.country = 'Russia'
 
-    user_4 = user_service.generate_random_user()
+    user_4 = randomizer.generate_random_user()
     user_4.date_of_birth = datetime.date.today().replace(year=2003)
     user_4.location.country = 'Russia'
     session.commit()
@@ -107,39 +108,39 @@ async def test_user_fetch_offline_limit_sort_age(
 async def test_user_fetch_online_gender(
         client: AsyncClient,
         default_user: models.User,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         redis_service: RedisUserService,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     default_user.date_of_birth = datetime.date.today().replace(year=2000)
 
     # --------------------------------------------------------------------------
-    user_1 = user_service.generate_random_user()
+    user_1 = randomizer.generate_random_user()
     user_1.name = 'user1'
     user_1.date_of_birth = datetime.date.today().replace(year=2000)
     user_1.gender = Gender.FEMALE
     user_1.location.country = 'Russia'
 
-    user_2 = user_service.generate_random_user()
+    user_2 = randomizer.generate_random_user()
     user_2.name = 'user2'
     user_2.date_of_birth = datetime.date.today().replace(year=2000)
     user_2.gender = Gender.FEMALE
     user_2.location.country = 'Russia'
 
-    user_3 = user_service.generate_random_user()
+    user_3 = randomizer.generate_random_user()
     user_3.name = 'user3'
     user_3.date_of_birth = datetime.date.today().replace(year=2001)
     user_3.gender = Gender.MALE
     await redis_service.refresh_online_status(user_3.id)
     user_3.location.country = 'Russia'
 
-    user_4 = user_service.generate_random_user()
+    user_4 = randomizer.generate_random_user()
     user_4.name = 'user4'
     user_4.date_of_birth = datetime.date.today().replace(year=2005)
     user_4.gender = Gender.MALE
     user_4.location.country = 'Russia'
 
-    user_5 = user_service.generate_random_user()
+    user_5 = randomizer.generate_random_user()
     user_5.name = 'user5'
     user_5.date_of_birth = datetime.date.today().replace(year=2002)
     user_5.gender = Gender.ATTACK_HELICOPTER
@@ -166,14 +167,14 @@ async def test_user_fetch_online_gender(
 async def test_user_fetch_online_city(
         client: AsyncClient,
         default_user: models.User,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         redis_service: RedisUserService,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     default_user.date_of_birth = datetime.date.today().replace(year=2000)
 
     # --------------------------------------------------------------------------
-    user_1 = user_service.generate_random_user()
+    user_1 = randomizer.generate_random_user()
     user_1.name = 'user1'
     user_1.date_of_birth = datetime.date.today().replace(year=2000)
     user_1.gender = Gender.FEMALE
@@ -181,7 +182,7 @@ async def test_user_fetch_online_city(
         'country': 'Russia', 'city': 'Moscow', 'flag': 'F'
     })
 
-    user_2 = user_service.generate_random_user()
+    user_2 = randomizer.generate_random_user()
     user_2.name = 'user2'
     user_2.date_of_birth = datetime.date.today().replace(year=2000)
     user_2.gender = Gender.FEMALE
@@ -189,7 +190,7 @@ async def test_user_fetch_online_city(
         'country': 'Russia', 'city': 'Moscow', 'flag': 'F'
     })
 
-    user_3 = user_service.generate_random_user()
+    user_3 = randomizer.generate_random_user()
     user_3.name = 'user3'
     user_3.date_of_birth = datetime.date.today().replace(year=2001)
     user_3.gender = Gender.MALE
@@ -198,7 +199,7 @@ async def test_user_fetch_online_city(
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
     })
 
-    user_4 = user_service.generate_random_user()
+    user_4 = randomizer.generate_random_user()
     user_4.name = 'user4'
     user_4.date_of_birth = datetime.date.today().replace(year=2005)
     await redis_service.refresh_online_status(user_4.id, ttl=60 * 60)
@@ -207,7 +208,7 @@ async def test_user_fetch_online_city(
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
     })
 
-    user_5 = user_service.generate_random_user()
+    user_5 = randomizer.generate_random_user()
     user_5.name = 'user5'
     user_5.date_of_birth = datetime.date.today().replace(year=2002)
     user_5.gender = Gender.ATTACK_HELICOPTER
@@ -237,14 +238,13 @@ async def test_user_fetch_online_city(
 async def test_user_fetch_blacklist(
         client: AsyncClient,
         default_user: models.User,
-        user_service: UserService,
-        redis_service: RedisUserService,
+        randomizer: RandomEntityGenerator,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     default_user.date_of_birth = datetime.date.today().replace(year=2000)
 
     # --------------------------------------------------------------------------
-    user_1 = user_service.generate_random_user()
+    user_1 = randomizer.generate_random_user()
     user_1.name = 'user1'
     user_1.date_of_birth = datetime.date.today().replace(year=2000)
     user_1.gender = Gender.FEMALE
@@ -252,7 +252,7 @@ async def test_user_fetch_blacklist(
         'country': 'Russia', 'city': 'Moscow', 'flag': 'F'
     })
 
-    user_2 = user_service.generate_random_user()
+    user_2 = randomizer.generate_random_user()
     user_2.name = 'user2'
     user_2.date_of_birth = datetime.date.today().replace(year=2000)
     user_2.gender = Gender.FEMALE
@@ -260,7 +260,7 @@ async def test_user_fetch_blacklist(
         'country': 'Russia', 'city': 'Moscow', 'flag': 'F'
     })
 
-    user_3 = user_service.generate_random_user()
+    user_3 = randomizer.generate_random_user()
     user_3.name = 'user3'
     user_3.date_of_birth = datetime.date.today().replace(year=2001)
     user_3.gender = Gender.MALE
@@ -268,7 +268,7 @@ async def test_user_fetch_blacklist(
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
     })
 
-    user_4 = user_service.generate_random_user()
+    user_4 = randomizer.generate_random_user()
     user_4.name = 'user4'
     user_4.date_of_birth = datetime.date.today().replace(year=2005)
     user_4.gender = Gender.MALE
@@ -276,7 +276,7 @@ async def test_user_fetch_blacklist(
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
     })
 
-    user_5 = user_service.generate_random_user()
+    user_5 = randomizer.generate_random_user()
     user_5.name = 'user5'
     user_5.date_of_birth = datetime.date.today().replace(year=2002)
     user_5.gender = Gender.ATTACK_HELICOPTER

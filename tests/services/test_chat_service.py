@@ -4,28 +4,28 @@ import uuid
 
 import lorem
 import pytest
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from swipe.chats.models import Chat, ChatStatus, GlobalChatMessage, ChatMessage, \
     MessageStatus
 from swipe.chats.services import ChatService
 from swipe.errors import SwipeError
+from swipe.randomizer import RandomEntityGenerator
 from swipe.users import models
-from swipe.users.services import UserService
 
 
 @pytest.mark.anyio
 async def test_fetch_chat_by_members(
         default_user: models.User,
         session: Session,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         chat_service: ChatService):
-    user_1 = user_service.generate_random_user()
-    user_2 = user_service.generate_random_user()
-    user_3 = user_service.generate_random_user()
+    user_1 = randomizer.generate_random_user()
+    user_2 = randomizer.generate_random_user()
+    user_3 = randomizer.generate_random_user()
 
-    new_chat = chat_service.generate_random_chat(user_1, user_2)
+    new_chat = randomizer.generate_random_chat(user_1, user_2)
 
     result_chat = chat_service.fetch_chat_by_members(user_1.id, user_2.id)
     assert result_chat is not None
@@ -43,10 +43,10 @@ async def test_fetch_chat_by_members(
 async def test_post_message_chat_exists(
         default_user: models.User,
         session: Session,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         chat_service: ChatService):
-    user_1 = user_service.generate_random_user()
-    user_2 = user_service.generate_random_user()
+    user_1 = randomizer.generate_random_user()
+    user_2 = randomizer.generate_random_user()
 
     chat = Chat(status=ChatStatus.ACCEPTED,
                 initiator=user_1, the_other_person=user_2)
@@ -67,10 +67,10 @@ async def test_post_message_chat_exists(
 async def test_post_message_no_chat(
         default_user: models.User,
         session: Session,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         chat_service: ChatService):
-    user_1 = user_service.generate_random_user()
-    user_2 = user_service.generate_random_user()
+    user_1 = randomizer.generate_random_user()
+    user_2 = randomizer.generate_random_user()
 
     chat_id = chat_service.post_message(
         message_id=uuid.uuid4(), sender_id=user_2.id, recipient_id=user_1.id,
@@ -86,9 +86,9 @@ async def test_post_message_no_chat(
 async def test_post_message_to_global(
         default_user: models.User,
         session: Session,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         chat_service: ChatService):
-    user_1 = user_service.generate_random_user()
+    user_1 = randomizer.generate_random_user()
 
     chat_service.post_message_to_global(
         message_id=(first_message_id := uuid.uuid4()),
@@ -109,9 +109,9 @@ async def test_post_message_to_global(
 async def test_fetch_from_global_from_id(
         default_user: models.User,
         session: Session,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         chat_service: ChatService):
-    user_1 = user_service.generate_random_user()
+    user_1 = randomizer.generate_random_user()
 
     chat_service.post_message_to_global(
         message_id=(first_message_id := uuid.uuid4()),
@@ -137,10 +137,10 @@ async def test_fetch_from_global_from_id(
 async def test_set_received(
         default_user: models.User,
         session: Session,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         chat_service: ChatService):
-    user_1 = user_service.generate_random_user()
-    chat: Chat = chat_service.generate_random_chat(
+    user_1 = randomizer.generate_random_user()
+    chat: Chat = randomizer.generate_random_chat(
         default_user, user_1, n_messages=3)
 
     message_id = chat.messages[2].id
@@ -156,9 +156,9 @@ async def test_set_received(
 async def test_set_read(
         default_user: models.User,
         session: Session,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         chat_service: ChatService):
-    user_1 = user_service.generate_random_user()
+    user_1 = randomizer.generate_random_user()
     chat = Chat(status=ChatStatus.ACCEPTED,
                 initiator=user_1, the_other_person=default_user)
     session.add(chat)
@@ -199,9 +199,9 @@ async def test_set_read(
 async def test_set_like(
         default_user: models.User,
         session: Session,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         chat_service: ChatService):
-    user_1 = user_service.generate_random_user()
+    user_1 = randomizer.generate_random_user()
     chat = Chat(status=ChatStatus.ACCEPTED,
                 initiator=user_1, the_other_person=default_user)
     session.add(chat)
@@ -229,10 +229,10 @@ async def test_set_like(
 async def test_delete_chat(
         default_user: models.User,
         session: Session,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         chat_service: ChatService,
         default_user_auth_headers: dict[str, str]):
-    initiator = user_service.generate_random_user()
+    initiator = randomizer.generate_random_user()
     chat = Chat(
         status=ChatStatus.ACCEPTED, initiator=default_user,
         the_other_person=initiator)
@@ -258,15 +258,16 @@ async def test_delete_chat(
     assert session.query(Chat).count() == 0
     assert session.query(ChatMessage).count() == 0
 
+
 @pytest.mark.anyio
 async def test_delete_chat_wrong_user(
         default_user: models.User,
         session: Session,
-        user_service: UserService,
+        randomizer: RandomEntityGenerator,
         chat_service: ChatService,
         default_user_auth_headers: dict[str, str]):
-    initiator = user_service.generate_random_user()
-    initiator2 = user_service.generate_random_user()
+    initiator = randomizer.generate_random_user()
+    initiator2 = randomizer.generate_random_user()
     chat = Chat(
         status=ChatStatus.ACCEPTED, initiator=initiator,
         the_other_person=initiator2)
