@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import enum
 import uuid
 
@@ -34,8 +35,11 @@ class Chat(ModelBase):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
+    creation_date = Column(DateTime, nullable=False,
+                           default=datetime.datetime.now)
     status = Column(Enum(ChatStatus), nullable=False,
                     default=ChatStatus.REQUESTED)
+    # TODO maybe use lazyload?
     messages = relationship('ChatMessage',
                             order_by='desc(ChatMessage.timestamp)',
                             collection_class=ordering_list('timestamp'),
