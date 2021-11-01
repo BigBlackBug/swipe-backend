@@ -56,8 +56,11 @@ async def generate_random_chat(chat_service: ChatService = Depends(),
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"User with id:{user_b_id} doesn't exist")
 
-    randomizer = RandomEntityGenerator(user_service=user_service,
-                                       chat_service=chat_service)
+    randomizer = RandomEntityGenerator(chat_service=chat_service)
+    chat = chat_service.fetch_chat_by_members(user_a_id, user_b_id)
+    if chat:
+        chat_service.delete_chat(chat.id)
+
     chat = randomizer.generate_random_chat(
         user_a=user_a, user_b=user_b,
         n_messages=n_messages, generate_images=True

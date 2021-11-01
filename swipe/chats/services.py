@@ -1,11 +1,9 @@
 import datetime
 import json
 import logging
-import random
 from typing import Optional, Any
 from uuid import UUID
 
-import lorem
 from aioredis import Redis
 from fastapi import Depends
 from sqlalchemy import select, update, desc, delete
@@ -197,12 +195,23 @@ class ChatService:
                 where(GlobalChatMessage.id == message_id)). \
             scalar_one_or_none()
 
-    def delete_chat(self, chat_id: UUID, current_user: User):
+    def delete_chat(self, chat_id: UUID, user_object: Optional[User] = None):
+        """
+        Deletes a chat. If user_object is provided and he is not a member
+        of the chat, raises SwipeError
+
+        :param chat_id:
+        :param user_object:
+        """
+        if not user_object:
+            self.db.execute(delete(Chat).where(Chat.id == chat_id))
+            return
+
         # Why make another query, when we can check rowcount?
         result = self.db.execute(
             delete(Chat).where(Chat.id == chat_id).
-                where((Chat.initiator_id == current_user.id) |
-                      (Chat.the_other_person_id == current_user.id)))
+                where((Chat.initiator_id == user_object.id) |
+                      (Chat.the_other_person_id == user_object.id)))
         if result.rowcount != 1:
             raise SwipeError("You are not allowed to delete this chat "
                              "because you are not a member")
