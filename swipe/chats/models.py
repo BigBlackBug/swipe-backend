@@ -36,10 +36,9 @@ class Chat(ModelBase):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     creation_date = Column(DateTime, nullable=False,
-                           default=datetime.datetime.now)
+                           default=datetime.datetime.utcnow())
     status = Column(Enum(ChatStatus), nullable=False,
                     default=ChatStatus.REQUESTED)
-    # TODO maybe use lazyload?
     messages = relationship('ChatMessage',
                             order_by='desc(ChatMessage.timestamp)',
                             collection_class=ordering_list('timestamp'),
@@ -72,8 +71,8 @@ class ChatMessage(ModelBase):
     sender_id = Column(UUID(as_uuid=True), ForeignKey('users.id'))
     sender = relationship('User', uselist=False)
 
-    chat_id = Column(UUID(as_uuid=True), ForeignKey(
-        'chats.id', ondelete="CASCADE"))
+    chat_id = Column(UUID(as_uuid=True),
+                     ForeignKey('chats.id', ondelete="CASCADE"))
     chat = relationship('Chat', back_populates='messages')
 
 
