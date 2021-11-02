@@ -36,7 +36,10 @@ pytest-timeout = "^2.0.1"
 timeout = 3
 
 [tool.coverage.run]
-source = ['swipe']
+source = [
+    'swipe'
+]
+include = ['message_consumer']
 branch = true
 omit = [
     '*/models.py',

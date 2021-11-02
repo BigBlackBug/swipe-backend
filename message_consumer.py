@@ -19,21 +19,23 @@ router = APIRouter()
 @router.post('/global')
 async def consume_message(request: Request,
                           chat_service: ChatService = Depends()):
-    # response = {
+    #  {
+    #   "room": ''
+    #   "textroom": 'message'
     #   "timestamp": "2021-10-26T17:43:46+0000",
     #   "sender": "user_id",
-    #   "recipient": "user_id",
+    #   "recipient": "user_id" #optional
     #   "payload" : {} # payload
     # }
     json_data = await request.json()
-    # TODO timestamps come in UTC
-    message_date = json_data['timestamp']
+    timestamp = dateutil.parser.isoparse(json_data['timestamp'])
     payload = json_data['payload']
 
     message_id = UUID(hex=payload['message_id'])
     sender_id = UUID(hex=json_data['sender'])
     payload_type = payload['type']
-    logger.info(f"Got payload with type {payload_type} from {sender_id}")
+    logger.info(f"Got payload with type '{payload_type}' from {sender_id}, "
+                f"payload:{payload}")
 
     if payload_type == 'message':
         if 'recipient' in json_data:
@@ -43,14 +45,14 @@ async def consume_message(request: Request,
                 recipient_id=UUID(hex=json_data['recipient']),
                 message=payload.get('text'),
                 image_id=payload.get('image_id'),
-                timestamp=dateutil.parser.isoparse(message_date)
+                timestamp=timestamp
             )
         else:
             chat_service.post_message_to_global(
                 message_id=message_id,
                 sender_id=sender_id,
                 message=payload['text'],
-                timestamp=dateutil.parser.isoparse(message_date)
+                timestamp=timestamp
             )
     elif payload_type == 'message_status':
         status = MessageStatus.__members__[payload['status'].upper()]
@@ -74,19 +76,19 @@ async def consume_lobby_message(request: Request,
     # }
     json_data = await request.json()
     # TODO timestamps come in UTC
-    message_date = json_data['timestamp']
     payload = json_data['payload']
 
     sender_id = json_data['sender']
     recipient_id = json_data['recipient']
     payload_type = payload['type']
-    logger.info(f"Got payload with type {payload_type} from {sender_id}")
+    logger.info(f"Got payload with type '{payload_type}' from {sender_id}, "
+                f"payload: {payload}")
 
     if payload_type == 'message':
         logger.info(f"[{sender_id}->{recipient_id}]. Got message: {payload}")
         await redis_service.save_message(
             sender_id, recipient_id,
-            timestamp=dateutil.parser.isoparse(message_date),
+            timestamp=dateutil.parser.isoparse(json_data['timestamp']),
             payload=payload)
     elif payload_type == 'skip':
         logger.info(f"[{sender_id}->{recipient_id}]. Deleting chat")
@@ -124,6 +126,3 @@ async def consume_lobby_message(request: Request,
 
 
 app.include_router(router)
-
-# uvicorn.run('message_consumer:app', host='0.0.0.0',  # noqa
-#             port=16000)

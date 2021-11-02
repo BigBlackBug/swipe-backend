@@ -15,6 +15,7 @@ from sqlalchemy.orm import sessionmaker, Session
 
 import config
 import main
+import message_consumer
 import swipe.dependencies
 from settings import settings
 from swipe.chats.services import ChatService, RedisChatService
@@ -78,6 +79,11 @@ def test_app():
     return main.init_app()
 
 
+@pytest.fixture(scope='session')
+def mc_test_app():
+    return message_consumer.app
+
+
 @pytest.fixture
 async def fake_redis():
     redis = FakeRedis()
@@ -136,6 +142,25 @@ async def client(session, fake_redis, test_app) -> Generator:
     yield client
     del test_app.dependency_overrides[swipe.dependencies.db]
     del test_app.dependency_overrides[swipe.dependencies.redis]
+    await client.aclose()
+
+
+@pytest.fixture
+async def mc_client(session, fake_redis, mc_test_app) -> Generator:
+    def test_database():
+        yield session
+
+    def patched_redis():
+        yield fake_redis
+
+    # database.db is a dependency used by the app
+    mc_test_app.dependency_overrides[swipe.dependencies.db] = test_database
+    mc_test_app.dependency_overrides[swipe.dependencies.redis] = patched_redis
+    # base_url is mandatory because starlette devs can be dumb sometimes
+    client = AsyncClient(app=mc_test_app, base_url='http://localhost')
+    yield client
+    del mc_test_app.dependency_overrides[swipe.dependencies.db]
+    del mc_test_app.dependency_overrides[swipe.dependencies.redis]
     await client.aclose()
 
 
