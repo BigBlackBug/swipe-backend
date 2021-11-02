@@ -88,8 +88,8 @@ class ChatService:
         self.db.commit()
         self.db.refresh(chat)
 
-        logger.info(f"Saving message from {sender_id} to {recipient_id} "
-                    f"to chat {chat.id}, text:{message}")
+        logger.info(f"Saving message from '{sender_id}' to '{recipient_id}' "
+                    f"to chat '{chat.id}', text: '{message}'")
         if message:
             chat_message = ChatMessage(
                 id=message_id, is_liked=is_liked,
@@ -142,7 +142,7 @@ class ChatService:
         message: ChatMessage = self.fetch_message(message_id)
 
         # TODO update only received or all?
-        dself.db.execute(
+        self.db.execute(
             update(ChatMessage).where(
                 (ChatMessage.timestamp <= message.timestamp) &
                 (ChatMessage.status != MessageStatus.READ) &
