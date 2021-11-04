@@ -8,6 +8,7 @@ def configure_logging():
     # TODO add current user to context
     logging.basicConfig(stream=sys.stderr,
                         format="[%(asctime)s %(levelname)s|%(processName)s] "
-                               "%(name)s %(message)s",
+                               "%(name)s | %(message)s",
                         level=logging.DEBUG)
     logging.getLogger('botocore').setLevel(logging.INFO)
+    logging.getLogger('urllib3').setLevel(logging.INFO)
