@@ -28,6 +28,8 @@ class Settings(BaseSettings):
 
     STORAGE_ACCESS_KEY: str
     STORAGE_SECRET_KEY: str
+    STORAGE_ENDPOINT: str = 'https://storage.yandexcloud.net'
+    STORAGE_REGION: str = 'ru-central1'
 
     # TODO debug mode
     ENABLE_SQL_ECHO: Optional[bool] = True

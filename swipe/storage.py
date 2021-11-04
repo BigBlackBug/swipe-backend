@@ -11,8 +11,6 @@ from settings import settings
 LINK_EXPIRATION_TIME_SEC = 60
 STORAGE_ACCOUNT_IMAGE_BUCKET = 'account-images'
 STORAGE_CHAT_IMAGE_BUCKET = 'chat-images'
-STORAGE_ENDPOINT = 'https://storage.yandexcloud.net'
-STORAGE_REGION = "ru-central1"
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +21,8 @@ class CloudStorage:
             "s3",
             aws_access_key_id=settings.STORAGE_ACCESS_KEY,
             aws_secret_access_key=settings.STORAGE_SECRET_KEY,
-            region_name=STORAGE_REGION,
-            endpoint_url=STORAGE_ENDPOINT,
+            region_name=settings.STORAGE_REGION,
+            endpoint_url=settings.STORAGE_ENDPOINT,
             config=Config(signature_version="s3v4")
         )
 
