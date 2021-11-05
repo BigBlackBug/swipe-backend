@@ -24,6 +24,13 @@ class ChatStatus(str, enum.Enum):
     ACCEPTED = 'accepted'
 
 
+class ChatSource(str, enum.Enum):
+    TEXT_LOBBY = 'text_lobby'
+    VIDEO_LOBBY = 'video_lobby'
+    AUDIO_LOBBY = 'audio_lobby'
+    DIRECT = 'direct'
+
+
 class Chat(ModelBase):
     __tablename__ = 'chats'
     __table_args__ = (
@@ -37,6 +44,7 @@ class Chat(ModelBase):
 
     creation_date = Column(DateTime, nullable=False,
                            default=datetime.datetime.utcnow())
+    source = Column(Enum(ChatSource), nullable=False)
     status = Column(Enum(ChatStatus), nullable=False,
                     default=ChatStatus.REQUESTED)
     messages = relationship('ChatMessage',

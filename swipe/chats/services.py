@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, selectinload, contains_eager
 
 import swipe.dependencies
 from swipe.chats.models import Chat, ChatStatus, ChatMessage, MessageStatus, \
-    GlobalChatMessage
+    GlobalChatMessage, ChatSource
 from swipe.chats.schemas import ChatMessageORMSchema
 from swipe.errors import SwipeError
 from swipe.users.models import User
@@ -62,10 +62,11 @@ class ChatService:
             message: Optional[str] = None,
             image_id: Optional[UUID] = None,
             is_liked: Optional[bool] = False,
-            status: Optional[MessageStatus] = MessageStatus.SENT) -> UUID:
+            status: Optional[MessageStatus] = MessageStatus.SENT):
         """
         Adds a message to the chat between supplied users.
-        If the chat doesn't exist, creates one with ChatStatus.REQUESTED
+
+        Raises SwipeError if the chat does not exist
 
         :param status:
         :param is_liked:
@@ -79,14 +80,8 @@ class ChatService:
         """
         chat: Chat = self.fetch_chat_by_members(sender_id, recipient_id)
         if not chat:
-            logger.info(f"Chat between {sender_id} and {recipient_id} "
-                        f"does not exist, creating")
-            chat = Chat(status=ChatStatus.REQUESTED,
-                        initiator_id=sender_id,
-                        the_other_person_id=recipient_id)
-            self.db.add(chat)
-        self.db.commit()
-        self.db.refresh(chat)
+            raise SwipeError(f"Chat between {sender_id} and {recipient_id} "
+                             f"does not exist")
 
         logger.info(f"Saving message from '{sender_id}' to '{recipient_id}' "
                     f"to chat '{chat.id}', text: '{message}'")
@@ -109,8 +104,6 @@ class ChatService:
 
         chat.messages.append(chat_message)
         self.db.commit()
-
-        return chat.id
 
     def post_message_to_global(self, message_id: UUID,
                                sender_id: UUID, message: str,
@@ -225,6 +218,22 @@ class ChatService:
         self.db.commit()
         if result.rowcount == 0:
             raise SwipeError(f'Chat with id:{chat_id} does not exist')
+
+    def create_chat(self, chat_id: UUID, initiator_id: UUID,
+                    the_other_person_id: UUID, chat_status: ChatStatus,
+                    source: ChatSource):
+        if self.fetch_chat(chat_id):
+            raise SwipeError(f"Chat with id:'{chat_id}' already exists")
+
+        logger.info(f"Creating chat, id:'{chat_id}' "
+                    f"between '{initiator_id}' and '{the_other_person_id}'")
+        chat = Chat(id=chat_id,
+                    source=source,
+                    status=chat_status,
+                    initiator_id=initiator_id,
+                    the_other_person_id=the_other_person_id)
+        self.db.add(chat)
+        self.db.commit()
 
 
 class RedisChatService:

@@ -6,7 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, validator
 
-from swipe.chats.models import MessageStatus, ChatMessage, Chat, ChatStatus
+from swipe.chats.models import MessageStatus, ChatMessage, Chat, ChatStatus, \
+    ChatSource
 from swipe.storage import storage_client
 
 
@@ -39,6 +40,7 @@ class ChatORMSchema(BaseModel):
     initiator_id: Optional[UUID] = None
     messages: list[ChatMessageORMSchema] = []
     creation_date: datetime.datetime
+    source: ChatSource
 
     @validator("messages", pre=True, each_item=True)
     def patch_message(cls, message: ChatMessage, values: dict[str, Any]):
@@ -57,12 +59,13 @@ class ChatORMSchema(BaseModel):
         orm_mode = True
 
 
-# this duplicate model is required because the ChatORMSchema
-# doesn't work with openapi because of orm_mode
+# this duplicate model is required for fastapi endpoints
+# because the ChatORMSchema doesn't work with openapi because of orm_mode
 class ChatOut(BaseModel):
     the_other_person_id: Optional[UUID] = None
     initiator_id: Optional[UUID] = None
     messages: list[ChatMessageORMSchema] = []
+    source: ChatSource
 
     creation_date: datetime.datetime
 

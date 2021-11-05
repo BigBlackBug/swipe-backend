@@ -12,7 +12,7 @@ from sqlalchemy import select
 
 from settings import constants
 from swipe.chats.models import Chat, ChatStatus, ChatMessage, MessageStatus, \
-    GlobalChatMessage
+    GlobalChatMessage, ChatSource
 from swipe.chats.services import ChatService
 from swipe.errors import SwipeError
 from swipe.storage import storage_client
@@ -81,6 +81,7 @@ class RandomEntityGenerator:
             self, user_a: User, user_b: User,
             n_messages: int = 10, generate_images: bool = False) -> Chat:
         chat = Chat(status=ChatStatus.ACCEPTED,
+                    source=random.choice(list(ChatSource)),
                     initiator=user_a, the_other_person=user_b)
         self._chat_service.db.add(chat)
 

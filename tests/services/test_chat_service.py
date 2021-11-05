@@ -8,11 +8,52 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from swipe.chats.models import Chat, ChatStatus, GlobalChatMessage, ChatMessage, \
-    MessageStatus
+    MessageStatus, ChatSource
 from swipe.chats.services import ChatService
 from swipe.errors import SwipeError
 from swipe.randomizer import RandomEntityGenerator
 from swipe.users import models
+
+
+@pytest.mark.anyio
+async def test_create_chat(
+        default_user: models.User,
+        session: Session,
+        randomizer: RandomEntityGenerator,
+        chat_service: ChatService):
+    user_1 = randomizer.generate_random_user()
+    user_2 = randomizer.generate_random_user()
+    chat_id = uuid.uuid4()
+    chat_service.create_chat(
+        chat_id=chat_id, initiator_id=user_1.id, the_other_person_id=user_2.id,
+        chat_status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY)
+
+    chat = session.execute(
+        select(Chat).where(Chat.id == chat_id)).scalars().one()
+    assert chat.id == chat_id
+
+
+@pytest.mark.anyio
+async def test_create_chat_duplicate(
+        default_user: models.User,
+        session: Session,
+        randomizer: RandomEntityGenerator,
+        chat_service: ChatService):
+    user_1 = randomizer.generate_random_user()
+    user_2 = randomizer.generate_random_user()
+    chat_id = uuid.uuid4()
+    chat_service.create_chat(
+        chat_id=chat_id, initiator_id=user_1.id, the_other_person_id=user_2.id,
+        chat_status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY)
+
+    chat = session.execute(
+        select(Chat).where(Chat.id == chat_id)).scalars().one()
+    assert chat.id == chat_id
+
+    with pytest.raises(SwipeError):
+        chat_service.create_chat(
+            chat_id=chat_id, initiator_id=user_1, the_other_person_id=user_2,
+            chat_status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY)
 
 
 @pytest.mark.anyio
@@ -48,7 +89,7 @@ async def test_post_message_chat_exists(
     user_1 = randomizer.generate_random_user()
     user_2 = randomizer.generate_random_user()
 
-    chat = Chat(status=ChatStatus.ACCEPTED,
+    chat = Chat(status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
                 initiator=user_1, the_other_person=user_2)
     session.add(chat)
     session.commit()
@@ -72,15 +113,11 @@ async def test_post_message_no_chat(
     user_1 = randomizer.generate_random_user()
     user_2 = randomizer.generate_random_user()
 
-    chat_id = chat_service.post_message(
-        message_id=uuid.uuid4(), sender_id=user_2.id, recipient_id=user_1.id,
-        timestamp=datetime.datetime.now(), message='hello')
-
-    chat = chat_service.fetch_chat(chat_id)
-    assert chat is not None
-    assert chat.status == ChatStatus.REQUESTED
-    assert len(chat.messages) == 1
-    assert chat.messages[0].message == 'hello'
+    with pytest.raises(SwipeError):
+        chat_service.post_message(
+            message_id=uuid.uuid4(), sender_id=user_2.id,
+            recipient_id=user_1.id,
+            timestamp=datetime.datetime.now(), message='hello')
 
 
 @pytest.mark.anyio
@@ -160,7 +197,7 @@ async def test_set_read(
         randomizer: RandomEntityGenerator,
         chat_service: ChatService):
     user_1 = randomizer.generate_random_user()
-    chat = Chat(status=ChatStatus.ACCEPTED,
+    chat = Chat(status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
                 initiator=user_1, the_other_person=default_user)
     session.add(chat)
 
@@ -203,7 +240,7 @@ async def test_set_like(
         randomizer: RandomEntityGenerator,
         chat_service: ChatService):
     user_1 = randomizer.generate_random_user()
-    chat = Chat(status=ChatStatus.ACCEPTED,
+    chat = Chat(status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
                 initiator=user_1, the_other_person=default_user)
     session.add(chat)
 
@@ -235,7 +272,8 @@ async def test_delete_chat(
         default_user_auth_headers: dict[str, str]):
     initiator = randomizer.generate_random_user()
     chat = Chat(
-        status=ChatStatus.ACCEPTED, initiator=default_user,
+        status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
+        initiator=default_user,
         the_other_person=initiator)
     session.add(chat)
 
@@ -270,7 +308,8 @@ async def test_delete_chat_wrong_user(
     initiator = randomizer.generate_random_user()
     initiator2 = randomizer.generate_random_user()
     chat = Chat(
-        status=ChatStatus.ACCEPTED, initiator=initiator,
+        status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
+        initiator=initiator,
         the_other_person=initiator2)
     session.add(chat)
 
