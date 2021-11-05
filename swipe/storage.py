@@ -48,11 +48,6 @@ class CloudStorage:
             Bucket=STORAGE_ACCOUNT_IMAGE_BUCKET, Key=image_id,
             Body=file_content)
 
-    def upload_chat_image(self, image_id: str, file_content: Union[IO, bytes]):
-        self._client.put_object(
-            Bucket=STORAGE_CHAT_IMAGE_BUCKET, Key=image_id,
-            Body=file_content)
-
     def get_image_url(self, image_id: str) -> str:
         # TODO add a check for file existence
         return self._client.generate_presigned_url(
@@ -60,6 +55,17 @@ class CloudStorage:
             Params={"Bucket": STORAGE_ACCOUNT_IMAGE_BUCKET, "Key": image_id},
             ExpiresIn=LINK_EXPIRATION_TIME_SEC,
         )
+
+    def delete_image(self, image_id: str):
+        logger.info(f"Deleting account image {image_id}")
+        # TODO any validations that objects were actually deleted?
+        self._client.delete_object(
+            Bucket=STORAGE_ACCOUNT_IMAGE_BUCKET, Key=image_id)
+
+    def upload_chat_image(self, image_id: str, file_content: Union[IO, bytes]):
+        self._client.put_object(
+            Bucket=STORAGE_CHAT_IMAGE_BUCKET, Key=image_id,
+            Body=file_content)
 
     def get_chat_image_url(self, image_id: str) -> str:
         # TODO add a check for file existence
@@ -69,11 +75,11 @@ class CloudStorage:
             ExpiresIn=LINK_EXPIRATION_TIME_SEC,
         )
 
-    def delete_image(self, image_id: str):
+    def delete_chat_image(self, image_id: str):
+        logger.info(f"Deleting chat image {image_id}")
         # TODO any validations that objects were actually deleted?
-        self._client.delete_objects(
-            Bucket=STORAGE_ACCOUNT_IMAGE_BUCKET,
-            Delete={'Objects': [{'Key': image_id}]})
+        self._client.delete_object(
+            Bucket=STORAGE_CHAT_IMAGE_BUCKET, Key=image_id)
 
 
 storage_client = CloudStorage()

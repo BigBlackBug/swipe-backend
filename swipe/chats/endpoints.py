@@ -1,8 +1,9 @@
+import logging
 import re
 import uuid
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Body
 from starlette import status
 from starlette.responses import Response
 
@@ -19,6 +20,8 @@ router = APIRouter()
 
 IMAGE_CONTENT_TYPE_REGEXP = 'image/(png|jpe?g)'
 
+logger = logging.getLogger(__name__)
+
 
 @router.get(
     '/global',
@@ -32,6 +35,24 @@ async def fetch_global_chat(
     chats: list[GlobalChatMessage] = \
         chat_service.fetch_global_chat(last_message_id)
     return chats
+
+
+@router.delete(
+    '/images',
+    name='Deletes chat images',
+    responses={
+        204: {
+            "description": "Images successfully deleted",
+        },
+    },
+    status_code=status.HTTP_204_NO_CONTENT)
+async def delete_chat_image(
+        image_ids: list[str] = Body(..., embed=True),
+        current_user: User = Depends(security.get_current_user)):
+    for image_id in image_ids:
+        storage_client.delete_chat_image(image_id)
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
