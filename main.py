@@ -24,6 +24,7 @@ from swipe.users.services import RedisUserService
 
 
 async def swipe_error_handler(request: Request, exc: SwipeError):
+    logger.exception("Something wrong", exc_info=sys.exc_info())
     return JSONResponse({
         'detail': str(exc)
     }, status_code=status.HTTP_409_CONFLICT)
