@@ -1,0 +1,62 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches:
+      - 'feature-*'
+env:
+  SWIPE_LOCAL_IMAGE: swipe/swipe-backend:latest
+  SWIPE_IMAGE: registry.digitalocean.com/swipe-dev/swipe/swipe-backend:latest
+  JANUS_IMAGE: registry.digitalocean.com/swipe-dev/swipe/janus:latest
+  APP_DIR: /opt/swipe
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install doctl
+      uses: digitalocean/action-doctl@v2
+      with:
+        token: ${{ secrets.DO_ACCESS_TOKEN }}    
+
+    - name: Build the Docker image
+      run: docker build . --file Dockerfile --tag ${{ env.SWIPE_LOCAL_IMAGE }}
+
+    - name: Push image to registry
+      run: |
+        doctl registry login
+        docker tag ${{ env.SWIPE_LOCAL_IMAGE }} ${{ env.SWIPE_IMAGE }}
+        docker push ${{ env.SWIPE_IMAGE }}
+
+    - name: Copy docker-compose
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.DO_DROPLET_HOST }}
+        username: root
+        port: 22
+        key: ${{ secrets.DO_SSH_KEY }}
+        source: "docker-compose-do.yml"
+        target: ${{ env.APP_DIR }}
+
+    - name: Start swipe
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.DO_DROPLET_HOST }}
+        username: root
+        port: 22
+        key: ${{ secrets.DO_SSH_KEY }}
+        script: |
+          set -e
+          docker login \
+            -u ${{ secrets.DO_ACCESS_TOKEN }} \
+            -p ${{ secrets.DO_ACCESS_TOKEN }} \
+            registry.digitalocean.com
+
+          export SWIPE_IMAGE=${{env.SWIPE_IMAGE}}
+          export JANUS_IMAGE=${{env.JANUS_IMAGE}}
+          export APP_DIR=${{env.APP_DIR}}
+
+          docker-compose -f ${{ env.APP_DIR }}/docker-compose-do.yml pull
+          docker-compose -f ${{ env.APP_DIR }}/docker-compose-do.yml up -d

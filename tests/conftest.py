@@ -38,7 +38,7 @@ def db_setup(request):
     })
     if not containers:
         pg_container: Container = client.containers.run(
-            'postgres:13', name='test_pg', detach=True,
+            'postgres:14', name='test_pg', detach=True,
             auto_remove=True,
             ports={'5432/tcp': 5432}, environment={
                 'POSTGRES_PASSWORD': 'postgres'

@@ -2,20 +2,17 @@ version: '3.7'
 
 services:
   janus-gateway:
-    image: 'canyan/janus-gateway:0.10.7'
-    command: ["/usr/local/bin/janus"]
-#    entrypoint: /bin/bash
-    tty: true
+    image: 'swipe/janus'
     ports:
 #      janus main port
       - "8088:8088"
 #      janus admin port
       - "7088:7088"
     volumes:
-      - "./_janus:/usr/local/etc/janus/:ro"
-      - "./_janus_plugins:/usr/local/lib/janus/plugins/:ro"
+      - "./_janus/config-local:/usr/local/etc/janus/:ro"
       - "demos:/usr/local/share/janus/demos/"
-    restart: always
+    network_mode: "host"
+    restart: on-failure
     depends_on:
       - event_consumer
       - message_consumer
@@ -24,11 +21,13 @@ services:
     image: redis
 
   pg:
-    image: postgres:13
+    image: postgres:14
+    environment:
+      - POSTGRES_PASSWORD=postgres
     volumes:
       - "./_data:/var/lib/postgresql/data"
-#    ports:
-#      - "25432:5432"
+    ports:
+      - "25432:5432"
 
   event_consumer:
     build: .
@@ -38,8 +37,6 @@ services:
     depends_on:
       - pg
       - redis
-
-  #    command: python event_consumer.py
 
   message_consumer:
     build: .
@@ -63,7 +60,6 @@ services:
     depends_on:
       - pg
       - redis
-#    command: python message_consumer.py
 
 volumes:
   demos:
@@ -71,4 +67,4 @@ volumes:
     driver_opts:
       o: bind
       type: none
-      device: "/Users/bigblackbug/projects/harddays/swipe-backend/_janus_demo"
+      device: "/Users/bigblackbug/projects/harddays/swipe-backend/_janus/demos"
