@@ -50,9 +50,9 @@ services:
     env_file:
       - swipe.env
     environment:
-      - JANUS_GATEWAY_URL=http://janus-gateway:8088/janus
-      - JANUS_GATEWAY_ADMIN_URL=http://janus-gateway:7088/admin
-      - PORT=8000
+      - JANUS_GATEWAY_URL=http://${DOCKER_GATEWAY_HOST}:8088/janus
+      - JANUS_GATEWAY_ADMIN_URL=http://${DOCKER_GATEWAY_HOST}:7088/admin
+      - SWIPE_PORT=8000
     ports:
       - "80:8000"
     command: python main.py
@@ -64,9 +64,6 @@ services:
     image: ${SWIPE_IMAGE:?unset}
     env_file:
       - swipe.env
-    environment:
-      - JANUS_GATEWAY_URL=http://janus-gateway:8088/janus
-      - JANUS_GATEWAY_ADMIN_URL=http://janus-gateway:7088/admin
     ports:
       - "18000:8000"
     command: "python3 -m http.server --bind 0.0.0.0 8000"

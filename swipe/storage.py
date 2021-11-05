@@ -25,8 +25,9 @@ class CloudStorage:
             endpoint_url=settings.STORAGE_ENDPOINT,
             config=Config(signature_version="s3v4")
         )
+        self._initialize_buckets()
 
-    def initialize_buckets(self):
+    def _initialize_buckets(self):
         self._initialize_bucket(STORAGE_ACCOUNT_IMAGE_BUCKET)
         self._initialize_bucket(STORAGE_CHAT_IMAGE_BUCKET)
 

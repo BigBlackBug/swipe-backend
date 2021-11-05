@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/v1"
     SWIPE_SECRET_KEY: str
 
-    PORT: Optional[int] = None
+    SWIPE_PORT: Optional[int] = None
     DATABASE_URL: Optional[PostgresDsn] = None
 
     STORAGE_ACCESS_KEY: str

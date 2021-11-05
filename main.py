@@ -91,19 +91,16 @@ if settings.ENABLE_ONLINE_CACHE_JOB:
         fast_api.on_event("startup")(populate_online_users_cache)
 
 if __name__ == '__main__':
-    storage_client.initialize_buckets()
-
     migrations_dir = str(Path('migrations').absolute())
     logger.info(
         f'Running DB migrations in {migrations_dir} '
         f'on {settings.DATABASE_URL}')
     alembic_cfg = alembic.config.Config('alembic.ini')
     alembic_cfg.set_main_option('script_location', migrations_dir)
-    alembic_cfg.set_main_option('sqlalchemy.url', settings.DATABASE_URL)
     alembic.command.upgrade(alembic_cfg, 'head')
 
-    logger.info(f'Starting app at port {settings.PORT}')
+    logger.info(f'Starting app at port {settings.SWIPE_PORT}')
     uvicorn.run('main:fast_api', host='0.0.0.0',  # noqa
-                port=settings.PORT,
+                port=settings.SWIPE_PORT,
                 # workers=1,
                 reload=settings.ENABLE_WEB_SERVER_AUTORELOAD)
