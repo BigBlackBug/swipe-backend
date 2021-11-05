@@ -18,7 +18,6 @@ import swipe.dependencies
 from settings import settings, constants
 from swipe import endpoints as misc_endpoints, chats, janus_client
 from swipe.errors import SwipeError
-from swipe.storage import storage_client
 from swipe.users.endpoints import me, users, swipes
 from swipe.users.services import RedisUserService
 
@@ -62,26 +61,27 @@ fast_api = init_app()
 
 config.configure_logging()
 logger = logging.getLogger(__name__)
+logger_janus = logging.getLogger('janus_client')
 
 
 @tasks.repeat_every(seconds=constants.ONLINE_USER_COOLDOWN_SEC - 5,
-                    logger=logger)
+                    logger=logger_janus)
 async def populate_online_users_cache():
     redis_service = RedisUserService(await swipe.dependencies.redis())
 
     for participant in janus_client.fetch_online_users(
-            settings.JANUS_GATEWAY_GLOBAL_ROOM_ID):
+            settings.JANUS_GATEWAY_GLOBAL_ROOM_ID, logger_janus):
         await redis_service.refresh_online_status(
             UUID(hex=participant['username']))
 
 
 @tasks.repeat_every(seconds=constants.ONLINE_USER_COOLDOWN_SEC - 5,
-                    logger=logger)
+                    logger=logger_janus)
 async def populate_lobby_users_cache():
     redis_service = RedisUserService(await swipe.dependencies.redis())
 
     for participant in janus_client.fetch_online_users(
-            settings.JANUS_GATEWAY_LOBBY_ROOM_ID):
+            settings.JANUS_GATEWAY_LOBBY_ROOM_ID, logger_janus):
         await redis_service.refresh_online_lobby_status(
             UUID(hex=participant['username']))
 

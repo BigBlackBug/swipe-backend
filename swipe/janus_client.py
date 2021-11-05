@@ -6,10 +6,8 @@ import requests
 
 from settings import settings
 
-logger = logging.getLogger(__name__)
 
-
-def fetch_online_users(room_id: str):
+def fetch_online_users(room_id: str, logger: logging.Logger):
     # TODO there has to be a better way than this
     # fetching a random handle out of all connections is stupid
     resp = requests.post(settings.JANUS_GATEWAY_ADMIN_URL, json={
