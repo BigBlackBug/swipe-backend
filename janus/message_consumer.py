@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-import datetime
 import logging
 import sys
-from typing import Optional, Union, Any, Type
 from urllib.request import Request
-from uuid import UUID
 
 import uvicorn
 from fastapi import FastAPI, APIRouter, Depends, Body
-from pydantic import BaseModel, Field
 from starlette import status
 from starlette.responses import JSONResponse
 
 import config
+from janus.schemas import BasePayload, MessagePayload, MessageStatusPayload, \
+    MessageLikePayload, CreateChatPayload, ChatMessagePayload, \
+    AcceptChatPayload, DeclineChatPayload
 from settings import settings
 from swipe.chats.models import MessageStatus, ChatSource, ChatStatus
 from swipe.chats.services import ChatService
@@ -26,89 +25,48 @@ app = FastAPI(docs_url=f'/docs')
 router = APIRouter()
 
 
-class MessagePayload(BaseModel):
-    type_: str = Field('message', alias='type')
-    message_id: UUID
-    text: Optional[str]
-    image_id: Optional[UUID]
-
-
-class MessageStatusPayload(BaseModel):
-    type_: str = Field('message_status', alias='type')
-    message_id: UUID
-    status: MessageStatus
-
-
-class MessageLikePayload(BaseModel):
-    type_: str = Field('like', alias='type')
-    message_id: UUID
-    like: bool
-
-
-class ChatMessagePayload(BaseModel):
-    message_id: UUID
-    sender: UUID
-    recipient: UUID
-    timestamp: datetime.datetime
-    text: Optional[str]
-    image_id: Optional[UUID]
-
-
-class CreateChatPayload(BaseModel):
-    type_: str = Field('create_chat', alias='type')
-    source: ChatSource
-    chat_id: UUID
-    message: Optional[ChatMessagePayload] = None
-    messages: Optional[list[ChatMessagePayload]] = []
-
-
-class AcceptChatPayload(BaseModel):
-    type_: str = Field('accept_chat', alias='type')
-    chat_id: UUID
-
-
-class DeclineChatPayload(BaseModel):
-    type_: str = Field('delete_chat', alias='type')
-    chat_id: UUID
-
-
-class BasePayload(BaseModel):
-    # room_id
-    room: str
-    # always equal to 'message'
-    textroom: str
-    timestamp: datetime.datetime
-    sender: UUID
-    recipient: Optional[UUID] = None
-    payload: Union[MessagePayload, MessageStatusPayload, MessageLikePayload,
-                   DeclineChatPayload, AcceptChatPayload, CreateChatPayload]
-
-    @classmethod
-    def payload_type(cls, payload_type: str) -> Type[BaseModel]:
-        if payload_type == 'message_status':
-            return MessageStatusPayload
-        elif payload_type == 'message':
-            return MessagePayload
-        elif payload_type == 'like':
-            return MessageLikePayload
-        elif payload_type == 'create_chat':
-            return CreateChatPayload
-        elif payload_type == 'accept_chat':
-            return AcceptChatPayload
-        elif payload_type == 'decline_chat':
-            return DeclineChatPayload
-
-    @classmethod
-    def validate(cls: BasePayload, value: Any) -> BasePayload:
-        result: BasePayload = super().validate(value)  # noqa
-        payload_type = cls.payload_type(value['payload']['type'])
-        result.payload = payload_type.parse_obj(value['payload'])
-        return result
-
-
-@router.post('/global', description='')
+@router.post('/global')
 async def consume_message(
-        json_data: BasePayload = Body(...),
+        json_data: BasePayload = Body(..., examples={
+            'janus message': {
+                'summary': 'Message sent by client to Janus. '
+                           'NOT FOR THIS ENDPOINT',
+                'description':
+                    'Payload takes one of the types listed below:\n'
+                    '- MessagePayload\n'
+                    '- MessageStatusPayload\n'
+                    '- MessageLikePayload\n'
+                    '- CreateChatPayload\n'
+                    '- AcceptChatPayload\n'
+                    '- DeclineChatPayload\n',
+                'value': {
+                    'textroom': 'message',
+                    'room': '<global_room_id>',
+                    'transaction': '<random_string>',
+                    'to': '<recipient_id> or omit to send to global chat',
+                    'payload': {}
+                }
+            },
+            'endpoint message':{
+                'summary': 'Message sent by Janus to the endpoint',
+                'description':
+                    'Payload takes one of the types listed below:\n'
+                    '- MessagePayload\n'
+                    '- MessageStatusPayload\n'
+                    '- MessageLikePayload\n'
+                    '- CreateChatPayload\n'
+                    '- AcceptChatPayload\n'
+                    '- DeclineChatPayload\n',
+                'value': {
+                    'textroom': 'message',
+                    'room': '<global_room_id>',
+                    'timestamp': 'iso formatted utc timestamp',
+                    'sender': '<user_id>',
+                    'recipient': '<user_id>',
+                    'payload': {}
+                }
+            }
+        }),
         chat_service: ChatService = Depends()):
     payload = json_data.payload
     logger.info(f"Got payload with type '{payload.type_}' "
@@ -132,10 +90,10 @@ async def consume_message(
                 timestamp=json_data.timestamp
             )
     elif isinstance(payload, MessageStatusPayload):
-        status = MessageStatus.__members__[payload.status.upper()]
-        if status == MessageStatus.RECEIVED:
+        message_status = MessageStatus.__members__[payload.status.upper()]
+        if message_status == MessageStatus.RECEIVED:
             chat_service.set_received_status(payload.message_id)
-        elif status == MessageStatus.READ:
+        elif message_status == MessageStatus.READ:
             chat_service.set_read_status(payload.message_id)
     elif isinstance(payload, MessageLikePayload):
         chat_service.set_like_status(payload.message_id, payload.like)

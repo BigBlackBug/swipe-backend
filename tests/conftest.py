@@ -15,8 +15,8 @@ from sqlalchemy.orm import sessionmaker, Session
 
 import config
 import main
-import message_consumer
 import swipe.dependencies
+from janus import message_consumer
 from settings import settings
 from swipe.chats.services import ChatService, RedisChatService
 from swipe.database import ModelBase

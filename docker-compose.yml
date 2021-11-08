@@ -33,7 +33,7 @@ services:
     build: .
     env_file:
       - env/docker.env
-    command: uvicorn --host 0.0.0.0 --port 15000 event_consumer:app
+    command: uvicorn --host 0.0.0.0 --port 15000 janus.event_consumer:app
     depends_on:
       - pg
       - redis
@@ -42,7 +42,7 @@ services:
     build: .
     env_file:
       - env/docker.env
-    command: uvicorn --host 0.0.0.0 --port 16000 message_consumer:app
+    command: uvicorn --host 0.0.0.0 --port 16000 janus.message_consumer:app
     depends_on:
       - pg
       - redis

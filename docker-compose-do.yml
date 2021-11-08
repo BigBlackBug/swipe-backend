@@ -29,7 +29,7 @@ services:
       - swipe.env
     ports:
       - "15000:15000"
-    command: uvicorn --host 0.0.0.0 --port 15000 event_consumer:app
+    command: uvicorn --host 0.0.0.0 --port 15000 janus.event_consumer:app
     depends_on:
       - pg
       - redis
@@ -40,7 +40,7 @@ services:
       - swipe.env
     ports:
       - "16000:16000"
-    command: uvicorn --host 0.0.0.0 --port 16000 message_consumer:app
+    command: uvicorn --host 0.0.0.0 --port 16000 janus.message_consumer:app
     depends_on:
       - pg
       - redis
@@ -50,8 +50,8 @@ services:
     env_file:
       - swipe.env
     environment:
-      - JANUS_GATEWAY_URL=http://${DOCKER_GATEWAY_HOST}:8088/janus
-      - JANUS_GATEWAY_ADMIN_URL=http://${DOCKER_GATEWAY_HOST}:7088/admin
+      - JANUS_GATEWAY_URL=http://${DOCKER_GATEWAY_HOST:?unset}:8088/janus
+      - JANUS_GATEWAY_ADMIN_URL=http://${DOCKER_GATEWAY_HOST:?unset}:7088/admin
       - SWIPE_PORT=8000
     ports:
       - "80:8000"
