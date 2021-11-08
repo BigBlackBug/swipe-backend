@@ -69,27 +69,6 @@ async def fetch_chat(
     return resp_data
 
 
-@router.delete(
-    '/{chat_id}',
-    name='Delete a single chat',
-    responses={
-        204: {
-            "description": "Chat deleted",
-        },
-        409: {
-            "description": "Unable to delete chat because "
-                           "you are not a member or chat does not exist"
-        }
-    }
-)
-async def delete_chat(
-        chat_id: UUID,
-        chat_service: ChatService = Depends(),
-        current_user: User = Depends(security.get_current_user)):
-    chat_service.delete_chat(chat_id, current_user)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
 @router.get(
     '',
     name='Fetch all chats',

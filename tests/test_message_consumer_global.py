@@ -1,8 +1,10 @@
 import datetime
+import secrets
 import uuid
 
 import pytest
 from httpx import AsyncClient, Response
+from sqlalchemy.orm import Session
 
 from swipe.chats.models import GlobalChatMessage, Chat, ChatMessage, \
     MessageStatus, ChatStatus, ChatSource
@@ -25,6 +27,8 @@ async def test_post_global_message(
         f"/global",
         json={
             'timestamp': NOW.isoformat(),
+            'room': secrets.token_urlsafe(6),
+            'textroom': 'message',
             'sender': str(default_user.id),
             'payload': {
                 'type': 'message',
@@ -60,6 +64,8 @@ async def test_post_directed_message(
         f"/global",
         json={
             'timestamp': NOW.isoformat(),
+            'room': secrets.token_urlsafe(6),
+            'textroom': 'message',
             'sender': str(default_user.id),
             'recipient': str(recipient.id),
             'payload': {
@@ -103,11 +109,13 @@ async def test_set_received_status(
         f"/global",
         json={
             'timestamp': NOW.isoformat(),
+            'room': secrets.token_urlsafe(6),
+            'textroom': 'message',
             'sender': str(default_user.id),
             'payload': {
                 'type': 'message_status',
                 'message_id': str(message_id),
-                'status': 'RECEIVED'
+                'status': 'received'
             }
         },
         headers=default_user_auth_headers
@@ -142,11 +150,13 @@ async def test_set_read_status(
         f"/global",
         json={
             'timestamp': NOW.isoformat(),
+            'room': secrets.token_urlsafe(6),
+            'textroom': 'message',
             'sender': str(default_user.id),
             'payload': {
                 'type': 'message_status',
                 'message_id': str(message_id),
-                'status': 'READ'
+                'status': 'read'
             }
         },
         headers=default_user_auth_headers
@@ -179,11 +189,13 @@ async def test_set_liked(
         f"/global",
         json={
             'timestamp': NOW.isoformat(),
+            'room': secrets.token_urlsafe(6),
+            'textroom': 'message',
             'sender': str(default_user.id),
             'payload': {
                 'type': 'like',
                 'message_id': str(message_id),
-                'status': True
+                'like': True
             }
         },
         headers=default_user_auth_headers
@@ -216,11 +228,13 @@ async def test_set_disliked(
         f"/global",
         json={
             'timestamp': NOW.isoformat(),
+            'room': secrets.token_urlsafe(6),
+            'textroom': 'message',
             'sender': str(default_user.id),
             'payload': {
                 'type': 'like',
                 'message_id': str(message_id),
-                'status': False
+                'like': False
             }
         },
         headers=default_user_auth_headers
@@ -245,6 +259,8 @@ async def test_create_chat_direct(
         f"/global",
         json={
             'timestamp': NOW.isoformat(),
+            'room': secrets.token_urlsafe(6),
+            'textroom': 'message',
             'sender': str(default_user.id),
             'recipient': str(recipient.id),
             'payload': {
@@ -256,6 +272,8 @@ async def test_create_chat_direct(
                     'sender': str(default_user.id),
                     'recipient': str(recipient.id),
                     'timestamp': NOW.isoformat(),
+                    'room': secrets.token_urlsafe(6),
+                    'textroom': 'message',
                     'text': 'hello'
                 }
             }
@@ -288,6 +306,8 @@ async def test_create_chat_text_lobby(
         f"/global",
         json={
             'timestamp': NOW.isoformat(),
+            'room': secrets.token_urlsafe(6),
+            'textroom': 'message',
             'sender': str(default_user.id),
             'recipient': str(recipient.id),
             'payload': {
@@ -299,6 +319,8 @@ async def test_create_chat_text_lobby(
                     'sender': str(default_user.id),
                     'recipient': str(recipient.id),
                     'timestamp': NOW.isoformat(),
+                    'room': secrets.token_urlsafe(6),
+                    'textroom': 'message',
                     'text': 'hello'
                 } for _ in range(5)]
             }
@@ -331,6 +353,8 @@ async def test_create_chat_audio_lobby(
         f"/global",
         json={
             'timestamp': NOW.isoformat(),
+            'room': secrets.token_urlsafe(6),
+            'textroom': 'message',
             'sender': str(default_user.id),
             'recipient': str(recipient.id),
             'payload': {
@@ -366,6 +390,8 @@ async def test_create_chat_video_lobby(
         f"/global",
         json={
             'timestamp': NOW.isoformat(),
+            'room': secrets.token_urlsafe(6),
+            'textroom': 'message',
             'sender': str(default_user.id),
             'recipient': str(recipient.id),
             'payload': {
@@ -386,3 +412,57 @@ async def test_create_chat_video_lobby(
     assert chat.initiator_id == default_user.id
     assert chat.the_other_person_id == recipient.id
     assert len(chat.messages) == 0
+
+
+@pytest.mark.anyio
+async def test_decline_chat(
+        mc_client: AsyncClient,
+        default_user: models.User,
+        chat_service: ChatService,
+        session: Session,
+        randomizer: RandomEntityGenerator,
+        default_user_auth_headers: dict[str, str]):
+    recipient = randomizer.generate_random_user()
+    chat_id = uuid.uuid4()
+    initiator = randomizer.generate_random_user()
+    chat = Chat(
+        id=chat_id,
+        status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
+        initiator=initiator,
+        the_other_person=default_user)
+    session.add(chat)
+
+    msg1 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='wtf omg lol', sender=default_user)
+    msg2 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='why dont u answer me???', sender=default_user)
+    msg3 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='fuck off', sender=initiator)
+    msg4 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        image_id='345345.png', sender=initiator)
+    chat.messages.extend([msg1, msg2, msg3, msg4])
+    session.commit()
+    response: Response = await mc_client.post(
+        f"/global",
+        json={
+            'timestamp': NOW.isoformat(),
+            'room': secrets.token_urlsafe(6),
+            'textroom': 'message',
+            'sender': str(default_user.id),
+            'recipient': str(recipient.id),
+            'payload': {
+                'type': 'decline_chat',
+                'chat_id': str(chat_id),
+            }
+        },
+        headers=default_user_auth_headers
+    )
+
+    assert response.status_code == 200
+
+    chat: Chat = chat_service.fetch_chat(chat_id)
+    assert not chat
