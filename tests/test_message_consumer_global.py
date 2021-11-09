@@ -33,7 +33,9 @@ async def test_post_global_message(
             'payload': {
                 'type': 'message',
                 'message_id': str(message_id),
-                'text': 'hello'
+                'text': 'hello',
+                'sender_name': default_user.name,
+                'sender_image_url': 'whatever'
             }
         },
         headers=default_user_auth_headers

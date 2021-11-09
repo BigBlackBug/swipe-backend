@@ -6,13 +6,14 @@ from urllib.request import Request
 
 import uvicorn
 from fastapi import FastAPI, APIRouter, Depends, Body
+from pydantic import BaseModel
 from starlette import status
 from starlette.responses import JSONResponse
 
 import config
 from janus.schemas import BasePayload, MessagePayload, MessageStatusPayload, \
     MessageLikePayload, CreateChatPayload, ChatMessagePayload, \
-    AcceptChatPayload, DeclineChatPayload, OpenChatPayload
+    AcceptChatPayload, DeclineChatPayload, OpenChatPayload, GlobalMessagePayload
 from settings import settings
 from swipe.chats.models import MessageStatus, ChatSource, ChatStatus
 from swipe.chats.services import ChatService
@@ -24,6 +25,11 @@ logger = logging.getLogger(__name__)
 app = FastAPI(docs_url=f'/docs')
 router = APIRouter()
 
+_supported_payloads = []
+for cls in BaseModel.__subclasses__():
+    if cls.__name__.endswith('Payload') and 'type_' in cls.__fields__:
+        _supported_payloads.append(cls.__name__)
+
 
 @router.post('/global')
 async def consume_message(
@@ -32,14 +38,8 @@ async def consume_message(
                 'summary': 'Message sent by client to Janus. '
                            'NOT FOR THIS ENDPOINT',
                 'description':
-                    'Payload takes one of the types listed below:\n'
-                    '- MessagePayload\n'
-                    '- MessageStatusPayload\n'
-                    '- MessageLikePayload\n'
-                    '- CreateChatPayload\n'
-                    '- AcceptChatPayload\n'
-                    '- DeclineChatPayload\n',
-                    '- OpenChatPayload\n'
+                    'Payload takes one of the types listed below:\n' +
+                    '\n'.join([f"- {x}" for x in _supported_payloads]),
                 'value': {
                     'textroom': 'message',
                     'room': '<global_room_id>',
@@ -51,14 +51,8 @@ async def consume_message(
             'endpoint message': {
                 'summary': 'Message sent by Janus to the endpoint',
                 'description':
-                    'Payload takes one of the types listed below:\n'
-                    '- MessagePayload\n'
-                    '- MessageStatusPayload\n'
-                    '- MessageLikePayload\n'
-                    '- CreateChatPayload\n'
-                    '- AcceptChatPayload\n'
-                    '- DeclineChatPayload\n',
-                    '- OpenChatPayload\n'
+                    'Payload takes one of the types listed below:\n' +
+                    '\n'.join([f"- {x}" for x in _supported_payloads]),
                 'value': {
                     'textroom': 'message',
                     'room': '<global_room_id>',
@@ -75,22 +69,21 @@ async def consume_message(
                 f"from {json_data.sender}, payload:{payload}")
 
     if isinstance(payload, MessagePayload):
-        if json_data.recipient:
-            chat_service.post_message(
-                message_id=payload.message_id,
-                sender_id=json_data.sender,
-                recipient_id=json_data.recipient,
-                message=payload.text,
-                image_id=payload.image_id,
-                timestamp=json_data.timestamp
-            )
-        else:
-            chat_service.post_message_to_global(
-                message_id=payload.message_id,
-                sender_id=json_data.sender,
-                message=payload.text,
-                timestamp=json_data.timestamp
-            )
+        chat_service.post_message(
+            message_id=payload.message_id,
+            sender_id=json_data.sender,
+            recipient_id=json_data.recipient,
+            message=payload.text,
+            image_id=payload.image_id,
+            timestamp=json_data.timestamp
+        )
+    elif isinstance(payload, GlobalMessagePayload):
+        chat_service.post_message_to_global(
+            message_id=payload.message_id,
+            sender_id=json_data.sender,
+            message=payload.text,
+            timestamp=json_data.timestamp
+        )
     elif isinstance(payload, MessageStatusPayload):
         message_status = MessageStatus.__members__[payload.status.upper()]
         if message_status == MessageStatus.RECEIVED:
