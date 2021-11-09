@@ -43,8 +43,13 @@ async def test_fetch_global_chat(
         headers=default_user_auth_headers
     )
     assert response.status_code == 200
-    messages = response.json()
-    assert len(response.json()) == 4
+
+    response_data = response.json()
+    assert 'users' in response_data
+    assert 'messages' in response_data
+
+    messages = response_data['messages']
+    assert len(messages) == 4
 
     assert messages[0]['id'] == str(msg4.id)
     assert messages[1]['id'] == str(msg3.id)
@@ -52,6 +57,15 @@ async def test_fetch_global_chat(
     assert messages[3]['id'] == str(msg1.id)
 
     assert messages[1]['message'] == msg3.message
+
+    users: dict = response_data['users']
+    assert len(users) == 3
+    assert set(users.keys()) == {
+        str(default_user.id), str(other_user.id), str(another_user.id)
+    }
+    assert users[str(default_user.id)]['name'] == default_user.name
+    assert users[str(another_user.id)]['name'] == another_user.name
+    assert users[str(other_user.id)]['name'] == other_user.name
 
 
 @pytest.mark.anyio
@@ -90,11 +104,25 @@ async def test_fetch_global_chat_from_id(
         headers=default_user_auth_headers
     )
     assert response.status_code == 200
-    messages = response.json()
-    assert len(response.json()) == 3
+
+    response_data = response.json()
+    assert 'users' in response_data
+    assert 'messages' in response_data
+
+    messages = response_data['messages']
+    assert len(messages) == 3
 
     assert messages[0]['id'] == str(msg4.id)
     assert messages[1]['id'] == str(msg3.id)
     assert messages[2]['id'] == str(msg2.id)
 
     assert messages[1]['message'] == msg3.message
+
+    users: dict = response_data['users']
+    assert len(users) == 3
+    assert set(users.keys()) == {
+        str(default_user.id), str(other_user.id), str(another_user.id)
+    }
+    assert users[str(default_user.id)]['name'] == default_user.name
+    assert users[str(another_user.id)]['name'] == another_user.name
+    assert users[str(other_user.id)]['name'] == other_user.name

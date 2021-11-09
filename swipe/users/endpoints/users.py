@@ -47,6 +47,7 @@ async def fetch_list_of_users(
     ignored_user_ids = list(filter_params.ignore_users)
     age_difference = 0
 
+    logger.info(f"Got filter params {filter_params}")
     # FEED filtered by same country by default)
     # premium filtered by gender
     # premium filtered by location(whole country/my city)

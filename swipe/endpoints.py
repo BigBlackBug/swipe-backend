@@ -74,7 +74,7 @@ async def generate_random_chat(chat_service: ChatService = Depends(),
              tags=['misc'],
              response_model=list[chat_schemas.ChatMessageORMSchema],
              response_model_exclude_none=True)
-async def generate_random_chat(chat_service: ChatService = Depends(),
+async def generate_global_chat(chat_service: ChatService = Depends(),
                                n_messages: int = Body(default=10, embed=True)):
     randomizer = RandomEntityGenerator(chat_service=chat_service)
     chat_messages: list[GlobalChatMessage] = \

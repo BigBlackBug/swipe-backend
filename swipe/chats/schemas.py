@@ -4,11 +4,42 @@ import datetime
 from typing import Optional, Any
 from uuid import UUID
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, validator, Field
+from sqlalchemy.engine import Row
 
 from swipe.chats.models import MessageStatus, ChatMessage, Chat, ChatStatus, \
-    ChatSource
+    ChatSource, GlobalChatMessage
 from swipe.storage import storage_client
+from swipe.users.models import User
+from swipe.users.schemas import LocationSchema
+
+
+class UserOutChatPreviewORM(BaseModel):
+    id: UUID
+    name: str
+    photos: list[str] = []
+    location: Optional[LocationSchema] = Field(None, alias='Location')
+
+    class Config:
+        # allows Pydantic to read orm models and not just dicts
+        orm_mode = True
+
+
+class UserOutChatPreview(BaseModel):
+    id: UUID
+    name: str
+    photo_url: Optional[str] = None
+    location: Optional[LocationSchema] = None
+
+    @classmethod
+    def patched_from_orm(cls: UserOutChatPreview,
+                         obj: User | Row) -> UserOutChatPreview:
+        orm_schema = UserOutChatPreviewORM.from_orm(obj)
+        schema_obj = cls.parse_obj(orm_schema)
+        if orm_schema.photos:
+            photo = orm_schema.photos[0]
+            schema_obj.photo_url = storage_client.get_image_url(photo)
+        return schema_obj
 
 
 class ChatMessageORMSchema(BaseModel):
@@ -33,6 +64,24 @@ class ChatMessageORMSchema(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class GlobalChatOut(BaseModel):
+    messages: list[ChatMessageORMSchema] = []
+    users: dict[UUID, UserOutChatPreview] = {}
+
+    @classmethod
+    def parse_chats(cls, messages: list[GlobalChatMessage],
+                    users: list[User] | list[Row]):
+        result = {'messages': [], 'users': {}}
+        for message in messages:
+            result['messages'].append(
+                ChatMessageORMSchema.patched_from_orm(message))
+        for user in users:
+            user_dict: UserOutChatPreview \
+                = UserOutChatPreview.patched_from_orm(user)
+            result['users'][user.id] = user_dict
+        return cls.parse_obj(result)
 
 
 class ChatORMSchema(BaseModel):
@@ -73,11 +122,13 @@ class ChatOut(BaseModel):
 class MultipleChatsOut(BaseModel):
     requests: list[ChatOut] = []
     chats: list[ChatOut] = []
+    users: dict[UUID, UserOutChatPreview] = {}
 
     @classmethod
     def parse_chats(cls, chats: list[Chat],
+                    users: list[User] | list[Row],
                     current_user_id: UUID) -> MultipleChatsOut:
-        result = {'chats': [], 'requests': []}
+        result = {'chats': [], 'requests': [], 'users': {}}
 
         for chat in chats:
             data = ChatORMSchema.parse_chat(chat, current_user_id)
@@ -86,4 +137,9 @@ class MultipleChatsOut(BaseModel):
                 result['requests'].append(data)
             else:
                 result['chats'].append(data)
+
+        for user in users:
+            user_dict: UserOutChatPreview \
+                = UserOutChatPreview.patched_from_orm(user)
+            result['users'][user.id] = user_dict
         return cls.parse_obj(result)

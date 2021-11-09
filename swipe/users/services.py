@@ -10,6 +10,7 @@ from fastapi import Depends
 from jose import jwt
 from jose.constants import ALGORITHMS
 from sqlalchemy import select
+from sqlalchemy.engine import Row
 from sqlalchemy.orm import Session
 
 import swipe.dependencies
@@ -155,6 +156,18 @@ class UserService:
         clause = True if user_ids is None else User.id.in_(user_ids)
         return self.db.execute(select(User).where(clause)). \
             scalars().all()
+
+    def get_user_chat_preview(
+            self, user_ids: Optional[IDList] = None,
+            location: bool = False) -> list[Row]:
+        clause = True if user_ids is None else User.id.in_(user_ids)
+        if location:
+            return self.db.execute(
+                select(User.id, User.name, User.photos, Location).
+                    join(Location).where(clause)).all()
+        else:
+            return self.db.execute(
+                select(User.id, User.name, User.photos).where(clause)).all()
 
     def update_user(
             self,

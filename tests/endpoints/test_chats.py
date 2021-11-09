@@ -65,12 +65,23 @@ async def test_fetch_existing_chats(
         headers=default_user_auth_headers
     )
     assert response.status_code == 200
-    assert len(response.json()['chats']) == 2
 
-    assert response.json()['chats'][0]['the_other_person_id'] \
+    users = response.json()['users']
+    assert len(users) == 3
+    assert set(users.keys()) == {
+        str(default_user.id), str(other_user.id), str(second_user.id)
+    }
+    assert users[str(default_user.id)]['name'] == default_user.name
+    assert users[str(other_user.id)]['name'] == other_user.name
+    assert users[str(second_user.id)]['name'] == second_user.name
+
+    chats = response.json()['chats']
+    assert len(chats) == 2
+
+    assert chats[0]['the_other_person_id'] \
            == str(other_user.id)
 
-    messages = response.json()['chats'][0]['messages']
+    messages = chats[0]['messages']
     assert len(messages) == 4
     assert messages[0]['id'] == str(msg4.id)
     assert messages[1]['id'] == str(msg3.id)
@@ -80,7 +91,7 @@ async def test_fetch_existing_chats(
     assert messages[1]['message'] == msg3.message
     assert messages[0].get('image_url')
 
-    messages = response.json()['chats'][1]['messages']
+    messages = chats[1]['messages']
     assert len(messages) == 3
     assert messages[0]['id'] == str(msg7.id)
     assert messages[1]['id'] == str(msg6.id)
@@ -144,11 +155,21 @@ async def test_fetch_existing_and_new_chats(
         headers=default_user_auth_headers
     )
     assert response.status_code == 200
-    assert len(response.json()['chats']) == 1
-    assert response.json()['chats'][0]['the_other_person_id'] \
-           == str(other_user.id)
+    users = response.json()['users']
+    assert len(users) == 3
+    assert set(users.keys()) == {
+        str(default_user.id), str(other_user.id), str(second_user.id)
+    }
+    assert users[str(default_user.id)]['name'] == default_user.name
+    assert users[str(other_user.id)]['name'] == other_user.name
+    assert users[str(second_user.id)]['name'] == second_user.name
+    assert users[str(second_user.id)]['location']['city'] \
+           == second_user.location.city
+    chats = response.json()['chats']
+    assert len(chats) == 1
+    assert chats[0]['the_other_person_id'] == str(other_user.id)
 
-    messages = response.json()['chats'][0]['messages']
+    messages = chats[0]['messages']
     assert len(messages) == 4
     assert messages[0]['id'] == str(msg4.id)
     assert messages[1]['id'] == str(msg3.id)
@@ -227,6 +248,14 @@ async def test_fetch_existing_chats_only_unread(
         headers=default_user_auth_headers
     )
     assert response.status_code == 200
+    users = response.json()['users']
+    assert len(users) == 2
+    assert set(users.keys()) == {
+        str(default_user.id), str(second_user.id)
+    }
+    assert users[str(default_user.id)]['name'] == default_user.name
+    assert users[str(second_user.id)]['name'] == second_user.name
+
     chat_response = response.json()['chats']
     assert len(chat_response) == 1
 

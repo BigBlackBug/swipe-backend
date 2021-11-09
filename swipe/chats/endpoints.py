@@ -4,16 +4,18 @@ import uuid
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Body
+from sqlalchemy.engine import Row
 from starlette import status
 from starlette.responses import Response
 
 from swipe import security
 from swipe.chats.models import Chat, GlobalChatMessage
 from swipe.chats.schemas import ChatOut, MultipleChatsOut, ChatORMSchema, \
-    ChatMessageORMSchema
+    GlobalChatOut
 from swipe.chats.services import ChatService
 from swipe.storage import storage_client
 from swipe.users.models import User
+from swipe.users.services import UserService
 
 router = APIRouter()
 
@@ -26,14 +28,17 @@ logger = logging.getLogger(__name__)
     '/global',
     name='Fetch global chat',
     response_model_exclude_none=True,
-    response_model=list[ChatMessageORMSchema])
+    response_model=GlobalChatOut)
 async def fetch_global_chat(
         last_message_id: UUID = None,
         chat_service: ChatService = Depends(),
+        user_service: UserService = Depends(),
         current_user: User = Depends(security.get_current_user)):
     chats: list[GlobalChatMessage] = \
         chat_service.fetch_global_chat(last_message_id)
-    return chats
+    users: list[Row] = \
+        user_service.get_user_chat_preview([chat.sender_id for chat in chats])
+    return GlobalChatOut.parse_chats(chats, users)
 
 
 @router.delete(
@@ -77,13 +82,21 @@ async def fetch_chat(
 async def fetch_chats(
         only_unread: bool = False,
         chat_service: ChatService = Depends(),
+        user_service: UserService = Depends(),
         current_user: User = Depends(security.get_current_user)):
     """
     When 'only_unread' is set to true, returns only chats with unread messages
     """
     chats: list[Chat] = chat_service.fetch_chats(current_user.id, only_unread)
+    user_ids = set()
+    for chat in chats:
+        user_ids.add(chat.initiator_id)
+        user_ids.add(chat.the_other_person_id)
+
+    users: list[Row] = \
+        user_service.get_user_chat_preview(list(user_ids), location=True)
     resp_data: MultipleChatsOut = \
-        MultipleChatsOut.parse_chats(chats, current_user.id)
+        MultipleChatsOut.parse_chats(chats, users, current_user.id)
     return resp_data
 
 
