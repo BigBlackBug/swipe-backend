@@ -55,6 +55,11 @@ class DeclineChatPayload(BaseModel):
     chat_id: UUID
 
 
+class OpenChatPayload(BaseModel):
+    type_: str = Field('open_chat', alias='type')
+    chat_id: UUID
+
+
 class BasePayload(BaseModel):
     # room_id
     room: str
@@ -63,8 +68,11 @@ class BasePayload(BaseModel):
     timestamp: datetime.datetime
     sender: UUID
     recipient: Optional[UUID] = None
-    payload: Union[MessagePayload, MessageStatusPayload, MessageLikePayload,
-                   DeclineChatPayload, AcceptChatPayload, CreateChatPayload]
+    payload: Union[
+        MessagePayload, MessageStatusPayload, MessageLikePayload,
+        DeclineChatPayload, AcceptChatPayload, CreateChatPayload,
+        OpenChatPayload
+    ]
 
     @classmethod
     def payload_type(cls, payload_type: str) -> Type[BaseModel]:
@@ -80,6 +88,8 @@ class BasePayload(BaseModel):
             return AcceptChatPayload
         elif payload_type == 'decline_chat':
             return DeclineChatPayload
+        elif payload_type == 'open_chat':
+            return OpenChatPayload
 
     @classmethod
     def validate(cls: BasePayload, value: Any) -> BasePayload:

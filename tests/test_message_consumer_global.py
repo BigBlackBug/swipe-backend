@@ -466,3 +466,111 @@ async def test_decline_chat(
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     assert not chat
+
+
+@pytest.mark.anyio
+async def test_accept_chat(
+        mc_client: AsyncClient,
+        default_user: models.User,
+        chat_service: ChatService,
+        session: Session,
+        randomizer: RandomEntityGenerator,
+        default_user_auth_headers: dict[str, str]):
+    recipient = randomizer.generate_random_user()
+    chat_id = uuid.uuid4()
+    initiator = randomizer.generate_random_user()
+    chat = Chat(
+        id=chat_id,
+        status=ChatStatus.OPENED, source=ChatSource.DIRECT,
+        initiator=initiator,
+        the_other_person=default_user)
+    session.add(chat)
+
+    msg1 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='wtf omg lol', sender=default_user)
+    msg2 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='why dont u answer me???', sender=default_user)
+    msg3 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='fuck off', sender=initiator)
+    msg4 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        image_id='345345.png', sender=initiator)
+    chat.messages.extend([msg1, msg2, msg3, msg4])
+    session.commit()
+    response: Response = await mc_client.post(
+        f"/global",
+        json={
+            'timestamp': NOW.isoformat(),
+            'room': secrets.token_urlsafe(6),
+            'textroom': 'message',
+            'sender': str(default_user.id),
+            'recipient': str(recipient.id),
+            'payload': {
+                'type': 'accept_chat',
+                'chat_id': str(chat_id),
+            }
+        },
+        headers=default_user_auth_headers
+    )
+
+    assert response.status_code == 200
+
+    chat: Chat = chat_service.fetch_chat(chat_id)
+    assert chat.status == ChatStatus.ACCEPTED
+
+
+@pytest.mark.anyio
+async def test_open_chat(
+        mc_client: AsyncClient,
+        default_user: models.User,
+        chat_service: ChatService,
+        session: Session,
+        randomizer: RandomEntityGenerator,
+        default_user_auth_headers: dict[str, str]):
+    recipient = randomizer.generate_random_user()
+    chat_id = uuid.uuid4()
+    initiator = randomizer.generate_random_user()
+    chat = Chat(
+        id=chat_id,
+        status=ChatStatus.REQUESTED, source=ChatSource.DIRECT,
+        initiator=initiator,
+        the_other_person=default_user)
+    session.add(chat)
+
+    msg1 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='wtf omg lol', sender=default_user)
+    msg2 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='why dont u answer me???', sender=default_user)
+    msg3 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='fuck off', sender=initiator)
+    msg4 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        image_id='345345.png', sender=initiator)
+    chat.messages.extend([msg1, msg2, msg3, msg4])
+    session.commit()
+    response: Response = await mc_client.post(
+        f"/global",
+        json={
+            'timestamp': NOW.isoformat(),
+            'room': secrets.token_urlsafe(6),
+            'textroom': 'message',
+            'sender': str(default_user.id),
+            'recipient': str(recipient.id),
+            'payload': {
+                'type': 'open_chat',
+                'chat_id': str(chat_id),
+            }
+        },
+        headers=default_user_auth_headers
+    )
+
+    assert response.status_code == 200
+
+    chat: Chat = chat_service.fetch_chat(chat_id)
+    assert chat.status == ChatStatus.OPENED

@@ -212,9 +212,9 @@ class ChatService:
             self.db.execute(delete(Chat).where(Chat.id == chat_id))
         self.db.commit()
 
-    def accept_chat(self, chat_id: UUID):
+    def update_chat_status(self, chat_id: UUID, status: ChatStatus):
         result = self.db.execute(update(Chat).where(Chat.id == chat_id).
-                                 values(status=ChatStatus.ACCEPTED))
+                                 values(status=status))
         self.db.commit()
         if result.rowcount == 0:
             raise SwipeError(f'Chat with id:{chat_id} does not exist')

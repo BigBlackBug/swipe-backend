@@ -12,7 +12,7 @@ from starlette.responses import JSONResponse
 import config
 from janus.schemas import BasePayload, MessagePayload, MessageStatusPayload, \
     MessageLikePayload, CreateChatPayload, ChatMessagePayload, \
-    AcceptChatPayload, DeclineChatPayload
+    AcceptChatPayload, DeclineChatPayload, OpenChatPayload
 from settings import settings
 from swipe.chats.models import MessageStatus, ChatSource, ChatStatus
 from swipe.chats.services import ChatService
@@ -39,6 +39,7 @@ async def consume_message(
                     '- CreateChatPayload\n'
                     '- AcceptChatPayload\n'
                     '- DeclineChatPayload\n',
+                    '- OpenChatPayload\n'
                 'value': {
                     'textroom': 'message',
                     'room': '<global_room_id>',
@@ -47,7 +48,7 @@ async def consume_message(
                     'payload': {}
                 }
             },
-            'endpoint message':{
+            'endpoint message': {
                 'summary': 'Message sent by Janus to the endpoint',
                 'description':
                     'Payload takes one of the types listed below:\n'
@@ -57,6 +58,7 @@ async def consume_message(
                     '- CreateChatPayload\n'
                     '- AcceptChatPayload\n'
                     '- DeclineChatPayload\n',
+                    '- OpenChatPayload\n'
                 'value': {
                     'textroom': 'message',
                     'room': '<global_room_id>',
@@ -137,7 +139,11 @@ async def consume_message(
             )
 
     elif isinstance(payload, AcceptChatPayload):
-        chat_service.accept_chat(chat_id=payload.chat_id)
+        chat_service.update_chat_status(
+            payload.chat_id, status=ChatStatus.ACCEPTED)
+    elif isinstance(payload, OpenChatPayload):
+        chat_service.update_chat_status(
+            payload.chat_id, status=ChatStatus.OPENED)
     elif isinstance(payload, DeclineChatPayload):
         chat_service.delete_chat(chat_id=payload.chat_id)
 

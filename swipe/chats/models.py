@@ -22,6 +22,7 @@ class MessageStatus(str, enum.Enum):
 class ChatStatus(str, enum.Enum):
     REQUESTED = 'requested'
     ACCEPTED = 'accepted'
+    OPENED = 'opened'
 
 
 class ChatSource(str, enum.Enum):

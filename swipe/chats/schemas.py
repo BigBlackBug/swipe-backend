@@ -90,6 +90,7 @@ class ChatORMSchema(BaseModel):
     messages: list[ChatMessageORMSchema] = []
     creation_date: datetime.datetime
     source: ChatSource
+    status: ChatStatus
 
     @validator("messages", pre=True, each_item=True)
     def patch_message(cls, message: ChatMessage, values: dict[str, Any]):
@@ -115,7 +116,7 @@ class ChatOut(BaseModel):
     initiator_id: Optional[UUID] = None
     messages: list[ChatMessageORMSchema] = []
     source: ChatSource
-
+    status: ChatStatus
     creation_date: datetime.datetime
 
 
@@ -133,10 +134,11 @@ class MultipleChatsOut(BaseModel):
         for chat in chats:
             data = ChatORMSchema.parse_chat(chat, current_user_id)
 
-            if chat.status == ChatStatus.REQUESTED:
-                result['requests'].append(data)
-            else:
+            if chat.status == ChatStatus.ACCEPTED:
                 result['chats'].append(data)
+            else:
+                # opened chats are still requested
+                result['requests'].append(data)
 
         for user in users:
             user_dict: UserOutChatPreview \
