@@ -7,7 +7,7 @@ from uuid import UUID
 from aioredis import Redis
 from fastapi import Depends
 from sqlalchemy import select, update, desc, delete
-from sqlalchemy.orm import Session, selectinload, contains_eager, noload
+from sqlalchemy.orm import Session, selectinload, contains_eager
 
 import swipe.dependencies
 from swipe.chats.models import Chat, ChatStatus, ChatMessage, MessageStatus, \

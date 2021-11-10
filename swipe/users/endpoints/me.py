@@ -51,6 +51,7 @@ async def delete_user(
         user_service: UserService = Depends(),
         chat_service: ChatService = Depends(),
         current_user: User = Depends(security.get_current_user)):
+    # TODO send event to all chat members to remove them from view
     chat_ids: list[UUID] = chat_service.fetch_chat_ids(current_user.id)
     for chat_id in chat_ids:
         chat_service.delete_chat(chat_id)

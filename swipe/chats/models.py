@@ -106,5 +106,6 @@ class GlobalChatMessage(ModelBase):
 
     message = Column(String(256))
 
-    sender_id = Column(UUID(as_uuid=True), ForeignKey('users.id'))
+    sender_id = Column(UUID(as_uuid=True),
+                       ForeignKey('users.id', ondelete='CASCADE'))
     sender = relationship('User', uselist=False)

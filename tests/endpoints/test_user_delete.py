@@ -4,14 +4,14 @@ from unittest.mock import MagicMock
 from uuid import UUID
 
 import pytest
-from httpx import AsyncClient, Response
+from httpx import AsyncClient
 from pytest_mock import MockerFixture
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from settings import settings
 from swipe.chats.models import ChatMessage, MessageStatus, Chat, ChatStatus, \
-    ChatSource
+    ChatSource, GlobalChatMessage
 from swipe.randomizer import RandomEntityGenerator
 from swipe.users import models
 from swipe.users.models import AuthInfo, User
@@ -20,7 +20,7 @@ from swipe.users.services import UserService, RedisUserService
 
 @pytest.mark.anyio
 async def test_user_delete(
-        mocker:MockerFixture,
+        mocker: MockerFixture,
         client: AsyncClient,
         default_user: models.User,
         user_service: UserService,
@@ -47,7 +47,7 @@ async def test_user_delete(
 
 @pytest.mark.anyio
 async def test_user_delete_with_chats(
-        mocker:MockerFixture,
+        mocker: MockerFixture,
         client: AsyncClient,
         default_user: models.User,
         user_service: UserService,
@@ -105,3 +105,55 @@ async def test_user_delete_with_chats(
 
     assert session.execute(
         select(User).where(User.id == other_user.id)).scalars().one()
+
+
+@pytest.mark.anyio
+async def test_user_delete_with_global(
+        mocker: MockerFixture,
+        client: AsyncClient,
+        default_user: models.User,
+        user_service: UserService,
+        redis_service: RedisUserService,
+        randomizer: RandomEntityGenerator,
+        session: Session,
+        default_user_auth_headers: dict[str, str]):
+    mock_user_storage: MagicMock = \
+        mocker.patch('swipe.users.models.storage_client')
+
+    photos: list[str] = default_user.photos
+    other_user = randomizer.generate_random_user()
+    another_user = randomizer.generate_random_user()
+
+    msg1 = GlobalChatMessage(
+        timestamp=datetime.datetime.now(),
+        message='wtf omg lol', sender=default_user)
+    msg2 = GlobalChatMessage(
+        timestamp=datetime.datetime.now(),
+        message='why dont u answer me???', sender=default_user)
+    msg3 = GlobalChatMessage(
+        timestamp=datetime.datetime.now(),
+        message='fuck off', sender=other_user)
+    msg4 = GlobalChatMessage(
+        timestamp=datetime.datetime.now(), message='what..',
+        sender=another_user)
+    session.add(msg1)
+    session.add(msg2)
+    session.add(msg3)
+    session.add(msg4)
+    session.commit()
+
+    auth_info_id: UUID = default_user.auth_info.id
+    await client.delete(
+        f"{settings.API_V1_PREFIX}/me",
+        headers=default_user_auth_headers)
+
+    for photo in photos:
+        mock_user_storage.delete_image.assert_called_with(photo)
+
+    assert not user_service.get_user(default_user.id)
+    assert not session.execute(
+        select(AuthInfo).where(AuthInfo.id == auth_info_id)). \
+        scalars().one_or_none()
+
+    assert set(session.execute(select(GlobalChatMessage.id)).scalars()) \
+           == {msg3.id, msg4.id}
