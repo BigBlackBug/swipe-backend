@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import enum
+import logging
 import uuid
 
 from sqlalchemy import Column, String, Enum, ForeignKey, DateTime, \
@@ -11,6 +12,9 @@ from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm import relationship
 
 from swipe.database import ModelBase
+from swipe.storage import storage_client
+
+logger = logging.getLogger(__name__)
 
 
 class MessageStatus(str, enum.Enum):
@@ -58,10 +62,12 @@ class Chat(ModelBase):
                             passive_deletes=True,
                             back_populates='chat')
 
-    initiator_id = Column(UUID(as_uuid=True), ForeignKey('users.id'))
+    initiator_id = Column(UUID(as_uuid=True),
+                          ForeignKey('users.id', ondelete='CASCADE'))
     initiator = relationship('User', foreign_keys=[initiator_id], uselist=False)
 
-    the_other_person_id = Column(UUID(as_uuid=True), ForeignKey('users.id'))
+    the_other_person_id = Column(UUID(as_uuid=True),
+                                 ForeignKey('users.id', ondelete='CASCADE'))
     the_other_person = relationship('User', foreign_keys=[the_other_person_id],
                                     uselist=False)
 
@@ -78,12 +84,18 @@ class ChatMessage(ModelBase):
 
     is_liked = Column(Boolean, default=False)
 
-    sender_id = Column(UUID(as_uuid=True), ForeignKey('users.id'))
+    sender_id = Column(UUID(as_uuid=True),
+                       ForeignKey('users.id', ondelete="CASCADE"))
     sender = relationship('User', uselist=False)
 
     chat_id = Column(UUID(as_uuid=True),
                      ForeignKey('chats.id', ondelete="CASCADE"))
     chat = relationship('Chat', back_populates='messages')
+
+    def delete_image(self):
+        if self.image_id:
+            logger.info(f"Deleting image {self.image_id} of chat {self.id}")
+            storage_client.delete_chat_image(self.image_id)
 
 
 class GlobalChatMessage(ModelBase):

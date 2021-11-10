@@ -1,11 +1,13 @@
 import logging
 import re
+from uuid import UUID
 
 from fastapi import Depends, Body, HTTPException, UploadFile, File, APIRouter
 from starlette import status
 from starlette.responses import Response
 
 from swipe import security
+from swipe.chats.services import ChatService
 from swipe.users import schemas
 from swipe.users.models import User
 from swipe.users.services import UserService
@@ -40,6 +42,21 @@ async def patch_user(
     # https://github.com/tiangolo/fastapi/issues/1357
     user_object = user_service.update_user(current_user, user_body)
     return user_object
+
+
+@router.delete(
+    '',
+    name="Delete user", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+        user_service: UserService = Depends(),
+        chat_service: ChatService = Depends(),
+        current_user: User = Depends(security.get_current_user)):
+    chat_ids: list[UUID] = chat_service.fetch_chat_ids(current_user.id)
+    for chat_id in chat_ids:
+        chat_service.delete_chat(chat_id)
+
+    user_service.delete_user(current_user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(

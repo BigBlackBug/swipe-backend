@@ -169,6 +169,7 @@ def default_user(randomizer: RandomEntityGenerator,
                  session: Session) -> models.User:
     new_user = randomizer.generate_random_user()
     new_user.name = 'default_user'
+    new_user.photos = ['default_photo.png']
     session.commit()
     return new_user
 

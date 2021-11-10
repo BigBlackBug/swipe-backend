@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 
 from sqlalchemy import Column, String, Boolean, Integer, Enum, ARRAY, \
@@ -8,9 +9,12 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, object_session
 
 from swipe.database import ModelBase
+from swipe.errors import SwipeError
+from swipe.storage import storage_client
 from swipe.users.enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
     RecurrenceRate, NotificationTypes
-from swipe.errors import SwipeError
+
+logger = logging.getLogger(__name__)
 
 IDList = list[UUID]
 
@@ -55,7 +59,6 @@ class User(ModelBase):
     location = relationship('Location', uselist=False)
     location_id = Column(UUID(as_uuid=True), ForeignKey('location.id'))
 
-    auth_info_id = Column(UUID(as_uuid=True), ForeignKey('auth_info.id'))
     auth_info = relationship('AuthInfo', back_populates='user', uselist=False)
 
     # variables
@@ -93,6 +96,11 @@ class User(ModelBase):
 
         self.blacklist.append(target_user)
 
+    def delete_photos(self):
+        logger.info(f"Deleting user {self.id} photos")
+        for photo in self.photos:
+            storage_client.delete_image(photo)
+
     def __str__(self):
         return f'User {self.id}, name: {self.name}'
 
@@ -118,4 +126,6 @@ class AuthInfo(ModelBase):
     auth_provider = Column(Enum(AuthProvider), nullable=False)
     provider_user_id = Column(String, nullable=False)
 
-    user = relationship('User', back_populates='auth_info', uselist=False)
+    user = relationship('User', back_populates='auth_info')
+    user_id = Column(UUID(as_uuid=True),
+                     ForeignKey('users.id', ondelete="CASCADE"))

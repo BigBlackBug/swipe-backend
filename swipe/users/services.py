@@ -9,7 +9,7 @@ from dateutil.relativedelta import relativedelta
 from fastapi import Depends
 from jose import jwt
 from jose.constants import ALGORITHMS
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.engine import Row
 from sqlalchemy.orm import Session
 
@@ -237,3 +237,9 @@ class UserService:
 
     def get_photo_url(self, image_id: str):
         return storage_client.get_image_url(image_id)
+
+    def delete_user(self, user: User):
+        logger.info(f"Deleting user {user.id}")
+        user.delete_photos()
+        self.db.execute(delete(User).where(User.id == user.id))
+        self.db.commit()

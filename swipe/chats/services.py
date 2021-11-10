@@ -7,7 +7,7 @@ from uuid import UUID
 from aioredis import Redis
 from fastapi import Depends
 from sqlalchemy import select, update, desc, delete
-from sqlalchemy.orm import Session, selectinload, contains_eager
+from sqlalchemy.orm import Session, selectinload, contains_eager, noload
 
 import swipe.dependencies
 from swipe.chats.models import Chat, ChatStatus, ChatMessage, MessageStatus, \
@@ -162,6 +162,13 @@ class ChatService:
             result = self.db.execute(query).scalars().all()
         return result
 
+    def fetch_chat_ids(self, user_id: UUID) -> list[UUID]:
+        query = select(Chat.id). \
+            where(((Chat.initiator_id == user_id) |
+                   (Chat.the_other_person_id == user_id)))
+        result = self.db.execute(query).scalars().all()
+        return result
+
     def fetch_global_chat(self, last_message_id: Optional[UUID] = None) \
             -> list[GlobalChatMessage]:
         if last_message_id:
@@ -199,17 +206,22 @@ class ChatService:
         :param chat_id:
         :param user_object:
         """
-        if user_object:
-            # Why make another query, when we can check rowcount?
-            result = self.db.execute(
-                delete(Chat).where(Chat.id == chat_id).
-                    where((Chat.initiator_id == user_object.id) |
-                          (Chat.the_other_person_id == user_object.id)))
-            if result.rowcount != 1:
-                raise SwipeError("You are not allowed to delete this chat "
-                                 "because you are not a member")
-        else:
-            self.db.execute(delete(Chat).where(Chat.id == chat_id))
+        chat = self.db.execute(
+            select(Chat).where(Chat.id == chat_id)). \
+            scalar_one_or_none()
+        if not chat:
+            raise SwipeError("You are not allowed to delete this chat "
+                             "because chat does not exist")
+        if user_object \
+                and user_object.id not in (
+                chat.initiator_id, chat.the_other_person_id):
+            raise SwipeError("You are not allowed to delete this chat "
+                             "because you are not a member")
+
+        for message in chat.messages:
+            message.delete_image()
+
+        self.db.execute(delete(Chat).where(Chat.id == chat_id))
         self.db.commit()
 
     def update_chat_status(self, chat_id: UUID, status: ChatStatus):

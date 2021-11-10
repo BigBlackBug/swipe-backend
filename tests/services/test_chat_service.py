@@ -1,9 +1,11 @@
 import datetime
 import random
 import uuid
+from unittest.mock import MagicMock
 
 import lorem
 import pytest
+from pytest_mock import MockerFixture
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -54,6 +56,50 @@ async def test_create_chat_duplicate(
         chat_service.create_chat(
             chat_id=chat_id, initiator_id=user_1, the_other_person_id=user_2,
             chat_status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY)
+
+
+@pytest.mark.anyio
+async def test_delete_chat(
+        mocker: MockerFixture,
+        default_user: models.User,
+        session: Session,
+        randomizer: RandomEntityGenerator,
+        chat_service: ChatService):
+    mock_storage: MagicMock = mocker.patch('swipe.chats.models.storage_client')
+
+    other_user = randomizer.generate_random_user()
+    chat_id = uuid.uuid4()
+    chat = Chat(
+        id=chat_id,
+        status=ChatStatus.ACCEPTED,
+        source=ChatSource.VIDEO_LOBBY,
+        initiator=other_user,
+        the_other_person=default_user)
+    session.add(chat)
+
+    msg1 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='wtf omg lol', sender=default_user)
+    msg2 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='why dont u answer me???', sender=default_user)
+    msg3 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        message='fuck off', sender=other_user)
+    msg4 = ChatMessage(
+        timestamp=datetime.datetime.now(), status=MessageStatus.SENT,
+        image_id='345345.png', sender=other_user)
+    chat.messages.extend([msg1, msg2, msg3, msg4])
+    session.commit()
+
+    chat_service.delete_chat(chat_id)
+    # -------------------------------
+
+    mock_storage.delete_chat_image.assert_called_with('345345.png')
+    chat = session.execute(
+        select(Chat).where(Chat.id == chat_id)).scalar_one_or_none()
+    assert not chat
+    assert session.query(ChatMessage).count() == 0
 
 
 @pytest.mark.anyio
