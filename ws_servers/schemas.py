@@ -26,7 +26,7 @@ class MessagePayload(BaseModel):
 
 
 class GlobalMessagePayload(BaseModel):
-    type_: str = Field('message', alias='type', const=True)
+    type_: str = Field('global_message', alias='type', const=True)
     message_id: UUID
     text: str
 
@@ -67,11 +67,11 @@ class OpenChatPayload(BaseModel):
 
 
 class BasePayload(BaseModel):
-    timestamp: datetime.datetime
     sender_id: UUID
     recipient_id: Optional[UUID] = None
     payload: Union[
-        MessagePayload, MessageStatusPayload, MessageLikePayload,
+        MessagePayload, GlobalMessagePayload,
+        MessageStatusPayload, MessageLikePayload,
         DeclineChatPayload, AcceptChatPayload, CreateChatPayload,
         OpenChatPayload
     ]
@@ -82,10 +82,9 @@ class BasePayload(BaseModel):
         if payload_type == 'message_status':
             return MessageStatusPayload
         elif payload_type == 'message':
-            if json_data.get('recipient_id'):
-                return MessagePayload
-            else:
-                return GlobalMessagePayload
+            return MessagePayload
+        elif payload_type == 'global_message':
+            return GlobalMessagePayload
         elif payload_type == 'like':
             return MessageLikePayload
         elif payload_type == 'create_chat':

@@ -1,3 +1,5 @@
+import base64
+
 import config
 
 config.configure_logging()
@@ -13,9 +15,10 @@ from pydantic import BaseModel
 from starlette.datastructures import Address
 from starlette.websockets import WebSocketDisconnect
 
-from swipe.users.services import UserService
+from swipe.users.services import UserService, RedisUserService
 from ws_servers.schemas import BasePayload, GlobalMessagePayload
-from ws_servers.services import WSChatRequestProcessor, WSConnectionManager
+from ws_servers.services import WSChatRequestProcessor, WSConnectionManager, \
+    ConnectedUser
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +38,6 @@ async def docs(json_data: BasePayload = Body(..., examples={
             'Payload takes one of the types listed below:\n' +
             '\n'.join([f"- {x}" for x in _supported_payloads]),
         'value': {
-            'timestamp': 'iso formatted utc timestamp',
             'sender_id': '<user_id>',
             'recipient_id': '<user_id>',
             'payload': {}
@@ -51,13 +53,23 @@ async def websocket_endpoint(
         websocket: WebSocket,
         connection_manager: WSConnectionManager = Depends(),
         user_service: UserService = Depends(),
+        redis_service: RedisUserService = Depends(),
         request_processor: WSChatRequestProcessor = Depends()):
-    if not user_service.get_user(user_id):
+    if (user := user_service.get_global_chat_preview_one(user_id)) is None:
         logger.info(f"User {user_id} not found")
         await websocket.close(1003)
         return
 
-    await connection_manager.connect(user_id, websocket)
+    # TODO that's bad, no indices
+    avatar = user[2]
+    if avatar:
+        avatar = base64.b64encode(avatar)
+    user = ConnectedUser(id=user_id, name=user[1],
+                         avatar=avatar, websocket=websocket)
+
+    await connection_manager.connect(user)
+    await redis_service.refresh_online_status(user_id)
+
     address: Address = websocket.client
 
     logger.info(f"{user_id} connected from {address}")
@@ -68,6 +80,7 @@ async def websocket_endpoint(
         except WebSocketDisconnect as e:
             logger.exception(f"{user_id} disconnected with code {e.code}")
             await connection_manager.disconnect(user_id)
+            await redis_service.remove_online_user(user_id)
             break
 
         payload: BasePayload = BasePayload.validate(json.loads(data))
@@ -75,12 +88,13 @@ async def websocket_endpoint(
 
         request_processor.process(payload)
         if isinstance(payload.payload, GlobalMessagePayload):
-            await connection_manager.broadcast(payload.sender_id,
-                                               payload.payload.dict(
-                                                   by_alias=True))
+            output_data = payload.payload.dict(by_alias=True)
+            output_data['name'] = user.name
+            output_data['avatar'] = user.avatar
+            await connection_manager.broadcast(payload.sender_id, output_data)
         else:
-            await connection_manager.send(payload.recipient_id,
-                                          payload.payload.dict(by_alias=True))
+            await connection_manager.send(
+                payload.recipient_id, payload.payload.dict(by_alias=True))
 
 
 if __name__ == '__main__':

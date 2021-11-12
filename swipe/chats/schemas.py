@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import datetime
 from typing import Optional, Any
 from uuid import UUID
@@ -23,6 +24,35 @@ class UserOutChatPreviewORM(BaseModel):
     class Config:
         # allows Pydantic to read orm models and not just dicts
         orm_mode = True
+
+
+class UserOutGlobalChatPreviewORM(BaseModel):
+    id: UUID
+    name: str
+    avatar: Optional[bytes]
+
+    class Config:
+        # allows Pydantic to read orm models and not just dicts
+        orm_mode = True
+
+
+class UserOutGlobalChatPreview(BaseModel):
+    id: UUID
+    name: str
+    avatar: Optional[str]
+
+    @classmethod
+    def patched_from_orm(cls: UserOutGlobalChatPreview,
+                         obj: Any) -> UserOutGlobalChatPreview:
+        schema_obj = UserOutGlobalChatPreviewORM.from_orm(obj)
+        response = {
+            'id': schema_obj.id,
+            'name': schema_obj.name,
+        }
+        if schema_obj.avatar:
+            # TODO just store base64 strings
+            response['avatar'] = base64.b64encode(schema_obj.avatar)
+        return UserOutGlobalChatPreview.parse_obj(response)
 
 
 class UserOutChatPreview(BaseModel):
@@ -68,7 +98,7 @@ class ChatMessageORMSchema(BaseModel):
 
 class GlobalChatOut(BaseModel):
     messages: list[ChatMessageORMSchema] = []
-    users: dict[UUID, UserOutChatPreview] = {}
+    users: dict[UUID, UserOutGlobalChatPreview] = {}
 
     @classmethod
     def parse_chats(cls, messages: list[GlobalChatMessage],
@@ -78,9 +108,8 @@ class GlobalChatOut(BaseModel):
             result['messages'].append(
                 ChatMessageORMSchema.patched_from_orm(message))
         for user in users:
-            user_dict: UserOutChatPreview \
-                = UserOutChatPreview.patched_from_orm(user)
-            result['users'][user.id] = user_dict
+            user_schema = UserOutGlobalChatPreview.patched_from_orm(user)
+            result['users'][user.id] = user_schema
         return cls.parse_obj(result)
 
 

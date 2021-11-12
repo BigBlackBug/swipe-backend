@@ -17,21 +17,17 @@ NOW = datetime.datetime.now()
 
 @pytest.mark.anyio
 async def test_post_global_message(
-
         default_user: models.User,
         chat_service: ChatService,
         default_user_auth_headers: dict[str, str]):
     message_id = uuid.uuid4()
     mp = WSChatRequestProcessor(chat_service)
     json_data = BasePayload.validate({
-        'timestamp': NOW.isoformat(),
         'sender_id': str(default_user.id),
         'payload': {
-            'type': 'message',
+            'type': 'global_message',
             'message_id': str(message_id),
-            'text': 'hello',
-            'sender_name': default_user.name,
-            'sender_image_url': 'whatever'
+            'text': 'hello'
         }
     })
     mp.process(json_data)
@@ -43,7 +39,6 @@ async def test_post_global_message(
 
 @pytest.mark.anyio
 async def test_post_directed_message(
-
         default_user: models.User,
         chat_service: ChatService,
         randomizer: RandomEntityGenerator,
@@ -58,7 +53,6 @@ async def test_post_directed_message(
 
     mp = WSChatRequestProcessor(chat_service)
     json_data = BasePayload.validate({
-        'timestamp': NOW.isoformat(),
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
         'payload': {
@@ -79,7 +73,6 @@ async def test_post_directed_message(
 
 @pytest.mark.anyio
 async def test_set_received_status(
-
         default_user: models.User,
         chat_service: ChatService,
         randomizer: RandomEntityGenerator,
@@ -96,7 +89,6 @@ async def test_set_received_status(
         timestamp=NOW, message='what', is_liked=False)
     mp = WSChatRequestProcessor(chat_service)
     json_data = BasePayload.validate({
-        'timestamp': NOW.isoformat(),
         'sender_id': str(default_user.id),
         'payload': {
             'type': 'message_status',
@@ -131,8 +123,6 @@ async def test_set_read_status(
         timestamp=NOW, message='what', is_liked=False)
     mp = WSChatRequestProcessor(chat_service)
     json_data = BasePayload.validate({
-        'timestamp': NOW.isoformat(),
-
         'sender_id': str(default_user.id),
         'payload': {
             'type': 'message_status',
@@ -165,8 +155,6 @@ async def test_set_liked(
         timestamp=NOW, message='what', is_liked=False)
     mp = WSChatRequestProcessor(chat_service)
     json_data = BasePayload.validate({
-        'timestamp': NOW.isoformat(),
-
         'sender_id': str(default_user.id),
         'payload': {
             'type': 'like',
@@ -182,7 +170,6 @@ async def test_set_liked(
 
 @pytest.mark.anyio
 async def test_set_disliked(
-
         default_user: models.User,
         chat_service: ChatService,
         randomizer: RandomEntityGenerator,
@@ -199,8 +186,6 @@ async def test_set_disliked(
         timestamp=NOW, message='what', is_liked=True)
     mp = WSChatRequestProcessor(chat_service)
     json_data = BasePayload.validate({
-        'timestamp': NOW.isoformat(),
-
         'sender_id': str(default_user.id),
         'payload': {
             'type': 'like',
@@ -216,7 +201,6 @@ async def test_set_disliked(
 
 @pytest.mark.anyio
 async def test_create_chat_direct(
-
         default_user: models.User,
         chat_service: ChatService,
         randomizer: RandomEntityGenerator,
@@ -225,7 +209,7 @@ async def test_create_chat_direct(
     chat_id = uuid.uuid4()
     mp = WSChatRequestProcessor(chat_service)
     json_data = BasePayload.validate({
-        'timestamp': NOW.isoformat(),
+        
 
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -238,7 +222,6 @@ async def test_create_chat_direct(
                 'sender_id': str(default_user.id),
                 'recipient_id': str(recipient.id),
                 'timestamp': NOW.isoformat(),
-
                 'text': 'hello'
             }
         }
@@ -257,7 +240,6 @@ async def test_create_chat_direct(
 
 @pytest.mark.anyio
 async def test_create_chat_text_lobby(
-
         default_user: models.User,
         chat_service: ChatService,
         randomizer: RandomEntityGenerator,
@@ -266,8 +248,6 @@ async def test_create_chat_text_lobby(
     chat_id = uuid.uuid4()
     mp = WSChatRequestProcessor(chat_service)
     json_data = BasePayload.validate({
-        'timestamp': NOW.isoformat(),
-
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
         'payload': {
@@ -279,7 +259,6 @@ async def test_create_chat_text_lobby(
                 'sender_id': str(default_user.id),
                 'recipient_id': str(recipient.id),
                 'timestamp': NOW.isoformat(),
-
                 'text': 'hello'
             } for _ in range(5)]
         }
@@ -298,7 +277,6 @@ async def test_create_chat_text_lobby(
 
 @pytest.mark.anyio
 async def test_create_chat_audio_lobby(
-
         default_user: models.User,
         chat_service: ChatService,
         randomizer: RandomEntityGenerator,
@@ -307,8 +285,6 @@ async def test_create_chat_audio_lobby(
     chat_id = uuid.uuid4()
     mp = WSChatRequestProcessor(chat_service)
     json_data = BasePayload.validate({
-        'timestamp': NOW.isoformat(),
-
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
         'payload': {
@@ -330,7 +306,6 @@ async def test_create_chat_audio_lobby(
 
 @pytest.mark.anyio
 async def test_create_chat_video_lobby(
-
         default_user: models.User,
         chat_service: ChatService,
         randomizer: RandomEntityGenerator,
@@ -339,8 +314,6 @@ async def test_create_chat_video_lobby(
     chat_id = uuid.uuid4()
     mp = WSChatRequestProcessor(chat_service)
     json_data = BasePayload.validate({
-        'timestamp': NOW.isoformat(),
-
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
         'payload': {
@@ -362,7 +335,6 @@ async def test_create_chat_video_lobby(
 
 @pytest.mark.anyio
 async def test_decline_chat(
-
         default_user: models.User,
         chat_service: ChatService,
         session: Session,
@@ -394,8 +366,6 @@ async def test_decline_chat(
     session.commit()
     mp = WSChatRequestProcessor(chat_service)
     json_data = BasePayload.validate({
-        'timestamp': NOW.isoformat(),
-
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
         'payload': {
@@ -411,7 +381,6 @@ async def test_decline_chat(
 
 @pytest.mark.anyio
 async def test_accept_chat(
-
         default_user: models.User,
         chat_service: ChatService,
         session: Session,
@@ -443,8 +412,6 @@ async def test_accept_chat(
     session.commit()
     mp = WSChatRequestProcessor(chat_service)
     json_data = BasePayload.validate({
-        'timestamp': NOW.isoformat(),
-
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
         'payload': {
@@ -460,7 +427,6 @@ async def test_accept_chat(
 
 @pytest.mark.anyio
 async def test_open_chat(
-
         default_user: models.User,
         chat_service: ChatService,
         session: Session,
@@ -492,8 +458,6 @@ async def test_open_chat(
     session.commit()
     mp = WSChatRequestProcessor(chat_service)
     json_data = BasePayload.validate({
-        'timestamp': NOW.isoformat(),
-
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
         'payload': {

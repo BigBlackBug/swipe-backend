@@ -6,6 +6,7 @@ from typing import Generator
 import docker
 import pytest
 import sqlalchemy.event
+from PIL import Image
 from aioredis import Redis
 from docker.models.containers import Container
 from fakeredis._aioredis2 import FakeRedis
@@ -187,6 +188,11 @@ def redis_service(fake_redis: Redis) -> RedisUserService:
 @pytest.fixture
 def chat_service(session: Session) -> ChatService:
     return ChatService(session)
+
+
+@pytest.fixture
+def random_image(randomizer: RandomEntityGenerator) -> Image:
+    return randomizer.generate_random_avatar('what woot')
 
 
 @pytest.fixture

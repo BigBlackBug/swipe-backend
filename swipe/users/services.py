@@ -4,6 +4,7 @@ import uuid
 from typing import Optional, IO, Union
 from uuid import UUID
 
+import requests
 from aioredis import Redis
 from dateutil.relativedelta import relativedelta
 from fastapi import Depends
@@ -15,6 +16,7 @@ from sqlalchemy.orm import Session
 
 import swipe.dependencies
 from settings import settings, constants
+from swipe import utils
 from swipe.storage import storage_client
 from swipe.users import schemas
 from swipe.users.enums import Gender
@@ -153,6 +155,17 @@ class UserService:
             return self.db.execute(
                 select(User.id, User.name, User.photos).where(clause)).all()
 
+    def get_global_chat_preview(
+            self, user_ids: Optional[IDList] = None) -> list[Row]:
+        clause = True if user_ids is None else User.id.in_(user_ids)
+        return self.db.execute(
+            select(User.id, User.name, User.avatar).where(clause)).all()
+
+    def get_global_chat_preview_one(self, user_id: UUID) -> Optional[Row]:
+        return self.db.execute(
+            select(User.id, User.name, User.avatar).
+                where(User.id == user_id)).one_or_none()
+
     def update_user(
             self,
             user_object: User,
@@ -162,9 +175,22 @@ class UserService:
                 user_object.set_location(v)
             else:
                 setattr(user_object, k, v)
+                if k == 'photos':
+                    if len(v) > 0:
+                        self._update_avatar(user_object, photo_id=v[0])
+                    else:
+                        user_object.avatar = None
         self.db.commit()
         self.db.refresh(user_object)
         return user_object
+
+    def _update_avatar(self, user: User, photo_id: Optional[str] = None,
+                       image_content: Optional = None):
+        if photo_id:
+            img_url = storage_client.get_image_url(photo_id)
+            image_content = requests.get(img_url).content
+
+        user.avatar = utils.compress_image(image_content)
 
     def add_photo(self, user_object: User, file_content: Union[IO, bytes],
                   extension: str) -> str:
@@ -172,13 +198,20 @@ class UserService:
         storage_client.upload_image(photo_id, file_content)
 
         user_object.photos = user_object.photos + [photo_id]
+        if len(user_object.photos) == 1:
+            self._update_avatar(user_object, image_content=file_content)
+
         self.db.commit()
         return photo_id
 
     def delete_photo(self, user_object: User, photo_id: str):
         new_list = list(user_object.photos)
-        new_list.remove(photo_id)
+        index = new_list.index(photo_id)
+        del new_list[index]
+
         user_object.photos = new_list
+        if index == 0:
+            self._update_avatar(user_object, photo_id=new_list[0])
 
         storage_client.delete_image(photo_id)
         self.db.commit()

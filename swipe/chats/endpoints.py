@@ -37,7 +37,7 @@ async def fetch_global_chat(
     chats: list[GlobalChatMessage] = \
         chat_service.fetch_global_chat(last_message_id)
     users: list[Row] = \
-        user_service.get_user_chat_preview([chat.sender_id for chat in chats])
+        user_service.get_global_chat_preview([chat.sender_id for chat in chats])
     return GlobalChatOut.parse_chats(chats, users)
 
 

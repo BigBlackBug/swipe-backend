@@ -1,5 +1,7 @@
+import datetime
 import json
 import logging
+from dataclasses import dataclass
 from uuid import UUID
 
 from fastapi import Depends
@@ -8,7 +10,6 @@ from starlette.websockets import WebSocket
 from swipe.chats.models import MessageStatus, ChatSource, ChatStatus
 from swipe.chats.services import ChatService
 from swipe.errors import SwipeError
-from swipe.users.services import RedisUserService
 from ws_servers.schemas import BasePayload, MessagePayload, \
     GlobalMessagePayload, \
     MessageStatusPayload, MessageLikePayload, ChatMessagePayload, \
@@ -24,32 +25,35 @@ class UUIDEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
+@dataclass
+class ConnectedUser:
+    id: UUID
+    name: str
+    avatar: bytes
+    websocket: WebSocket
+
+
 class WSConnectionManager:
-    active_connections: dict[UUID, WebSocket] = {}
+    active_connections: dict[UUID, ConnectedUser] = {}
 
-    def __init__(self, redis_service: RedisUserService = Depends()):
-        self.redis_service = redis_service
-
-    async def connect(self, user_id: UUID, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections[user_id] = websocket
-        await self.redis_service.refresh_online_status(user_id)
+    async def connect(self, user: ConnectedUser):
+        await user.websocket.accept()
+        self.active_connections[user.id] = user
 
     async def disconnect(self, user_id: UUID):
         del self.active_connections[user_id]
-        await self.redis_service.remove_online_user(user_id)
 
     async def send(self, user_id: UUID, payload: dict):
         logger.info(f"Sending payload to {user_id}")
-        await self.active_connections[user_id].send_text(
+        await self.active_connections[user_id].websocket.send_text(
             json.dumps(payload, cls=UUIDEncoder))
 
     async def broadcast(self, sender_id: UUID, payload: dict):
-        for user_id, ws in self.active_connections.items():
+        for user_id, user in self.active_connections.items():
             if user_id == sender_id:
                 continue
             logger.info(f"Sending payload to {user_id}")
-            await ws.send_text(json.dumps(payload, cls=UUIDEncoder))
+            await user.websocket.send_text(json.dumps(payload, cls=UUIDEncoder))
 
 
 class WSChatRequestProcessor:
@@ -68,14 +72,14 @@ class WSChatRequestProcessor:
                 recipient_id=data.recipient_id,
                 message=payload.text,
                 image_id=payload.image_id,
-                timestamp=data.timestamp
+                timestamp=datetime.datetime.utcnow()
             )
         elif isinstance(payload, GlobalMessagePayload):
             self.chat_service.post_message_to_global(
                 message_id=payload.message_id,
                 sender_id=data.sender_id,
                 message=payload.text,
-                timestamp=data.timestamp
+                timestamp=datetime.datetime.utcnow()
             )
         elif isinstance(payload, MessageStatusPayload):
             message_status = MessageStatus.__members__[payload.status.upper()]

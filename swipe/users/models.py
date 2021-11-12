@@ -4,7 +4,7 @@ import logging
 import uuid
 
 from sqlalchemy import Column, String, Boolean, Integer, Enum, ARRAY, \
-    ForeignKey, Date, UniqueConstraint, select, Table
+    ForeignKey, Date, UniqueConstraint, select, Table, LargeBinary
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, object_session
 
@@ -50,6 +50,8 @@ class User(ModelBase):
 
     interests = Column(ARRAY(Enum(UserInterests)), nullable=False, default=[])
     photos = Column(ARRAY(String(50)), nullable=False, default=[])
+    # base64 encoded 30x30 avatar
+    avatar = Column(LargeBinary)
 
     enabled_notifications = Column(Enum(NotificationTypes))
     instagram_profile = Column(String, nullable=False, default='')
