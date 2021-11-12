@@ -16,9 +16,8 @@ from sqlalchemy.orm import sessionmaker, Session
 import config
 import main
 import swipe.dependencies
-from janus import message_consumer
 from settings import settings
-from swipe.chats.services import ChatService, RedisChatService
+from swipe.chats.services import ChatService
 from swipe.database import ModelBase
 from swipe.randomizer import RandomEntityGenerator
 from swipe.users import models
@@ -77,11 +76,6 @@ def db_setup(request):
 @pytest.fixture(scope='session')
 def test_app():
     return main.init_app()
-
-
-@pytest.fixture(scope='session')
-def mc_test_app():
-    return message_consumer.app
 
 
 @pytest.fixture
@@ -193,11 +187,6 @@ def redis_service(fake_redis: Redis) -> RedisUserService:
 @pytest.fixture
 def chat_service(session: Session) -> ChatService:
     return ChatService(session)
-
-
-@pytest.fixture
-def redis_chat_service(fake_redis: Redis) -> RedisChatService:
-    return RedisChatService(fake_redis)
 
 
 @pytest.fixture

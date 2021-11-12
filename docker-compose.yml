@@ -1,22 +1,6 @@
 version: '3.7'
 
 services:
-  janus-gateway:
-    image: 'swipe/janus'
-    ports:
-#      janus main port
-      - "8088:8088"
-#      janus admin port
-      - "7088:7088"
-    volumes:
-      - "./_janus/config-local:/usr/local/etc/janus/:ro"
-      - "demos:/usr/local/share/janus/demos/"
-    network_mode: "host"
-    restart: on-failure
-    depends_on:
-      - event_consumer
-      - message_consumer
-
   redis:
     image: redis
 
@@ -29,42 +13,27 @@ services:
     ports:
       - "25432:5432"
 
-  event_consumer:
-    build: .
-    env_file:
-      - env/docker.env
-    command: uvicorn --host 0.0.0.0 --port 15000 janus.event_consumer:app
-    depends_on:
-      - pg
-      - redis
-
-  message_consumer:
-    build: .
-    env_file:
-      - env/docker.env
-    command: uvicorn --host 0.0.0.0 --port 16000 janus.message_consumer:app
-    depends_on:
-      - pg
-      - redis
-
   server:
     build: .
     env_file:
       - env/docker.env
     environment:
-      - JANUS_GATEWAY_URL=http://janus-gateway:8088/janus
-      - JANUS_GATEWAY_ADMIN_URL=http://janus-gateway:7088/admin
+      - SWIPE_PORT=8000
     ports:
       - "8000:8000"
-    command: uvicorn --host 0.0.0.0 --port 8000 main:fast_api
+    command: python main.py
     depends_on:
       - pg
       - redis
 
-volumes:
-  demos:
-    driver: local
-    driver_opts:
-      o: bind
-      type: none
-      device: "/Users/bigblackbug/projects/harddays/swipe-backend/_janus/demos"
+  chat_server:
+    build: .
+    env_file:
+      - env/docker.env
+    ports:
+      - "16000:16000"
+    command: uvicorn --host 0.0.0.0 --port 16000 ws_servers.chat_server:app
+    depends_on:
+      - server
+      - pg
+      - redis

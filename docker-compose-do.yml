@@ -11,47 +11,11 @@ services:
     volumes:
       - "${APP_DIR:?unset}/data:/var/lib/postgresql/data"
 
-# janus port 8088
-# janus admin port 7088
-  janus-gateway:
-    image: ${JANUS_IMAGE:?unset}
-    network_mode: host
-    restart: on-failure
-    depends_on:
-      - event_consumer
-      - message_consumer
-    volumes:
-      - "demos:/usr/local/share/janus/demos/"
-
-  event_consumer:
-    image: ${SWIPE_IMAGE:?unset}
-    env_file:
-      - swipe.env
-    ports:
-      - "15000:15000"
-    command: uvicorn --host 0.0.0.0 --port 15000 janus.event_consumer:app
-    depends_on:
-      - pg
-      - redis
-
-  message_consumer:
-    image: ${SWIPE_IMAGE:?unset}
-    env_file:
-      - swipe.env
-    ports:
-      - "16000:16000"
-    command: uvicorn --host 0.0.0.0 --port 16000 janus.message_consumer:app
-    depends_on:
-      - pg
-      - redis
-
   server:
     image: ${SWIPE_IMAGE:?unset}
     env_file:
       - swipe.env
     environment:
-      - JANUS_GATEWAY_URL=http://${DOCKER_GATEWAY_HOST:?unset}:8088/janus
-      - JANUS_GATEWAY_ADMIN_URL=http://${DOCKER_GATEWAY_HOST:?unset}:7088/admin
       - SWIPE_PORT=8000
     ports:
       - "80:8000"
@@ -60,18 +24,13 @@ services:
       - pg
       - redis
 
-  demo:
+  chat_server:
     image: ${SWIPE_IMAGE:?unset}
     env_file:
       - swipe.env
     ports:
-      - "18000:8000"
-    command: "python3 -m http.server --bind 0.0.0.0 8000"
+      - "16000:16000"
+    command: uvicorn --host 0.0.0.0 --port 16000 ws_servers.chat_server:app
     depends_on:
       - pg
       - redis
-    volumes:
-      - "demos:/code/demos"
-
-volumes:
-  demos:

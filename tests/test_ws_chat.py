@@ -1,9 +1,7 @@
 import datetime
-import secrets
 import uuid
 
 import pytest
-from httpx import AsyncClient, Response
 from sqlalchemy.orm import Session
 
 from swipe.chats.models import GlobalChatMessage, Chat, ChatMessage, \
@@ -11,37 +9,32 @@ from swipe.chats.models import GlobalChatMessage, Chat, ChatMessage, \
 from swipe.chats.services import ChatService
 from swipe.randomizer import RandomEntityGenerator
 from swipe.users import models
+from ws_servers.services import WSChatRequestProcessor
+from ws_servers.schemas import BasePayload
 
 NOW = datetime.datetime.now()
 
 
 @pytest.mark.anyio
 async def test_post_global_message(
-        mc_client: AsyncClient,
+
         default_user: models.User,
         chat_service: ChatService,
         default_user_auth_headers: dict[str, str]):
     message_id = uuid.uuid4()
-
-    response: Response = await mc_client.post(
-        f"/global",
-        json={
-            'timestamp': NOW.isoformat(),
-            'room': secrets.token_urlsafe(6),
-            'textroom': 'message',
-            'sender': str(default_user.id),
-            'payload': {
-                'type': 'message',
-                'message_id': str(message_id),
-                'text': 'hello',
-                'sender_name': default_user.name,
-                'sender_image_url': 'whatever'
-            }
-        },
-        headers=default_user_auth_headers
-    )
-
-    assert response.status_code == 200
+    mp = WSChatRequestProcessor(chat_service)
+    json_data = BasePayload.validate({
+        'timestamp': NOW.isoformat(),
+        'sender_id': str(default_user.id),
+        'payload': {
+            'type': 'message',
+            'message_id': str(message_id),
+            'text': 'hello',
+            'sender_name': default_user.name,
+            'sender_image_url': 'whatever'
+        }
+    })
+    mp.process(json_data)
 
     global_messages: list[GlobalChatMessage] = chat_service.fetch_global_chat()
     assert len(global_messages) == 1
@@ -50,7 +43,7 @@ async def test_post_global_message(
 
 @pytest.mark.anyio
 async def test_post_directed_message(
-        mc_client: AsyncClient,
+
         default_user: models.User,
         chat_service: ChatService,
         randomizer: RandomEntityGenerator,
@@ -62,24 +55,19 @@ async def test_post_directed_message(
         the_other_person_id=recipient.id,
         chat_status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY)
     message_id = uuid.uuid4()
-    response: Response = await mc_client.post(
-        f"/global",
-        json={
-            'timestamp': NOW.isoformat(),
-            'room': secrets.token_urlsafe(6),
-            'textroom': 'message',
-            'sender': str(default_user.id),
-            'recipient': str(recipient.id),
-            'payload': {
-                'type': 'message',
-                'message_id': str(message_id),
-                'text': 'hello'
-            }
-        },
-        headers=default_user_auth_headers
-    )
 
-    assert response.status_code == 200
+    mp = WSChatRequestProcessor(chat_service)
+    json_data = BasePayload.validate({
+        'timestamp': NOW.isoformat(),
+        'sender_id': str(default_user.id),
+        'recipient_id': str(recipient.id),
+        'payload': {
+            'type': 'message',
+            'message_id': str(message_id),
+            'text': 'hello'
+        }
+    })
+    mp.process(json_data)
 
     chat: Chat = \
         chat_service.fetch_chat_by_members(recipient.id, default_user.id)
@@ -91,7 +79,7 @@ async def test_post_directed_message(
 
 @pytest.mark.anyio
 async def test_set_received_status(
-        mc_client: AsyncClient,
+
         default_user: models.User,
         chat_service: ChatService,
         randomizer: RandomEntityGenerator,
@@ -106,24 +94,17 @@ async def test_set_received_status(
     chat_service.post_message(
         message_id, default_user.id, recipient.id,
         timestamp=NOW, message='what', is_liked=False)
-
-    response: Response = await mc_client.post(
-        f"/global",
-        json={
-            'timestamp': NOW.isoformat(),
-            'room': secrets.token_urlsafe(6),
-            'textroom': 'message',
-            'sender': str(default_user.id),
-            'payload': {
-                'type': 'message_status',
-                'message_id': str(message_id),
-                'status': 'received'
-            }
-        },
-        headers=default_user_auth_headers
-    )
-
-    assert response.status_code == 200
+    mp = WSChatRequestProcessor(chat_service)
+    json_data = BasePayload.validate({
+        'timestamp': NOW.isoformat(),
+        'sender_id': str(default_user.id),
+        'payload': {
+            'type': 'message_status',
+            'message_id': str(message_id),
+            'status': 'received'
+        }
+    })
+    mp.process(json_data)
 
     chat = chat_service.fetch_chat(chat_id)
     assert len(chat.messages) == 1
@@ -133,7 +114,7 @@ async def test_set_received_status(
 
 @pytest.mark.anyio
 async def test_set_read_status(
-        mc_client: AsyncClient,
+
         default_user: models.User,
         chat_service: ChatService,
         randomizer: RandomEntityGenerator,
@@ -148,23 +129,18 @@ async def test_set_read_status(
     chat_service.post_message(
         message_id, default_user.id, recipient.id,
         timestamp=NOW, message='what', is_liked=False)
-    response: Response = await mc_client.post(
-        f"/global",
-        json={
-            'timestamp': NOW.isoformat(),
-            'room': secrets.token_urlsafe(6),
-            'textroom': 'message',
-            'sender': str(default_user.id),
-            'payload': {
-                'type': 'message_status',
-                'message_id': str(message_id),
-                'status': 'read'
-            }
-        },
-        headers=default_user_auth_headers
-    )
+    mp = WSChatRequestProcessor(chat_service)
+    json_data = BasePayload.validate({
+        'timestamp': NOW.isoformat(),
 
-    assert response.status_code == 200
+        'sender_id': str(default_user.id),
+        'payload': {
+            'type': 'message_status',
+            'message_id': str(message_id),
+            'status': 'read'
+        }
+    })
+    mp.process(json_data)
 
     message: ChatMessage = chat_service.fetch_message(message_id)
     assert message.status == MessageStatus.READ
@@ -172,7 +148,7 @@ async def test_set_read_status(
 
 @pytest.mark.anyio
 async def test_set_liked(
-        mc_client: AsyncClient,
+
         default_user: models.User,
         chat_service: ChatService,
         randomizer: RandomEntityGenerator,
@@ -187,23 +163,18 @@ async def test_set_liked(
     chat_service.post_message(
         message_id, default_user.id, recipient.id,
         timestamp=NOW, message='what', is_liked=False)
-    response: Response = await mc_client.post(
-        f"/global",
-        json={
-            'timestamp': NOW.isoformat(),
-            'room': secrets.token_urlsafe(6),
-            'textroom': 'message',
-            'sender': str(default_user.id),
-            'payload': {
-                'type': 'like',
-                'message_id': str(message_id),
-                'like': True
-            }
-        },
-        headers=default_user_auth_headers
-    )
+    mp = WSChatRequestProcessor(chat_service)
+    json_data = BasePayload.validate({
+        'timestamp': NOW.isoformat(),
 
-    assert response.status_code == 200
+        'sender_id': str(default_user.id),
+        'payload': {
+            'type': 'like',
+            'message_id': str(message_id),
+            'like': True
+        }
+    })
+    mp.process(json_data)
 
     message: ChatMessage = chat_service.fetch_message(message_id)
     assert message.is_liked
@@ -211,7 +182,7 @@ async def test_set_liked(
 
 @pytest.mark.anyio
 async def test_set_disliked(
-        mc_client: AsyncClient,
+
         default_user: models.User,
         chat_service: ChatService,
         randomizer: RandomEntityGenerator,
@@ -226,23 +197,18 @@ async def test_set_disliked(
     chat_service.post_message(
         message_id, default_user.id, recipient.id,
         timestamp=NOW, message='what', is_liked=True)
-    response: Response = await mc_client.post(
-        f"/global",
-        json={
-            'timestamp': NOW.isoformat(),
-            'room': secrets.token_urlsafe(6),
-            'textroom': 'message',
-            'sender': str(default_user.id),
-            'payload': {
-                'type': 'like',
-                'message_id': str(message_id),
-                'like': False
-            }
-        },
-        headers=default_user_auth_headers
-    )
+    mp = WSChatRequestProcessor(chat_service)
+    json_data = BasePayload.validate({
+        'timestamp': NOW.isoformat(),
 
-    assert response.status_code == 200
+        'sender_id': str(default_user.id),
+        'payload': {
+            'type': 'like',
+            'message_id': str(message_id),
+            'like': False
+        }
+    })
+    mp.process(json_data)
 
     message: ChatMessage = chat_service.fetch_message(message_id)
     assert not message.is_liked
@@ -250,40 +216,34 @@ async def test_set_disliked(
 
 @pytest.mark.anyio
 async def test_create_chat_direct(
-        mc_client: AsyncClient,
+
         default_user: models.User,
         chat_service: ChatService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
-    response: Response = await mc_client.post(
-        f"/global",
-        json={
-            'timestamp': NOW.isoformat(),
-            'room': secrets.token_urlsafe(6),
-            'textroom': 'message',
-            'sender': str(default_user.id),
-            'recipient': str(recipient.id),
-            'payload': {
-                'type': 'create_chat',
-                'source': ChatSource.DIRECT,
-                'chat_id': str(chat_id),
-                'message': {
-                    'message_id': str(uuid.uuid4()),
-                    'sender': str(default_user.id),
-                    'recipient': str(recipient.id),
-                    'timestamp': NOW.isoformat(),
-                    'room': secrets.token_urlsafe(6),
-                    'textroom': 'message',
-                    'text': 'hello'
-                }
-            }
-        },
-        headers=default_user_auth_headers
-    )
+    mp = WSChatRequestProcessor(chat_service)
+    json_data = BasePayload.validate({
+        'timestamp': NOW.isoformat(),
 
-    assert response.status_code == 200
+        'sender_id': str(default_user.id),
+        'recipient_id': str(recipient.id),
+        'payload': {
+            'type': 'create_chat',
+            'source': ChatSource.DIRECT,
+            'chat_id': str(chat_id),
+            'message': {
+                'message_id': str(uuid.uuid4()),
+                'sender_id': str(default_user.id),
+                'recipient_id': str(recipient.id),
+                'timestamp': NOW.isoformat(),
+
+                'text': 'hello'
+            }
+        }
+    })
+    mp.process(json_data)
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     # direct chats are created 'requested'
@@ -297,40 +257,34 @@ async def test_create_chat_direct(
 
 @pytest.mark.anyio
 async def test_create_chat_text_lobby(
-        mc_client: AsyncClient,
+
         default_user: models.User,
         chat_service: ChatService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
-    response: Response = await mc_client.post(
-        f"/global",
-        json={
-            'timestamp': NOW.isoformat(),
-            'room': secrets.token_urlsafe(6),
-            'textroom': 'message',
-            'sender': str(default_user.id),
-            'recipient': str(recipient.id),
-            'payload': {
-                'type': 'create_chat',
-                'source': ChatSource.TEXT_LOBBY,
-                'chat_id': str(chat_id),
-                'messages': [{
-                    'message_id': str(uuid.uuid4()),
-                    'sender': str(default_user.id),
-                    'recipient': str(recipient.id),
-                    'timestamp': NOW.isoformat(),
-                    'room': secrets.token_urlsafe(6),
-                    'textroom': 'message',
-                    'text': 'hello'
-                } for _ in range(5)]
-            }
-        },
-        headers=default_user_auth_headers
-    )
+    mp = WSChatRequestProcessor(chat_service)
+    json_data = BasePayload.validate({
+        'timestamp': NOW.isoformat(),
 
-    assert response.status_code == 200
+        'sender_id': str(default_user.id),
+        'recipient_id': str(recipient.id),
+        'payload': {
+            'type': 'create_chat',
+            'source': ChatSource.TEXT_LOBBY,
+            'chat_id': str(chat_id),
+            'messages': [{
+                'message_id': str(uuid.uuid4()),
+                'sender_id': str(default_user.id),
+                'recipient_id': str(recipient.id),
+                'timestamp': NOW.isoformat(),
+
+                'text': 'hello'
+            } for _ in range(5)]
+        }
+    })
+    mp.process(json_data)
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     # lobby chats are accepted from the beginning
@@ -344,31 +298,26 @@ async def test_create_chat_text_lobby(
 
 @pytest.mark.anyio
 async def test_create_chat_audio_lobby(
-        mc_client: AsyncClient,
+
         default_user: models.User,
         chat_service: ChatService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
-    response: Response = await mc_client.post(
-        f"/global",
-        json={
-            'timestamp': NOW.isoformat(),
-            'room': secrets.token_urlsafe(6),
-            'textroom': 'message',
-            'sender': str(default_user.id),
-            'recipient': str(recipient.id),
-            'payload': {
-                'type': 'create_chat',
-                'source': ChatSource.VIDEO_LOBBY,
-                'chat_id': str(chat_id),
-            }
-        },
-        headers=default_user_auth_headers
-    )
+    mp = WSChatRequestProcessor(chat_service)
+    json_data = BasePayload.validate({
+        'timestamp': NOW.isoformat(),
 
-    assert response.status_code == 200
+        'sender_id': str(default_user.id),
+        'recipient_id': str(recipient.id),
+        'payload': {
+            'type': 'create_chat',
+            'source': ChatSource.VIDEO_LOBBY,
+            'chat_id': str(chat_id),
+        }
+    })
+    mp.process(json_data)
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     # lobby chats are accepted from the beginning
@@ -381,31 +330,26 @@ async def test_create_chat_audio_lobby(
 
 @pytest.mark.anyio
 async def test_create_chat_video_lobby(
-        mc_client: AsyncClient,
+
         default_user: models.User,
         chat_service: ChatService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
-    response: Response = await mc_client.post(
-        f"/global",
-        json={
-            'timestamp': NOW.isoformat(),
-            'room': secrets.token_urlsafe(6),
-            'textroom': 'message',
-            'sender': str(default_user.id),
-            'recipient': str(recipient.id),
-            'payload': {
-                'type': 'create_chat',
-                'source': ChatSource.AUDIO_LOBBY,
-                'chat_id': str(chat_id),
-            }
-        },
-        headers=default_user_auth_headers
-    )
+    mp = WSChatRequestProcessor(chat_service)
+    json_data = BasePayload.validate({
+        'timestamp': NOW.isoformat(),
 
-    assert response.status_code == 200
+        'sender_id': str(default_user.id),
+        'recipient_id': str(recipient.id),
+        'payload': {
+            'type': 'create_chat',
+            'source': ChatSource.AUDIO_LOBBY,
+            'chat_id': str(chat_id),
+        }
+    })
+    mp.process(json_data)
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     # lobby chats are accepted from the beginning
@@ -418,7 +362,7 @@ async def test_create_chat_video_lobby(
 
 @pytest.mark.anyio
 async def test_decline_chat(
-        mc_client: AsyncClient,
+
         default_user: models.User,
         chat_service: ChatService,
         session: Session,
@@ -448,23 +392,18 @@ async def test_decline_chat(
         image_id='345345.png', sender=initiator)
     chat.messages.extend([msg1, msg2, msg3, msg4])
     session.commit()
-    response: Response = await mc_client.post(
-        f"/global",
-        json={
-            'timestamp': NOW.isoformat(),
-            'room': secrets.token_urlsafe(6),
-            'textroom': 'message',
-            'sender': str(default_user.id),
-            'recipient': str(recipient.id),
-            'payload': {
-                'type': 'decline_chat',
-                'chat_id': str(chat_id),
-            }
-        },
-        headers=default_user_auth_headers
-    )
+    mp = WSChatRequestProcessor(chat_service)
+    json_data = BasePayload.validate({
+        'timestamp': NOW.isoformat(),
 
-    assert response.status_code == 200
+        'sender_id': str(default_user.id),
+        'recipient_id': str(recipient.id),
+        'payload': {
+            'type': 'decline_chat',
+            'chat_id': str(chat_id),
+        }
+    })
+    mp.process(json_data)
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     assert not chat
@@ -472,7 +411,7 @@ async def test_decline_chat(
 
 @pytest.mark.anyio
 async def test_accept_chat(
-        mc_client: AsyncClient,
+
         default_user: models.User,
         chat_service: ChatService,
         session: Session,
@@ -502,23 +441,18 @@ async def test_accept_chat(
         image_id='345345.png', sender=initiator)
     chat.messages.extend([msg1, msg2, msg3, msg4])
     session.commit()
-    response: Response = await mc_client.post(
-        f"/global",
-        json={
-            'timestamp': NOW.isoformat(),
-            'room': secrets.token_urlsafe(6),
-            'textroom': 'message',
-            'sender': str(default_user.id),
-            'recipient': str(recipient.id),
-            'payload': {
-                'type': 'accept_chat',
-                'chat_id': str(chat_id),
-            }
-        },
-        headers=default_user_auth_headers
-    )
+    mp = WSChatRequestProcessor(chat_service)
+    json_data = BasePayload.validate({
+        'timestamp': NOW.isoformat(),
 
-    assert response.status_code == 200
+        'sender_id': str(default_user.id),
+        'recipient_id': str(recipient.id),
+        'payload': {
+            'type': 'accept_chat',
+            'chat_id': str(chat_id),
+        }
+    })
+    mp.process(json_data)
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     assert chat.status == ChatStatus.ACCEPTED
@@ -526,7 +460,7 @@ async def test_accept_chat(
 
 @pytest.mark.anyio
 async def test_open_chat(
-        mc_client: AsyncClient,
+
         default_user: models.User,
         chat_service: ChatService,
         session: Session,
@@ -556,23 +490,18 @@ async def test_open_chat(
         image_id='345345.png', sender=initiator)
     chat.messages.extend([msg1, msg2, msg3, msg4])
     session.commit()
-    response: Response = await mc_client.post(
-        f"/global",
-        json={
-            'timestamp': NOW.isoformat(),
-            'room': secrets.token_urlsafe(6),
-            'textroom': 'message',
-            'sender': str(default_user.id),
-            'recipient': str(recipient.id),
-            'payload': {
-                'type': 'open_chat',
-                'chat_id': str(chat_id),
-            }
-        },
-        headers=default_user_auth_headers
-    )
+    mp = WSChatRequestProcessor(chat_service)
+    json_data = BasePayload.validate({
+        'timestamp': NOW.isoformat(),
 
-    assert response.status_code == 200
+        'sender_id': str(default_user.id),
+        'recipient_id': str(recipient.id),
+        'payload': {
+            'type': 'open_chat',
+            'chat_id': str(chat_id),
+        }
+    })
+    mp.process(json_data)
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     assert chat.status == ChatStatus.OPENED

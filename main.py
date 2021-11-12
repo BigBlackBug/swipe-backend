@@ -1,25 +1,20 @@
 import logging
 import sys
 from pathlib import Path
-from uuid import UUID
 
 import alembic.command
 import alembic.config
 import uvicorn
 from fastapi import FastAPI
-from fastapi_utils import tasks
 from starlette import status
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 import config
-import swipe
-import swipe.dependencies
-from settings import settings, constants
-from swipe import endpoints as misc_endpoints, chats, janus_client
+from settings import settings
+from swipe import endpoints as misc_endpoints, chats
 from swipe.errors import SwipeError
 from swipe.users.endpoints import me, users, swipes
-from swipe.users.services import RedisUserService
 
 
 async def swipe_error_handler(request: Request, exc: SwipeError):
@@ -61,34 +56,6 @@ fast_api = init_app()
 
 config.configure_logging()
 logger = logging.getLogger(__name__)
-logger_janus = logging.getLogger('janus_client')
-
-
-@tasks.repeat_every(seconds=constants.ONLINE_USER_COOLDOWN_SEC - 5,
-                    logger=logger_janus)
-async def populate_online_users_cache():
-    redis_service = RedisUserService(await swipe.dependencies.redis())
-
-    for participant in janus_client.fetch_online_users(
-            settings.JANUS_GATEWAY_GLOBAL_ROOM_ID, logger_janus):
-        await redis_service.refresh_online_status(
-            UUID(hex=participant['username']))
-
-
-@tasks.repeat_every(seconds=constants.ONLINE_USER_COOLDOWN_SEC - 5,
-                    logger=logger_janus)
-async def populate_lobby_users_cache():
-    redis_service = RedisUserService(await swipe.dependencies.redis())
-
-    for participant in janus_client.fetch_online_users(
-            settings.JANUS_GATEWAY_LOBBY_ROOM_ID, logger_janus):
-        await redis_service.refresh_online_lobby_status(
-            UUID(hex=participant['username']))
-
-
-if settings.ENABLE_ONLINE_CACHE_JOB:
-    populate_online_users_cache = \
-        fast_api.on_event("startup")(populate_online_users_cache)
 
 if __name__ == '__main__':
     migrations_dir = str(Path('migrations').absolute())

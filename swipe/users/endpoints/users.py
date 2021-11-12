@@ -36,10 +36,6 @@ async def fetch_list_of_users(
     Important point - ignore_users is supposed to be used
     when fetching users for the popular list
     """
-    if filter_params.online is not None and filter_params.lobby is not None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail='online and lobby filters can not be used at the same time')
     # TODO how does sqlalchemy check equality?
     # I need to use a set here (linear searching takes a shit ton of time)
     # but I'm afraid adding __hash__ will fuck something up
@@ -62,10 +58,6 @@ async def fetch_list_of_users(
         if filter_params.online is not None:
             current_user_ids = await redis_service.filter_online_users(
                 current_user_ids, status=filter_params.online)
-
-        if filter_params.lobby is not None:
-            current_user_ids = \
-                await redis_service.filter_lobby_users(current_user_ids)
 
         collected_user_ids.extend(current_user_ids)
         ignored_user_ids.extend(current_user_ids)

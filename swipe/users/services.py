@@ -75,25 +75,9 @@ class RedisUserService:
             f'{constants.ONLINE_USER_PREFIX}{user_id}',
             time=ttl, value=1)
 
-    async def filter_lobby_users(self, user_ids: IDList):
-        result: IDList = []
-        for user_id in user_ids:
-            # TODO cache online users in memory and use set intersections
-            is_online = await self.is_in_lobby(user_id)
-            if bool(is_online):
-                result.append(user_id)
-        return result
-
-    async def is_in_lobby(self, user_id: UUID) -> IDList:
-        return await self.redis.get(
-            f'{constants.ONLINE_USER_LOBBY_PREFIX}{user_id}')
-
-    async def refresh_online_lobby_status(
-            self, user_id: UUID,
-            ttl: int = constants.ONLINE_USER_COOLDOWN_SEC):
-        await self.redis.setex(
-            f'{constants.ONLINE_USER_LOBBY_PREFIX}{user_id}',
-            time=ttl, value=1)
+    async def remove_online_user(self, user_id: UUID):
+        await self.redis.delete(
+            f'{constants.ONLINE_USER_PREFIX}{user_id}')
 
 
 class UserService:

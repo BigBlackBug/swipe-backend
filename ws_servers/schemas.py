@@ -11,8 +11,8 @@ from swipe.chats.models import MessageStatus, ChatSource
 
 class ChatMessagePayload(BaseModel):
     message_id: UUID
-    sender: UUID
-    recipient: UUID
+    sender_id: UUID
+    recipient_id: UUID
     timestamp: datetime.datetime
     text: Optional[str]
     image_id: Optional[UUID]
@@ -67,13 +67,9 @@ class OpenChatPayload(BaseModel):
 
 
 class BasePayload(BaseModel):
-    # room_id
-    room: str
-    # always equal to 'message'
-    textroom: str
     timestamp: datetime.datetime
-    sender: UUID
-    recipient: Optional[UUID] = None
+    sender_id: UUID
+    recipient_id: Optional[UUID] = None
     payload: Union[
         MessagePayload, MessageStatusPayload, MessageLikePayload,
         DeclineChatPayload, AcceptChatPayload, CreateChatPayload,
@@ -86,7 +82,7 @@ class BasePayload(BaseModel):
         if payload_type == 'message_status':
             return MessageStatusPayload
         elif payload_type == 'message':
-            if json_data.get('recipient'):
+            if json_data.get('recipient_id'):
                 return MessagePayload
             else:
                 return GlobalMessagePayload

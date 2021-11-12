@@ -19,5 +19,6 @@ def db() -> Session:
 
 
 async def redis() -> aioredis.Redis:
+    logging.info(f'Connecting to a redis@{settings.REDIS_URL}')
     # TODO IDK if it's the right way to use redis connections since it's a pool
     return aioredis.from_url(settings.REDIS_URL, decode_responses=True)
