@@ -1,16 +1,20 @@
+import config
+
+config.configure_logging()
+
+import uvicorn
 import logging
 import sys
 from pathlib import Path
 
 import alembic.command
 import alembic.config
-import uvicorn
+
 from fastapi import FastAPI
 from starlette import status
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-import config
 from settings import settings
 from swipe import endpoints as misc_endpoints, chats
 from swipe.errors import SwipeError
@@ -54,7 +58,6 @@ def init_app() -> FastAPI:
 
 fast_api = init_app()
 
-config.configure_logging()
 logger = logging.getLogger(__name__)
 
 if __name__ == '__main__':

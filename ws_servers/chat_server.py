@@ -1,3 +1,7 @@
+import config
+
+config.configure_logging()
+
 import json
 import logging
 from uuid import UUID
@@ -9,14 +13,13 @@ from pydantic import BaseModel
 from starlette.datastructures import Address
 from starlette.websockets import WebSocketDisconnect
 
-import config
+from swipe.users.services import UserService
 from ws_servers.schemas import BasePayload, GlobalMessagePayload
 from ws_servers.services import WSChatRequestProcessor, WSConnectionManager
 
-config.configure_logging()
 logger = logging.getLogger(__name__)
 
-app = FastAPI(docs_url=None, redoc_url=None)
+app = FastAPI()
 
 _supported_payloads = []
 for cls in BaseModel.__subclasses__():
