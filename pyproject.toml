@@ -25,6 +25,7 @@ pytest-cov = "^3.0.0"
 fastapi-utils = "^0.2.1"
 pytest-mock = "^3.6.1"
 websockets = "^10.0"
+aiopipe = "^0.2.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.5"

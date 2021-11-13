@@ -3,7 +3,6 @@ from swipe.users.schemas import UserOutGlobalChatPreviewORM
 
 config.configure_logging()
 
-import json
 import logging
 from uuid import UUID
 
@@ -25,7 +24,9 @@ app = FastAPI()
 
 _supported_payloads = []
 for cls in BaseModel.__subclasses__():
-    if cls.__name__.endswith('Payload') and 'type_' in cls.__fields__:
+    if cls.__name__.endswith('Payload') \
+            and not cls.__name__.startswith('MM') \
+            and 'type_' in cls.__fields__:
         _supported_payloads.append(cls.__name__)
 
 
@@ -74,7 +75,7 @@ async def websocket_endpoint(
 
     while True:
         try:
-            data = await websocket.receive_text()
+            data: dict = await websocket.receive_json()
             logger.info(f"Received data {data} from {user_id}")
         except WebSocketDisconnect as e:
             logger.exception(f"{user_id} disconnected with code {e.code}")
@@ -82,7 +83,7 @@ async def websocket_endpoint(
             await redis_service.remove_online_user(user_id)
             break
 
-        payload: BasePayload = BasePayload.validate(json.loads(data))
+        payload: BasePayload = BasePayload.validate(data)
         logger.info(f"Payload type: {payload.payload.type_}")
 
         request_processor.process(payload)

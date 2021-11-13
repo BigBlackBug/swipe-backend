@@ -34,3 +34,16 @@ services:
     depends_on:
       - pg
       - redis
+      - server
+
+  matchmaking_server:
+    image: ${SWIPE_IMAGE:?unset}
+    env_file:
+      - swipe.env
+    ports:
+      - "17000:17000"
+    command: python ws_servers/matchmaking_server.py
+    depends_on:
+      - pg
+      - redis
+      - server

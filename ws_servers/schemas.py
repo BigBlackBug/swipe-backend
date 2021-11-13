@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import datetime
-from typing import Optional, Union, Any, Type
+from enum import Enum
+from typing import Optional, Union, Any, Type, Tuple
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 from swipe.chats.models import MessageStatus, ChatSource
+
+Match = Tuple[str, str]
 
 
 class ChatMessagePayload(BaseModel):
@@ -84,8 +87,7 @@ class BasePayload(BaseModel):
     ]
 
     @classmethod
-    def payload_type(cls, payload_type: str, json_data: dict) \
-            -> Type[BaseModel]:
+    def payload_type(cls, payload_type: str) -> Type[BaseModel]:
         if payload_type == 'message_status':
             return MessageStatusPayload
         elif payload_type == 'message':
@@ -106,6 +108,43 @@ class BasePayload(BaseModel):
     @classmethod
     def validate(cls: BasePayload, value: Any) -> BasePayload:
         result: BasePayload = super().validate(value)  # noqa
-        payload_type = cls.payload_type(value['payload']['type'], value)
+        payload_type = cls.payload_type(value['payload']['type'])
+        result.payload = payload_type.parse_obj(value['payload'])
+        return result
+
+
+class MMSDPPayload(BaseModel):
+    type_: str = Field('sdp', alias='type', const=True)
+    sdp: str
+
+
+class MMResponseAction(str, Enum):
+    ACCEPT = 'accept'
+    DECLINE = 'decline'
+
+
+class MMMatchPayload(BaseModel):
+    type_: str = Field('match', alias='type', const=True)
+    action: MMResponseAction
+
+
+class MMBasePayload(BaseModel):
+    sender_id: str
+    recipient_id: str
+    payload: Union[
+        MMSDPPayload, MMMatchPayload
+    ]
+
+    @classmethod
+    def payload_type(cls, payload_type: str) -> Type[BaseModel]:
+        if payload_type == 'sdp':
+            return MMSDPPayload
+        elif payload_type == 'match':
+            return MMMatchPayload
+
+    @classmethod
+    def validate(cls: MMBasePayload, value: Any) -> MMBasePayload:
+        result: MMBasePayload = super().validate(value)  # noqa
+        payload_type = cls.payload_type(value['payload']['type'])
         result.payload = payload_type.parse_obj(value['payload'])
         return result

@@ -1,11 +1,13 @@
 import datetime
 import json
 import logging
+from asyncio import StreamWriter
 from dataclasses import dataclass
 from uuid import UUID
 
 from fastapi import Depends
 from starlette.websockets import WebSocket
+from websocket import WebSocketConnectionClosedException
 
 from swipe.chats.models import MessageStatus, ChatSource, ChatStatus
 from swipe.chats.services import ChatService
@@ -44,10 +46,15 @@ class WSConnectionManager:
         self.active_connections[user.user_id] = user
 
     async def disconnect(self, user_id: UUID):
-        del self.active_connections[user_id]
+        if user_id in self.active_connections:
+            del self.active_connections[user_id]
 
     async def send(self, user_id: UUID, payload: dict):
         logger.info(f"Sending payload to {user_id}")
+        if user_id not in self.active_connections:
+            raise WebSocketConnectionClosedException(
+                f"{user_id} is not online")
+
         await self.active_connections[user_id].connection.send_text(
             json.dumps(payload, cls=UUIDEncoder))
 
@@ -58,6 +65,45 @@ class WSConnectionManager:
             logger.info(f"Sending payload to {user_id}")
             await user.connection.send_text(
                 json.dumps(payload, cls=UUIDEncoder))
+
+    def is_connected(self, user_id: UUID):
+        return user_id in self.active_connections
+
+
+class MMPipe:
+    def __init__(self, writer: StreamWriter):
+        self.writer = writer
+
+    def connect(self, user_id: str):
+        self.writer.write(json.dumps({
+            'user_id': user_id,
+            'operation': 'connect'
+        }).encode('utf-8'))
+        self.writer.write(b'\n')
+
+    def disconnect(self, user_id: str):
+        self.writer.write(json.dumps({
+            'user_id': user_id,
+            'operation': 'disconnect'
+        }).encode('utf-8'))
+        self.writer.write(b'\n')
+
+    def send_match(self, user_a, user_b):
+        self.writer.write(json.dumps({
+            'match': [user_a, user_b]
+        }).encode('utf-8'))
+        self.writer.write(b'\n')
+
+
+class WSPipe:
+    def __init__(self, writer: StreamWriter):
+        self.writer = writer
+
+    def send_match(self, user_a, user_b):
+        self.writer.write(json.dumps({
+            'match': [user_a, user_b]
+        }).encode('utf-8'))
+        self.writer.write(b'\n')
 
 
 class WSChatRequestProcessor:
