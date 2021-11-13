@@ -1,7 +1,8 @@
+import base64
 import logging
 import time
 import uuid
-from typing import Optional, IO, Union
+from typing import Optional
 from uuid import UUID
 
 import requests
@@ -17,6 +18,7 @@ from sqlalchemy.orm import Session
 import swipe.dependencies
 from settings import settings, constants
 from swipe import utils
+from swipe.errors import SwipeError
 from swipe.storage import storage_client
 from swipe.users import schemas
 from swipe.users.enums import Gender
@@ -185,14 +187,18 @@ class UserService:
         return user_object
 
     def _update_avatar(self, user: User, photo_id: Optional[str] = None,
-                       image_content: Optional = None):
+                       image_content: Optional[bytes] = None):
         if photo_id:
             img_url = storage_client.get_image_url(photo_id)
             image_content = requests.get(img_url).content
+        elif not image_content:
+            raise SwipeError(
+                "Either photo_id or image_content must be provided")
 
-        user.avatar = utils.compress_image(image_content)
+        compressed_image = utils.compress_image(image_content)
+        user.avatar = base64.b64encode(compressed_image)
 
-    def add_photo(self, user_object: User, file_content: Union[IO, bytes],
+    def add_photo(self, user_object: User, file_content: bytes,
                   extension: str) -> str:
         photo_id = f'{uuid.uuid4()}.{extension}'
         storage_client.upload_image(photo_id, file_content)

@@ -66,6 +66,13 @@ class OpenChatPayload(BaseModel):
     chat_id: UUID
 
 
+class UserJoinPayloadOut(BaseModel):
+    type_: str = Field('join', alias='type', const=True)
+    user_id: UUID
+    name: str
+    avatar: bytes
+
+
 class BasePayload(BaseModel):
     sender_id: UUID
     recipient_id: Optional[UUID] = None

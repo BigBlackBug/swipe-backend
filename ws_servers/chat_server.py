@@ -1,6 +1,5 @@
-import base64
-
 import config
+from swipe.users.schemas import UserOutGlobalChatPreviewORM
 
 config.configure_logging()
 
@@ -12,11 +11,11 @@ import uvicorn
 from fastapi import FastAPI, Depends, Body
 from fastapi import WebSocket
 from pydantic import BaseModel
-from starlette.datastructures import Address
 from starlette.websockets import WebSocketDisconnect
 
 from swipe.users.services import UserService, RedisUserService
-from ws_servers.schemas import BasePayload, GlobalMessagePayload
+from ws_servers.schemas import BasePayload, GlobalMessagePayload, \
+    UserJoinPayloadOut
 from ws_servers.services import WSChatRequestProcessor, WSConnectionManager, \
     ConnectedUser
 
@@ -60,19 +59,19 @@ async def websocket_endpoint(
         await websocket.close(1003)
         return
 
-    # TODO that's bad, no indices
-    avatar = user[2]
-    if avatar:
-        avatar = base64.b64encode(avatar)
-    user = ConnectedUser(id=user_id, name=user[1],
-                         avatar=avatar, websocket=websocket)
+    user = UserOutGlobalChatPreviewORM.from_orm(user)
+    user = ConnectedUser(user_id=user_id, name=user.name,
+                         avatar=user.avatar, connection=websocket)
 
     await connection_manager.connect(user)
     await redis_service.refresh_online_status(user_id)
 
-    address: Address = websocket.client
+    logger.info(f"{user_id} connected from {websocket.client}, "
+                f"sending join event")
+    await connection_manager.broadcast(
+        user_id,
+        UserJoinPayloadOut.parse_obj(user.__dict__).dict(by_alias=True))
 
-    logger.info(f"{user_id} connected from {address}")
     while True:
         try:
             data = await websocket.receive_text()
@@ -88,13 +87,12 @@ async def websocket_endpoint(
 
         request_processor.process(payload)
         if isinstance(payload.payload, GlobalMessagePayload):
-            output_data = payload.payload.dict(by_alias=True)
-            output_data['name'] = user.name
-            output_data['avatar'] = user.avatar
-            await connection_manager.broadcast(payload.sender_id, output_data)
+            await connection_manager.broadcast(
+                payload.sender_id, payload.payload.dict(by_alias=True))
         else:
             await connection_manager.send(
-                payload.recipient_id, payload.payload.dict(by_alias=True))
+                payload.recipient_id, payload.payload.dict(
+                    by_alias=True, exclude_unset=True))
 
 
 if __name__ == '__main__':

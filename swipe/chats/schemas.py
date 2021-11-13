@@ -1,75 +1,18 @@
 from __future__ import annotations
 
-import base64
 import datetime
 from typing import Optional, Any
 from uuid import UUID
 
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, validator
 from sqlalchemy.engine import Row
 
 from swipe.chats.models import MessageStatus, ChatMessage, Chat, ChatStatus, \
     ChatSource, GlobalChatMessage
 from swipe.storage import storage_client
 from swipe.users.models import User
-from swipe.users.schemas import LocationSchema
-
-
-class UserOutChatPreviewORM(BaseModel):
-    id: UUID
-    name: str
-    photos: list[str] = []
-    location: Optional[LocationSchema] = Field(None, alias='Location')
-
-    class Config:
-        # allows Pydantic to read orm models and not just dicts
-        orm_mode = True
-
-
-class UserOutGlobalChatPreviewORM(BaseModel):
-    id: UUID
-    name: str
-    avatar: Optional[bytes]
-
-    class Config:
-        # allows Pydantic to read orm models and not just dicts
-        orm_mode = True
-
-
-class UserOutGlobalChatPreview(BaseModel):
-    id: UUID
-    name: str
-    avatar: Optional[str]
-
-    @classmethod
-    def patched_from_orm(cls: UserOutGlobalChatPreview,
-                         obj: Any) -> UserOutGlobalChatPreview:
-        schema_obj = UserOutGlobalChatPreviewORM.from_orm(obj)
-        response = {
-            'id': schema_obj.id,
-            'name': schema_obj.name,
-        }
-        if schema_obj.avatar:
-            # TODO just store base64 strings
-            response['avatar'] = base64.b64encode(schema_obj.avatar)
-        return UserOutGlobalChatPreview.parse_obj(response)
-
-
-class UserOutChatPreview(BaseModel):
-    id: UUID
-    name: str
-    photo_url: Optional[str] = None
-    location: Optional[LocationSchema] = None
-
-    @classmethod
-    def patched_from_orm(cls: UserOutChatPreview,
-                         obj: User | Row) -> UserOutChatPreview:
-        orm_schema = UserOutChatPreviewORM.from_orm(obj)
-        schema_obj = cls.parse_obj(orm_schema)
-        if orm_schema.photos:
-            photo = orm_schema.photos[0]
-            schema_obj.photo_url = storage_client.get_image_url(photo)
-        return schema_obj
+from swipe.users.schemas import UserOutGlobalChatPreviewORM, \
+    UserOutChatPreview
 
 
 class ChatMessageORMSchema(BaseModel):
@@ -98,7 +41,7 @@ class ChatMessageORMSchema(BaseModel):
 
 class GlobalChatOut(BaseModel):
     messages: list[ChatMessageORMSchema] = []
-    users: dict[UUID, UserOutGlobalChatPreview] = {}
+    users: dict[UUID, UserOutGlobalChatPreviewORM] = {}
 
     @classmethod
     def parse_chats(cls, messages: list[GlobalChatMessage],
@@ -108,7 +51,7 @@ class GlobalChatOut(BaseModel):
             result['messages'].append(
                 ChatMessageORMSchema.patched_from_orm(message))
         for user in users:
-            user_schema = UserOutGlobalChatPreview.patched_from_orm(user)
+            user_schema = UserOutGlobalChatPreviewORM.from_orm(user)
             result['users'][user.id] = user_schema
         return cls.parse_obj(result)
 

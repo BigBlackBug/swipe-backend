@@ -6,10 +6,12 @@ from typing import Optional, Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field, validator, root_validator
+from sqlalchemy.engine import Row
 
 from swipe.storage import storage_client
 from .enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
     RecurrenceRate, NotificationTypes
+from .models import User
 
 
 class LocationSchema(BaseModel):
@@ -143,3 +145,40 @@ class FilterBody(BaseModel):
     max_age_difference: Optional[int] = 5
 
     sort: Optional[SortType] = SortType.AGE_DIFFERENCE
+
+
+class UserOutChatPreviewORM(BaseModel):
+    id: UUID
+    name: str
+    photos: list[str] = []
+    location: Optional[LocationSchema] = Field(None, alias='Location')
+
+    class Config:
+        # allows Pydantic to read orm models and not just dicts
+        orm_mode = True
+
+
+class UserOutGlobalChatPreviewORM(BaseModel):
+    id: UUID
+    name: str
+    avatar: Optional[bytes]
+
+    class Config:
+        orm_mode = True
+
+
+class UserOutChatPreview(BaseModel):
+    id: UUID
+    name: str
+    photo_url: Optional[str] = None
+    location: Optional[LocationSchema] = None
+
+    @classmethod
+    def patched_from_orm(cls: UserOutChatPreview,
+                         obj: User | Row) -> UserOutChatPreview:
+        orm_schema = UserOutChatPreviewORM.from_orm(obj)
+        schema_obj = cls.parse_obj(orm_schema)
+        if orm_schema.photos:
+            photo = orm_schema.photos[0]
+            schema_obj.photo_url = storage_client.get_image_url(photo)
+        return schema_obj

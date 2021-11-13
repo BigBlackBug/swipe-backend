@@ -95,7 +95,7 @@ async def add_photo(
 
     _, _, extension = file.content_type.partition('/')
 
-    photo_id = user_service.add_photo(current_user, file.file, extension)
+    photo_id = user_service.add_photo(current_user, file.file.read(), extension)
     photo_url = user_service.get_photo_url(photo_id)
 
     return {'photo_id': photo_id, 'photo_url': photo_url}

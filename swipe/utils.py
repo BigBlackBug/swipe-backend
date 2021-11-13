@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 import io
-from tempfile import SpooledTemporaryFile
-from typing import IO
 
 from PIL import Image
+
+from swipe.errors import SwipeError
 
 AVATAR_WIDTH = 30
 
 
-def compress_image(image_source: bytes | SpooledTemporaryFile):
-    if isinstance(image_source, bytes):
-        image: Image = Image.open(io.BytesIO(image_source))
-    else:
-        image: Image = Image.open(image_source)
+def compress_image(image_source: bytes):
+    if not isinstance(image_source, bytes):
+        raise SwipeError("Invalid image content, should be 'bytes'")
+
+    image: Image = Image.open(io.BytesIO(image_source))
     # TODO off by one pixel, meh
     width, height = image.size[0], image.size[1]
     if width > height:

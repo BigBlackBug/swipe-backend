@@ -22,30 +22,33 @@ class UUIDEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, UUID):
             return str(obj)
+        elif isinstance(obj, bytes):
+            # avatars are b64 encoded byte strings
+            return obj.decode('utf-8')
         return json.JSONEncoder.default(self, obj)
 
 
 @dataclass
 class ConnectedUser:
-    id: UUID
+    user_id: UUID
     name: str
     avatar: bytes
-    websocket: WebSocket
+    connection: WebSocket
 
 
 class WSConnectionManager:
     active_connections: dict[UUID, ConnectedUser] = {}
 
     async def connect(self, user: ConnectedUser):
-        await user.websocket.accept()
-        self.active_connections[user.id] = user
+        await user.connection.accept()
+        self.active_connections[user.user_id] = user
 
     async def disconnect(self, user_id: UUID):
         del self.active_connections[user_id]
 
     async def send(self, user_id: UUID, payload: dict):
         logger.info(f"Sending payload to {user_id}")
-        await self.active_connections[user_id].websocket.send_text(
+        await self.active_connections[user_id].connection.send_text(
             json.dumps(payload, cls=UUIDEncoder))
 
     async def broadcast(self, sender_id: UUID, payload: dict):
@@ -53,7 +56,8 @@ class WSConnectionManager:
             if user_id == sender_id:
                 continue
             logger.info(f"Sending payload to {user_id}")
-            await user.websocket.send_text(json.dumps(payload, cls=UUIDEncoder))
+            await user.connection.send_text(
+                json.dumps(payload, cls=UUIDEncoder))
 
 
 class WSChatRequestProcessor:
