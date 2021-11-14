@@ -52,8 +52,8 @@ class WSConnectionManager:
     async def send(self, user_id: UUID, payload: dict):
         logger.info(f"Sending payload to {user_id}")
         if user_id not in self.active_connections:
-            raise WebSocketConnectionClosedException(
-                f"{user_id} is not online")
+            logger.info(f"{user_id} is not online, payload won't be sent")
+            return
 
         await self.active_connections[user_id].connection.send_text(
             json.dumps(payload, cls=UUIDEncoder))
@@ -74,36 +74,33 @@ class MMPipe:
     def __init__(self, writer: StreamWriter):
         self.writer = writer
 
-    def connect(self, user_id: str):
+    async def connect(self, user_id: str):
         self.writer.write(json.dumps({
             'user_id': user_id,
             'operation': 'connect'
         }).encode('utf-8'))
         self.writer.write(b'\n')
+        await self.writer.drain()
 
-    def disconnect(self, user_id: str):
+    async def disconnect(self, user_id: str):
         self.writer.write(json.dumps({
             'user_id': user_id,
             'operation': 'disconnect'
         }).encode('utf-8'))
         self.writer.write(b'\n')
-
-    def send_match(self, user_a, user_b):
-        self.writer.write(json.dumps({
-            'match': [user_a, user_b]
-        }).encode('utf-8'))
-        self.writer.write(b'\n')
+        await self.writer.drain()
 
 
 class WSPipe:
     def __init__(self, writer: StreamWriter):
         self.writer = writer
 
-    def send_match(self, user_a, user_b):
+    async def send_match(self, user_a, user_b):
         self.writer.write(json.dumps({
             'match': [user_a, user_b]
         }).encode('utf-8'))
         self.writer.write(b'\n')
+        await self.writer.drain()
 
 
 class WSChatRequestProcessor:
@@ -113,7 +110,7 @@ class WSChatRequestProcessor:
     def process(self, data: BasePayload):
         payload = data.payload
         logger.info(f"Got payload with type '{payload.type_}' "
-                    f"from {data.sender_id}, payload:{payload}")
+                    f"from {data.sender_id}, payload: {payload}")
 
         if isinstance(payload, MessagePayload):
             self.chat_service.post_message(
