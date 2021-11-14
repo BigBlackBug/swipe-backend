@@ -32,18 +32,27 @@ services:
       - "16000:16000"
     command: uvicorn --host 0.0.0.0 --port 16000 ws_servers.chat_server:app
     depends_on:
-      - pg
-      - redis
       - server
 
   matchmaking_server:
     image: ${SWIPE_IMAGE:?unset}
     env_file:
       - swipe.env
+    environment:
+      - MATCHMAKER_HOST=matchmaker
+      - MATCHMAKER_PORT=50505
     ports:
       - "17000:17000"
     command: python ws_servers/matchmaking_server.py
     depends_on:
-      - pg
-      - redis
+      - matchmaker
       - server
+
+  matchmaker:
+    image: ${SWIPE_IMAGE:?unset}
+    env_file:
+      - swipe.env
+    environment:
+      - MATCHMAKER_HOST=matchmaker
+      - MATCHMAKER_PORT=50505
+    command: python ws_servers/matchmaker.py

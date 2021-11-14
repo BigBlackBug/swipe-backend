@@ -1,8 +1,8 @@
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Optional
 
-from pydantic import BaseSettings, PostgresDsn, validator
+from pydantic import BaseSettings, PostgresDsn
 
 
 class Constants(BaseSettings):
@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     # TODO debug mode
     ENABLE_SQL_ECHO: Optional[bool] = True
     ENABLE_WEB_SERVER_AUTORELOAD: Optional[bool] = False
+
+    MATCHMAKER_HOST: Optional[str]
+    MATCHMAKER_PORT: Optional[int]
 
     REDIS_URL: str
     JANUS_GATEWAY_URL: str = None

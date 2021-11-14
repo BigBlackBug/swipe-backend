@@ -57,6 +57,7 @@ class GlobalChatOut(BaseModel):
 
 
 class ChatORMSchema(BaseModel):
+    id: UUID
     the_other_person_id: Optional[UUID] = None
     initiator_id: Optional[UUID] = None
     messages: list[ChatMessageORMSchema] = []
@@ -84,6 +85,7 @@ class ChatORMSchema(BaseModel):
 # this duplicate model is required for fastapi endpoints
 # because the ChatORMSchema doesn't work with openapi because of orm_mode
 class ChatOut(BaseModel):
+    id: UUID
     the_other_person_id: Optional[UUID] = None
     initiator_id: Optional[UUID] = None
     messages: list[ChatMessageORMSchema] = []

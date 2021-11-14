@@ -7,7 +7,6 @@ from uuid import UUID
 
 from fastapi import Depends
 from starlette.websockets import WebSocket
-from websocket import WebSocketConnectionClosedException
 
 from swipe.chats.models import MessageStatus, ChatSource, ChatStatus
 from swipe.chats.services import ChatService
@@ -70,7 +69,7 @@ class WSConnectionManager:
         return user_id in self.active_connections
 
 
-class MMPipe:
+class MatchMakerConnection:
     def __init__(self, writer: StreamWriter):
         self.writer = writer
 
@@ -91,7 +90,7 @@ class MMPipe:
         await self.writer.drain()
 
 
-class WSPipe:
+class MMServerConnection:
     def __init__(self, writer: StreamWriter):
         self.writer = writer
 
@@ -183,4 +182,5 @@ class WSChatRequestProcessor:
             self.chat_service.update_chat_status(
                 payload.chat_id, status=ChatStatus.OPENED)
         elif isinstance(payload, DeclineChatPayload):
+            # TODO add to blacklist
             self.chat_service.delete_chat(chat_id=payload.chat_id)

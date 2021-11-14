@@ -42,6 +42,20 @@ services:
     build: .
     env_file:
       - env/docker.env
+    environment:
+      - MATCHMAKER_HOST=matchmaker
+      - MATCHMAKER_PORT=50505
     ports:
       - "17000:17000"
     command: python ws_servers/matchmaking_server.py
+    depends_on:
+      - matchmaker
+
+  matchmaker:
+    build: .
+    env_file:
+      - env/docker.env
+    environment:
+      - MATCHMAKER_HOST=matchmaker
+      - MATCHMAKER_PORT=50505
+    command: python ws_servers/matchmaker.py
