@@ -92,10 +92,11 @@ async def websocket_endpoint(
             request_processor.process(payload)
             if isinstance(payload.payload, GlobalMessagePayload):
                 await connection_manager.broadcast(
-                    payload.sender_id, payload.payload.dict(by_alias=True))
+                    payload.sender_id, payload.dict(
+                        by_alias=True, exclude_unset=True))
             else:
                 await connection_manager.send(
-                    payload.recipient_id, payload.payload.dict(
+                    payload.recipient_id, payload.dict(
                         by_alias=True, exclude_unset=True))
         except:
             logger.exception(f"Error processing message: {raw_data}")
