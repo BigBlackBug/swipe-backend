@@ -9,7 +9,7 @@ from swipe.chats.models import GlobalChatMessage, Chat, ChatMessage, \
 from swipe.chats.services import ChatService
 from swipe.randomizer import RandomEntityGenerator
 from swipe.users import models
-from ws_servers.services import WSChatRequestProcessor
+from ws_servers.services import ChatServerRequestProcessor
 from ws_servers.schemas import BasePayload
 
 NOW = datetime.datetime.now()
@@ -21,7 +21,7 @@ async def test_post_global_message(
         chat_service: ChatService,
         default_user_auth_headers: dict[str, str]):
     message_id = uuid.uuid4()
-    mp = WSChatRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'payload': {
@@ -51,7 +51,7 @@ async def test_post_directed_message(
         chat_status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY)
     message_id = uuid.uuid4()
 
-    mp = WSChatRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -87,7 +87,7 @@ async def test_set_received_status(
     chat_service.post_message(
         message_id, default_user.id, recipient.id,
         timestamp=NOW, message='what', is_liked=False)
-    mp = WSChatRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'payload': {
@@ -121,7 +121,7 @@ async def test_set_read_status(
     chat_service.post_message(
         message_id, default_user.id, recipient.id,
         timestamp=NOW, message='what', is_liked=False)
-    mp = WSChatRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'payload': {
@@ -153,7 +153,7 @@ async def test_set_liked(
     chat_service.post_message(
         message_id, default_user.id, recipient.id,
         timestamp=NOW, message='what', is_liked=False)
-    mp = WSChatRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'payload': {
@@ -184,7 +184,7 @@ async def test_set_disliked(
     chat_service.post_message(
         message_id, default_user.id, recipient.id,
         timestamp=NOW, message='what', is_liked=True)
-    mp = WSChatRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'payload': {
@@ -207,7 +207,7 @@ async def test_create_chat_direct(
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
-    mp = WSChatRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service)
     json_data = BasePayload.validate({
         
 
@@ -246,7 +246,7 @@ async def test_create_chat_text_lobby(
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
-    mp = WSChatRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -283,7 +283,7 @@ async def test_create_chat_audio_lobby(
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
-    mp = WSChatRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -312,7 +312,7 @@ async def test_create_chat_video_lobby(
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
-    mp = WSChatRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -364,7 +364,7 @@ async def test_decline_chat(
         image_id='345345.png', sender=initiator)
     chat.messages.extend([msg1, msg2, msg3, msg4])
     session.commit()
-    mp = WSChatRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -410,7 +410,7 @@ async def test_accept_chat(
         image_id='345345.png', sender=initiator)
     chat.messages.extend([msg1, msg2, msg3, msg4])
     session.commit()
-    mp = WSChatRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -456,7 +456,7 @@ async def test_open_chat(
         image_id='345345.png', sender=initiator)
     chat.messages.extend([msg1, msg2, msg3, msg4])
     session.commit()
-    mp = WSChatRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),

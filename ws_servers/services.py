@@ -102,7 +102,7 @@ class MMServerConnection:
         await self.writer.drain()
 
 
-class WSChatRequestProcessor:
+class ChatServerRequestProcessor:
     def __init__(self, chat_service: ChatService = Depends()):
         self.chat_service = chat_service
 

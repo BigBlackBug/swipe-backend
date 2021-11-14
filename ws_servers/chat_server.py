@@ -17,7 +17,7 @@ from starlette.websockets import WebSocketDisconnect
 from swipe.users.services import UserService, RedisUserService
 from ws_servers.schemas import BasePayload, GlobalMessagePayload, \
     UserJoinPayloadOut
-from ws_servers.services import WSChatRequestProcessor, WSConnectionManager, \
+from ws_servers.services import ChatServerRequestProcessor, WSConnectionManager, \
     ConnectedUser
 
 logger = logging.getLogger(__name__)
@@ -56,7 +56,7 @@ async def websocket_endpoint(
         connection_manager: WSConnectionManager = Depends(),
         user_service: UserService = Depends(),
         redis_service: RedisUserService = Depends(),
-        request_processor: WSChatRequestProcessor = Depends()):
+        request_processor: ChatServerRequestProcessor = Depends()):
     if (user := user_service.get_global_chat_preview_one(user_id)) is None:
         logger.info(f"User {user_id} not found")
         await websocket.close(1003)
