@@ -1,3 +1,5 @@
+import json
+
 import config
 from swipe.users.schemas import UserOutGlobalChatPreviewORM
 
@@ -75,15 +77,15 @@ async def websocket_endpoint(
 
     while True:
         try:
-            data: dict = await websocket.receive_json()
-            logger.info(f"Received data {data} from {user_id}")
+            raw_data: str = await websocket.receive_text()
+            logger.info(f"Received data {raw_data} from {user_id}")
         except WebSocketDisconnect as e:
             logger.exception(f"{user_id} disconnected with code {e.code}")
             await connection_manager.disconnect(user_id)
             await redis_service.remove_online_user(user_id)
             break
 
-        payload: BasePayload = BasePayload.validate(data)
+        payload: BasePayload = BasePayload.validate(json.loads(raw_data))
         logger.info(f"Payload type: {payload.payload.type_}")
 
         request_processor.process(payload)
