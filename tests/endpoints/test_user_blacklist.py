@@ -4,9 +4,9 @@ import pytest
 from httpx import Response, AsyncClient
 from sqlalchemy.orm import Session
 
-from settings import settings
-from swipe.randomizer import RandomEntityGenerator
-from swipe.users import models
+from swipe.settings import settings
+from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
+from swipe.swipe_server.users import models
 
 
 @pytest.mark.anyio

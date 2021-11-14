@@ -4,13 +4,14 @@ import uuid
 import pytest
 from sqlalchemy.orm import Session
 
-from swipe.chats.models import GlobalChatMessage, Chat, ChatMessage, \
+from swipe.chat_server.schemas import BasePayload
+from swipe.chat_server.services import ChatServerRequestProcessor
+from swipe.swipe_server.chats.models import GlobalChatMessage, Chat, \
+    ChatMessage, \
     MessageStatus, ChatStatus, ChatSource
-from swipe.chats.services import ChatService
-from swipe.randomizer import RandomEntityGenerator
-from swipe.users import models
-from ws_servers.services import ChatServerRequestProcessor
-from ws_servers.schemas import BasePayload
+from swipe.swipe_server.chats.services import ChatService
+from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
+from swipe.swipe_server.users import models
 
 NOW = datetime.datetime.now()
 
@@ -209,7 +210,6 @@ async def test_create_chat_direct(
     chat_id = uuid.uuid4()
     mp = ChatServerRequestProcessor(chat_service)
     json_data = BasePayload.validate({
-        
 
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),

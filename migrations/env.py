@@ -4,7 +4,7 @@ from alembic import context
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
-from settings import settings
+from swipe.settings import settings
 
 config = context.config
 config.set_main_option('sqlalchemy.url', settings.DATABASE_URL)
@@ -12,8 +12,8 @@ config.set_main_option('sqlalchemy.url', settings.DATABASE_URL)
 # configure alembic logging
 fileConfig(config.config_file_name)
 
-from swipe.database import ModelBase  # noqa
-from swipe.users.models import *  # noqa
+from swipe.swipe_server.misc.database import ModelBase  # noqa
+from swipe.swipe_server.users.models import *  # noqa
 
 target_metadata = ModelBase.metadata
 

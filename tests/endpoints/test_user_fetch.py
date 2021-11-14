@@ -4,17 +4,17 @@ import pytest
 from httpx import AsyncClient, Response
 from sqlalchemy.orm import Session
 
-from settings import settings
-from swipe.randomizer import RandomEntityGenerator
-from swipe.users import models
-from swipe.users.enums import Gender
-from swipe.users.services import UserService, RedisUserService
+from swipe.settings import settings
+from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
+from swipe.swipe_server.users.enums import Gender
+from swipe.swipe_server.users.models import User
+from swipe.swipe_server.users.services import RedisUserService
 
 
 @pytest.mark.anyio
 async def test_user_fetch_offline_ignore(
         client: AsyncClient,
-        default_user: models.User,
+        default_user: User,
         randomizer: RandomEntityGenerator,
         session: Session,
         default_user_auth_headers: dict[str, str]):
@@ -60,7 +60,7 @@ async def test_user_fetch_offline_ignore(
 @pytest.mark.anyio
 async def test_user_fetch_offline_limit_sort_age(
         client: AsyncClient,
-        default_user: models.User,
+        default_user: User,
         randomizer: RandomEntityGenerator,
         session: Session,
         default_user_auth_headers: dict[str, str]):
@@ -107,7 +107,7 @@ async def test_user_fetch_offline_limit_sort_age(
 @pytest.mark.anyio
 async def test_user_fetch_online_gender(
         client: AsyncClient,
-        default_user: models.User,
+        default_user: User,
         randomizer: RandomEntityGenerator,
         redis_service: RedisUserService,
         session: Session,
@@ -166,7 +166,7 @@ async def test_user_fetch_online_gender(
 @pytest.mark.anyio
 async def test_user_fetch_online_city(
         client: AsyncClient,
-        default_user: models.User,
+        default_user: User,
         randomizer: RandomEntityGenerator,
         redis_service: RedisUserService,
         session: Session,
@@ -237,7 +237,7 @@ async def test_user_fetch_online_city(
 @pytest.mark.anyio
 async def test_user_fetch_blacklist(
         client: AsyncClient,
-        default_user: models.User,
+        default_user: User,
         randomizer: RandomEntityGenerator,
         session: Session,
         default_user_auth_headers: dict[str, str]):

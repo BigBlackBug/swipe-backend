@@ -10,16 +10,16 @@ from httpx import AsyncClient, Response
 from pytest_mock import MockerFixture
 from sqlalchemy.orm import Session
 
-from settings import settings
-from swipe.users import models
-from swipe.users.enums import ZodiacSign
-from swipe.users.services import UserService, RedisUserService
+from swipe.settings import settings
+from swipe.swipe_server.users.enums import ZodiacSign
+from swipe.swipe_server.users.models import User
+from swipe.swipe_server.users.services import UserService, RedisUserService
 
 
 @pytest.mark.anyio
 async def test_user_update_dob_zodiac(
         client: AsyncClient,
-        default_user: models.User,
+        default_user: User,
         user_service: UserService,
         redis_service: RedisUserService,
         session: Session,
@@ -42,7 +42,7 @@ async def test_user_update_dob_zodiac(
 async def test_user_update_photo_list(
         mocker: MockerFixture,
         client: AsyncClient,
-        default_user: models.User,
+        default_user: User,
         user_service: UserService,
         redis_service: RedisUserService,
         session: Session,
@@ -51,7 +51,7 @@ async def test_user_update_photo_list(
     session.commit()
 
     update_avatar_mock = MagicMock()
-    mocker.patch('swipe.users.services.UserService._update_avatar',
+    mocker.patch('swipe.swipe_server.users.services.UserService._update_avatar',
                  update_avatar_mock)
     # patch
     response: Response = await client.patch(
@@ -69,7 +69,7 @@ async def test_user_add_first_photo(
         mocker: MockerFixture,
         random_image: Image,
         client: AsyncClient,
-        default_user: models.User,
+        default_user: User,
         user_service: UserService,
         redis_service: RedisUserService,
         session: Session,
@@ -78,10 +78,10 @@ async def test_user_add_first_photo(
     session.commit()
 
     update_avatar_mock = MagicMock()
-    mocker.patch('swipe.users.services.UserService._update_avatar',
+    mocker.patch('swipe.swipe_server.users.services.UserService._update_avatar',
                  update_avatar_mock)
     mock_storage: MagicMock = \
-        mocker.patch('swipe.users.services.storage_client')
+        mocker.patch('swipe.swipe_server.users.services.storage_client')
 
     image_data = io.BytesIO()
     random_image.save(image_data, format='png')
@@ -104,7 +104,7 @@ async def test_user_delete_photo(
         mocker: MockerFixture,
         random_image: Image,
         client: AsyncClient,
-        default_user: models.User,
+        default_user: User,
         user_service: UserService,
         redis_service: RedisUserService,
         session: Session,
@@ -113,9 +113,10 @@ async def test_user_delete_photo(
     session.commit()
 
     update_avatar_mock = MagicMock()
-    mocker.patch('swipe.users.services.UserService._update_avatar',
+    mocker.patch('swipe.swipe_server.users.services.UserService._update_avatar',
                  update_avatar_mock)
-    mock_storage: MagicMock = mocker.patch('swipe.users.services.storage_client')
+    mock_storage: MagicMock = mocker.patch(
+        'swipe.swipe_server.users.services.storage_client')
 
     image_data = io.BytesIO()
     random_image.save(image_data, format='png')

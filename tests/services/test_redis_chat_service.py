@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy.orm import Session
 
-from swipe.users import models
+from swipe.swipe_server.users import models
 
 
 @pytest.mark.anyio

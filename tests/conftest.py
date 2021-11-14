@@ -14,16 +14,16 @@ from httpx import AsyncClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
-import config
-import main
-import swipe.dependencies
-from settings import settings
-from swipe.chats.services import ChatService
-from swipe.database import ModelBase
-from swipe.randomizer import RandomEntityGenerator
-from swipe.users import models
-from swipe.users.schemas import AuthenticationIn
-from swipe.users.services import UserService, RedisUserService
+from swipe import config
+import swipe.swipe_server.misc.dependencies
+from swipe.settings import settings
+from swipe.swipe_server import swipe_app
+from swipe.swipe_server.chats.services import ChatService
+from swipe.swipe_server.misc.database import ModelBase
+from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
+from swipe.swipe_server.users import models
+from swipe.swipe_server.users.schemas import AuthenticationIn
+from swipe.swipe_server.users.services import UserService, RedisUserService
 
 config.configure_logging()
 logger = logging.getLogger(__name__)
@@ -76,7 +76,7 @@ def db_setup(request):
 
 @pytest.fixture(scope='session')
 def test_app():
-    return main.init_app()
+    return swipe_app.init_app()
 
 
 @pytest.fixture
@@ -130,13 +130,16 @@ async def client(session, fake_redis, test_app) -> Generator:
         yield fake_redis
 
     # database.db is a dependency used by the app
-    test_app.dependency_overrides[swipe.dependencies.db] = test_database
-    test_app.dependency_overrides[swipe.dependencies.redis] = patched_redis
+    test_app.dependency_overrides[
+        swipe.swipe_server.misc.dependencies.db] = test_database
+    test_app.dependency_overrides[
+        swipe.swipe_server.misc.dependencies.redis] = patched_redis
     # base_url is mandatory because starlette devs can be dumb sometimes
     client = AsyncClient(app=test_app, base_url='http://localhost')
     yield client
-    del test_app.dependency_overrides[swipe.dependencies.db]
-    del test_app.dependency_overrides[swipe.dependencies.redis]
+    del test_app.dependency_overrides[swipe.swipe_server.misc.dependencies.db]
+    del test_app.dependency_overrides[
+        swipe.swipe_server.misc.dependencies.redis]
     await client.aclose()
 
 
@@ -149,13 +152,17 @@ async def mc_client(session, fake_redis, mc_test_app) -> Generator:
         yield fake_redis
 
     # database.db is a dependency used by the app
-    mc_test_app.dependency_overrides[swipe.dependencies.db] = test_database
-    mc_test_app.dependency_overrides[swipe.dependencies.redis] = patched_redis
+    mc_test_app.dependency_overrides[
+        swipe.swipe_server.misc.dependencies.db] = test_database
+    mc_test_app.dependency_overrides[
+        swipe.swipe_server.misc.dependencies.redis] = patched_redis
     # base_url is mandatory because starlette devs can be dumb sometimes
     client = AsyncClient(app=mc_test_app, base_url='http://localhost')
     yield client
-    del mc_test_app.dependency_overrides[swipe.dependencies.db]
-    del mc_test_app.dependency_overrides[swipe.dependencies.redis]
+    del mc_test_app.dependency_overrides[
+        swipe.swipe_server.misc.dependencies.db]
+    del mc_test_app.dependency_overrides[
+        swipe.swipe_server.misc.dependencies.redis]
     await client.aclose()
 
 

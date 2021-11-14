@@ -3,8 +3,8 @@ from aioredis import Redis
 from httpx import AsyncClient, Response
 from sqlalchemy.orm import Session
 
-from settings import settings, constants
-from swipe.users import models
+from swipe.settings import settings, constants
+from swipe.swipe_server.users import models
 
 
 @pytest.mark.anyio

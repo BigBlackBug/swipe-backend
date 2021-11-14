@@ -19,7 +19,7 @@ services:
       - SWIPE_PORT=8000
     ports:
       - "80:8000"
-    command: python main.py
+    entrypoint: python bin/swipe_server.py
     depends_on:
       - pg
       - redis
@@ -28,9 +28,11 @@ services:
     image: ${SWIPE_IMAGE:?unset}
     env_file:
       - swipe.env
+    environment:
+      - CHAT_SERVER_PORT=16000
     ports:
       - "16000:16000"
-    command: uvicorn --host 0.0.0.0 --port 16000 ws_servers.chat_server:app
+    entrypoint: python bin/chat_server.py
     depends_on:
       - server
 
@@ -41,9 +43,10 @@ services:
     environment:
       - MATCHMAKER_HOST=matchmaker
       - MATCHMAKER_PORT=50505
+      - MATCHMAKING_SERVER_PORT=17000
     ports:
       - "17000:17000"
-    command: python ws_servers/matchmaking_server.py
+    entrypoint: python bin/matchmaking_server.py
     depends_on:
       - matchmaker
       - server
@@ -55,4 +58,4 @@ services:
     environment:
       - MATCHMAKER_HOST=matchmaker
       - MATCHMAKER_PORT=50505
-    command: python ws_servers/matchmaker.py
+    entrypoint: python bin/matchmaker.py

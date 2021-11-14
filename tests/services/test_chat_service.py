@@ -9,12 +9,13 @@ from pytest_mock import MockerFixture
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from swipe.chats.models import Chat, ChatStatus, GlobalChatMessage, ChatMessage, \
+from swipe.swipe_server.chats.models import Chat, ChatStatus, GlobalChatMessage, \
+    ChatMessage, \
     MessageStatus, ChatSource
-from swipe.chats.services import ChatService
-from swipe.errors import SwipeError
-from swipe.randomizer import RandomEntityGenerator
-from swipe.users import models
+from swipe.swipe_server.chats.services import ChatService
+from swipe.swipe_server.misc.errors import SwipeError
+from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
+from swipe.swipe_server.users import models
 
 
 @pytest.mark.anyio
@@ -65,7 +66,8 @@ async def test_delete_chat(
         session: Session,
         randomizer: RandomEntityGenerator,
         chat_service: ChatService):
-    mock_storage: MagicMock = mocker.patch('swipe.chats.models.storage_client')
+    mock_storage: MagicMock = mocker.patch(
+        'swipe.swipe_server.chats.models.storage_client')
 
     other_user = randomizer.generate_random_user()
     chat_id = uuid.uuid4()

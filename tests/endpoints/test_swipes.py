@@ -1,12 +1,11 @@
 import datetime
-import time
 
 import pytest
 from aioredis import Redis
 from httpx import AsyncClient, Response
 
-from settings import constants, settings
-from swipe.users import models
+from swipe.settings import constants, settings
+from swipe.swipe_server.users import models
 
 
 @pytest.mark.anyio

@@ -4,11 +4,12 @@ import pytest
 from httpx import AsyncClient, Response
 from sqlalchemy.orm import Session
 
-from settings import settings
-from swipe.chats.models import Chat, ChatStatus, ChatMessage, MessageStatus, \
+from swipe.settings import settings
+from swipe.swipe_server.chats.models import Chat, ChatStatus, ChatMessage, \
+    MessageStatus, \
     ChatSource
-from swipe.randomizer import RandomEntityGenerator
-from swipe.users import models
+from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
+from swipe.swipe_server.users import models
 
 
 @pytest.mark.anyio

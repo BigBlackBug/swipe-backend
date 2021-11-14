@@ -9,26 +9,26 @@ from pytest_mock import MockerFixture
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from settings import settings
-from swipe.chats.models import ChatMessage, MessageStatus, Chat, ChatStatus, \
+from swipe.settings import settings
+from swipe.swipe_server.chats.models import ChatMessage, MessageStatus, Chat, \
+    ChatStatus, \
     ChatSource, GlobalChatMessage
-from swipe.randomizer import RandomEntityGenerator
-from swipe.users import models
-from swipe.users.models import AuthInfo, User
-from swipe.users.services import UserService, RedisUserService
+from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
+from swipe.swipe_server.users.models import AuthInfo, User
+from swipe.swipe_server.users.services import UserService, RedisUserService
 
 
 @pytest.mark.anyio
 async def test_user_delete(
         mocker: MockerFixture,
         client: AsyncClient,
-        default_user: models.User,
+        default_user: User,
         user_service: UserService,
         redis_service: RedisUserService,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     mock_user_storage: MagicMock = \
-        mocker.patch('swipe.users.models.storage_client')
+        mocker.patch('swipe.swipe_server.users.models.storage_client')
 
     auth_info_id: UUID = default_user.auth_info.id
     photos: list[str] = default_user.photos
@@ -49,16 +49,16 @@ async def test_user_delete(
 async def test_user_delete_with_chats(
         mocker: MockerFixture,
         client: AsyncClient,
-        default_user: models.User,
+        default_user: User,
         user_service: UserService,
         redis_service: RedisUserService,
         randomizer: RandomEntityGenerator,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     mock_user_storage: MagicMock = \
-        mocker.patch('swipe.users.models.storage_client')
+        mocker.patch('swipe.swipe_server.users.models.storage_client')
     mock_chat_storage: MagicMock = \
-        mocker.patch('swipe.chats.models.storage_client')
+        mocker.patch('swipe.swipe_server.chats.models.storage_client')
 
     other_user = randomizer.generate_random_user()
     photos: list[str] = default_user.photos
@@ -111,14 +111,14 @@ async def test_user_delete_with_chats(
 async def test_user_delete_with_global(
         mocker: MockerFixture,
         client: AsyncClient,
-        default_user: models.User,
+        default_user: User,
         user_service: UserService,
         redis_service: RedisUserService,
         randomizer: RandomEntityGenerator,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     mock_user_storage: MagicMock = \
-        mocker.patch('swipe.users.models.storage_client')
+        mocker.patch('swipe.swipe_server.users.models.storage_client')
 
     photos: list[str] = default_user.photos
     other_user = randomizer.generate_random_user()
