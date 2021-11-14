@@ -85,17 +85,20 @@ async def websocket_endpoint(
             await redis_service.remove_online_user(user_id)
             break
 
-        payload: BasePayload = BasePayload.validate(json.loads(raw_data))
-        logger.info(f"Payload type: {payload.payload.type_}")
+        try:
+            payload: BasePayload = BasePayload.validate(json.loads(raw_data))
+            logger.info(f"Payload type: {payload.payload.type_}")
 
-        request_processor.process(payload)
-        if isinstance(payload.payload, GlobalMessagePayload):
-            await connection_manager.broadcast(
-                payload.sender_id, payload.payload.dict(by_alias=True))
-        else:
-            await connection_manager.send(
-                payload.recipient_id, payload.payload.dict(
-                    by_alias=True, exclude_unset=True))
+            request_processor.process(payload)
+            if isinstance(payload.payload, GlobalMessagePayload):
+                await connection_manager.broadcast(
+                    payload.sender_id, payload.payload.dict(by_alias=True))
+            else:
+                await connection_manager.send(
+                    payload.recipient_id, payload.payload.dict(
+                        by_alias=True, exclude_unset=True))
+        except:
+            logger.exception(f"Error processing message: {raw_data}")
 
 
 if __name__ == '__main__':
