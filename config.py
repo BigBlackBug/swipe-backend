@@ -11,8 +11,8 @@ LOGGING_CONFIG: dict = {
     "disable_existing_loggers": False,
     "formatters": {
         "default": {
-            "format": "[%(asctime)s %(levelname)s|%(processName)s] "
-                      "%(name)s | %(funcName)s@%(lineno)d | %(message)s"
+            "format": "[%(asctime)s %(levelname)s|%(processName)s] | "
+                      "%(module)s@%(lineno)d | %(message)s"
         },
         "access": {
             "()": "uvicorn.logging.AccessFormatter",
