@@ -16,11 +16,20 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-#    - name: Install doctl
-#      uses: digitalocean/action-doctl@v2
-#      with:
-#        token: ${{ secrets.DO_ACCESS_TOKEN }}
-    - run: docker-compose -f ${{ env.APP_DIR }}/docker-compose-do.yml pull
+
+    - name: Install doctl
+      uses: digitalocean/action-doctl@v2
+      with:
+        token: ${{ secrets.DO_ACCESS_TOKEN }}
+
+    - run: |
+        set -e
+        docker login \
+          -u ${{ secrets.DO_ACCESS_TOKEN }} \
+          -p ${{ secrets.DO_ACCESS_TOKEN }} \
+          registry.digitalocean.com
+
+        docker pull ${{env.SWIPE_IMAGE}}
 
     # In this step, this action saves a list of existing images,
     # the cache is created without them in the post run.
