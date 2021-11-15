@@ -10,8 +10,8 @@ from starlette.responses import Response
 
 from swipe.swipe_server.misc import security
 from swipe.swipe_server.chats.models import Chat, GlobalChatMessage
-from swipe.swipe_server.chats.schemas import ChatOut, MultipleChatsOut, ChatORMSchema, \
-    GlobalChatOut
+from swipe.swipe_server.chats.schemas import ChatOut, MultipleChatsOut, \
+    ChatORMSchema, GlobalChatOut
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.models import User
