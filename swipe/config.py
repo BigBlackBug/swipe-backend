@@ -37,6 +37,10 @@ LOGGING_CONFIG: dict = {
             "handlers": ["default"],
             "propagate": False
         },
+        'alembic': {
+            'handlers': ['default'],
+            'propagate': False
+        },
         # "uvicorn.error": {"handlers": ["default"], "level": "INFO"},
         "uvicorn.access": {
             "handlers": ["access"],

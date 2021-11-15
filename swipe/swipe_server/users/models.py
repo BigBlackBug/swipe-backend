@@ -11,8 +11,8 @@ from sqlalchemy.orm import relationship, object_session
 from swipe.swipe_server.misc.database import ModelBase
 from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.misc.storage import storage_client
-from swipe.swipe_server.users.enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
-    RecurrenceRate, NotificationTypes
+from swipe.swipe_server.users.enums import UserInterests, Gender, \
+    AuthProvider, ZodiacSign, RecurrenceRate, NotificationTypes
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +23,9 @@ blacklist_table = Table(
     "blacklist",
     ModelBase.metadata,
     Column("blocked_by_id", UUID(as_uuid=True),
-           ForeignKey("users.id"), primary_key=True),
+           ForeignKey("users.id", ondelete='CASCADE'), primary_key=True),
     Column("blocked_user_id", UUID(as_uuid=True),
-           ForeignKey("users.id"), primary_key=True),
+           ForeignKey("users.id", ondelete='CASCADE'), primary_key=True),
 )
 
 

@@ -157,3 +157,32 @@ async def test_user_delete_with_global(
 
     assert set(session.execute(select(GlobalChatMessage.id)).scalars()) \
            == {msg3.id, msg4.id}
+
+
+@pytest.mark.anyio
+async def test_user_delete_with_blacklist(
+        mocker: MockerFixture,
+        client: AsyncClient,
+        default_user: User,
+        user_service: UserService,
+        randomizer: RandomEntityGenerator,
+        session: Session,
+        default_user_auth_headers: dict[str, str]):
+    mocker.patch('swipe.swipe_server.users.models.storage_client')
+
+    other_user = randomizer.generate_random_user()
+    other_user.block_user(default_user)
+    session.commit()
+
+    auth_info_id: UUID = default_user.auth_info.id
+    await client.delete(
+        f"{settings.API_V1_PREFIX}/me",
+        headers=default_user_auth_headers)
+
+    assert not user_service.get_user(default_user.id)
+    assert not session.execute(
+        select(AuthInfo).where(AuthInfo.id == auth_info_id)). \
+        scalars().one_or_none()
+
+    session.refresh(other_user)
+    assert len(other_user.blacklist) == 0
