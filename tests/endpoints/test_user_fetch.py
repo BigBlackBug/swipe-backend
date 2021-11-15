@@ -194,7 +194,7 @@ async def test_user_fetch_online_city(
     user_3.name = 'user3'
     user_3.date_of_birth = datetime.date.today().replace(year=2001)
     user_3.gender = Gender.MALE
-    await redis_service.refresh_online_status(user_3.id, ttl=60 * 60)
+    await redis_service.refresh_online_status(user_3.id)
     user_3.set_location({
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
     })
@@ -202,7 +202,7 @@ async def test_user_fetch_online_city(
     user_4 = randomizer.generate_random_user()
     user_4.name = 'user4'
     user_4.date_of_birth = datetime.date.today().replace(year=2005)
-    await redis_service.refresh_online_status(user_4.id, ttl=60 * 60)
+    await redis_service.refresh_online_status(user_4.id)
     user_4.gender = Gender.MALE
     user_4.set_location({
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'

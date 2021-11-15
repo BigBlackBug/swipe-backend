@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
 
 
 class RedisUserService:
+    ONLINE_USERS_SET = 'online_users'
+
     def __init__(self,
                  redis: Redis = Depends(
                      swipe.swipe_server.misc.dependencies.redis)):
@@ -65,24 +67,18 @@ class RedisUserService:
         for user_id in user_ids:
             # TODO cache online users in memory and use set intersections
             is_online = await self.is_online(user_id)
-            if bool(is_online) == status:
+            if is_online == status:
                 result.append(user_id)
         return result
 
-    async def is_online(self, user_id: UUID) -> IDList:
-        return await self.redis.get(
-            f'{constants.ONLINE_USER_PREFIX}{user_id}')
+    async def is_online(self, user_id: UUID) -> bool:
+        return await self.redis.sismember(self.ONLINE_USERS_SET, str(user_id))
 
-    async def refresh_online_status(
-            self, user_id: UUID,
-            ttl: int = constants.ONLINE_USER_COOLDOWN_SEC):
-        await self.redis.setex(
-            f'{constants.ONLINE_USER_PREFIX}{user_id}',
-            time=ttl, value=1)
+    async def refresh_online_status(self, user_id: UUID):
+        await self.redis.sadd(self.ONLINE_USERS_SET, str(user_id))
 
     async def remove_online_user(self, user_id: UUID):
-        await self.redis.delete(
-            f'{constants.ONLINE_USER_PREFIX}{user_id}')
+        await self.redis.srem(self.ONLINE_USERS_SET, str(user_id))
 
 
 class UserService:
