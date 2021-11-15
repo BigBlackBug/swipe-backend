@@ -1,12 +1,10 @@
-from swipe import config
-
-config.configure_logging()
 import json
 import logging
 from uuid import UUID
 
 from fastapi import FastAPI, Depends, Body
 from fastapi import WebSocket
+from firebase_admin import messaging as firebase
 from pydantic import BaseModel
 from starlette.websockets import WebSocketDisconnect
 
@@ -16,7 +14,6 @@ from swipe.chat_server.services import ChatServerRequestProcessor, \
     ConnectedUser, WSConnectionManager
 from swipe.swipe_server.users.schemas import UserOutGlobalChatPreviewORM
 from swipe.swipe_server.users.services import UserService, RedisUserService
-from firebase_admin import messaging as firebase
 
 logger = logging.getLogger(__name__)
 

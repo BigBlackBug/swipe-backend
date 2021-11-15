@@ -1,6 +1,3 @@
-from swipe import config
-
-config.configure_logging()
 import asyncio
 import json
 import logging
@@ -13,10 +10,10 @@ from pydantic import BaseModel
 from starlette.websockets import WebSocketDisconnect
 from uvicorn import Config, Server
 
+from swipe.chat_server.services import ConnectedUser, WSConnectionManager
+from swipe.matchmaking.connections import MatchMakerConnection
 from swipe.matchmaking.schemas import MMBasePayload, MMMatchPayload, \
     MMResponseAction
-from swipe.matchmaking.connections import MatchMakerConnection
-from swipe.chat_server.services import ConnectedUser, WSConnectionManager
 from swipe.settings import settings
 from swipe.swipe_server.users.schemas import UserOutGlobalChatPreviewORM
 from swipe.swipe_server.users.services import UserService
@@ -142,7 +139,7 @@ async def connect_to_matchmaker():
 def start_server():
     server_config = Config(app=app, host='0.0.0.0',
                            port=settings.MATCHMAKING_SERVER_PORT,
-                           loop='asyncio')
+                           workers=1, loop='asyncio')
     server = Server(server_config)
     loop.run_until_complete(connect_to_matchmaker())
     loop.run_until_complete(server.serve())

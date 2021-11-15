@@ -5,12 +5,10 @@ import random
 import time
 from asyncio import StreamReader, StreamWriter
 
-from swipe import config
-from swipe.matchmaking.schemas import Match
 from swipe.matchmaking.connections import MMServerConnection
+from swipe.matchmaking.schemas import Match
 from swipe.settings import settings
 
-config.configure_logging()
 logger = logging.getLogger(__name__)
 # TODO all connected users again, gotta be a set
 matchmaking_pool: list = []

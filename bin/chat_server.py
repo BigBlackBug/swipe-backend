@@ -3,7 +3,9 @@ import sys
 
 # TODO WTF
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
+from swipe import config
 
+config.configure_logging()
 import uvicorn
 import firebase_admin
 from firebase_admin import credentials

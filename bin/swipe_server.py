@@ -13,7 +13,6 @@ import alembic.command
 import alembic.config
 import uvicorn
 
-
 from swipe.settings import settings
 from swipe.swipe_server import swipe_app
 
@@ -21,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 app = swipe_app.init_app()
 
-if __name__ == '__main__':
-    # TODO path issues, doesn't work
+
+def run_migrations():
     root_dir = Path('.').absolute()
     migrations_dir = str(root_dir.joinpath('migrations').absolute())
     alembic_cfg_dir = str(root_dir.joinpath('alembic.ini').absolute())
@@ -34,8 +33,10 @@ if __name__ == '__main__':
     alembic_cfg.set_main_option('script_location', migrations_dir)
     alembic.command.upgrade(alembic_cfg, 'head')
 
+
+if __name__ == '__main__':
+    run_migrations()
     logger.info(f'Starting app at port {settings.SWIPE_PORT}')
     uvicorn.run('bin.swipe_server:app', host='0.0.0.0',  # noqa
-                port=settings.SWIPE_PORT,
-                # workers=1,
+                port=settings.SWIPE_PORT, workers=1,
                 reload=settings.ENABLE_WEB_SERVER_AUTORELOAD)
