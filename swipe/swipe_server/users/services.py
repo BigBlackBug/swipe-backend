@@ -268,3 +268,7 @@ class UserService:
         user.delete_photos()
         self.db.execute(delete(User).where(User.id == user.id))
         self.db.commit()
+
+    def get_firebase_token(self, user_id: UUID):
+        return self.db.execute(select(User.firebase_token).
+                               where(User.id == user_id)).scalar_one_or_none()

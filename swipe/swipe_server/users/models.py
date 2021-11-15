@@ -62,7 +62,7 @@ class User(ModelBase):
     location_id = Column(UUID(as_uuid=True), ForeignKey('location.id'))
 
     auth_info = relationship('AuthInfo', back_populates='user', uselist=False)
-
+    firebase_token = Column(String)
     # variables
     rating = Column(Integer, nullable=False, default=0)
     swipes = Column(Integer, nullable=False, default=0)

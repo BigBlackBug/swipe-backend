@@ -41,7 +41,8 @@ class Settings(BaseSettings):
     MATCHMAKING_SERVER_PORT: Optional[int]
 
     REDIS_URL: str
-    JANUS_GATEWAY_URL: str = None
+
+    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
 
     class Config:
         case_sensitive = True

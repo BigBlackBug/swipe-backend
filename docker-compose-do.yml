@@ -30,6 +30,9 @@ services:
       - swipe.env
     environment:
       - CHAT_SERVER_PORT=16000
+      - GOOGLE_APPLICATION_CREDENTIALS=/etc/swipe/google-credentials.json
+    volumes:
+      - './google-credentials.json:/etc/swipe/google-credentials.json:ro'
     ports:
       - "16000:16000"
     entrypoint: python bin/chat_server.py

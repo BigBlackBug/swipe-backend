@@ -7,7 +7,7 @@ from asyncio import StreamReader, StreamWriter
 
 from swipe import config
 from swipe.matchmaking.schemas import Match
-from swipe.matchmaking.services import MMServerConnection
+from swipe.matchmaking.connections import MMServerConnection
 from swipe.settings import settings
 
 config.configure_logging()

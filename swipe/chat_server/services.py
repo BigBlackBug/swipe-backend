@@ -1,13 +1,18 @@
 import datetime
+import json
 import logging
+from dataclasses import dataclass
+from uuid import UUID
 
 from fastapi import Depends
+from starlette.websockets import WebSocket
 
 from swipe.chat_server.schemas import BasePayload, MessagePayload, \
     GlobalMessagePayload, \
     MessageStatusPayload, MessageLikePayload, ChatMessagePayload, \
     AcceptChatPayload, OpenChatPayload, DeclineChatPayload, CreateChatPayload
-from swipe.swipe_server.chats.models import MessageStatus, ChatSource, ChatStatus
+from swipe.swipe_server.chats.models import MessageStatus, ChatSource, \
+    ChatStatus
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.errors import SwipeError
 
@@ -96,3 +101,53 @@ class ChatServerRequestProcessor:
         elif isinstance(payload, DeclineChatPayload):
             # TODO add to blacklist
             self.chat_service.delete_chat(chat_id=payload.chat_id)
+
+
+class UUIDEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, UUID):
+            return str(obj)
+        elif isinstance(obj, bytes):
+            # avatars are b64 encoded byte strings
+            return obj.decode('utf-8')
+        return json.JSONEncoder.default(self, obj)
+
+
+@dataclass
+class ConnectedUser:
+    user_id: UUID
+    name: str
+    avatar: bytes
+    connection: WebSocket
+
+
+class WSConnectionManager:
+    active_connections: dict[UUID, ConnectedUser] = {}
+
+    async def connect(self, user: ConnectedUser):
+        await user.connection.accept()
+        self.active_connections[user.user_id] = user
+
+    async def disconnect(self, user_id: UUID):
+        if user_id in self.active_connections:
+            del self.active_connections[user_id]
+
+    async def send(self, user_id: UUID, payload: dict):
+        logger.info(f"Sending payload to {user_id}")
+        if user_id not in self.active_connections:
+            logger.info(f"{user_id} is not online, payload won't be sent")
+            return
+
+        await self.active_connections[user_id].connection.send_text(
+            json.dumps(payload, cls=UUIDEncoder))
+
+    async def broadcast(self, sender_id: UUID, payload: dict):
+        for user_id, user in self.active_connections.items():
+            if user_id == sender_id:
+                continue
+            logger.info(f"Sending payload to {user_id}")
+            await user.connection.send_text(
+                json.dumps(payload, cls=UUIDEncoder))
+
+    def is_connected(self, user_id: UUID):
+        return user_id in self.active_connections

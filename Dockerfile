@@ -4,6 +4,8 @@ LABEL maintainer="Evgeny Shakhmaev"
 ENV PYTHONUNBUFFERED=1
 ENV TZ='Europe/Moscow'
 
+RUN mkdir /etc/swipe
+
 WORKDIR /code
 RUN pip install --no-cache-dir poetry
 

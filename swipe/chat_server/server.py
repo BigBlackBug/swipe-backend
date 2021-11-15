@@ -11,11 +11,12 @@ from pydantic import BaseModel
 from starlette.websockets import WebSocketDisconnect
 
 from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
-    UserJoinPayloadOut
-from swipe.chat_server.services import ChatServerRequestProcessor
-from swipe.matchmaking.services import WSConnectionManager, ConnectedUser
+    UserJoinPayloadOut, MessagePayload, CreateChatPayload
+from swipe.chat_server.services import ChatServerRequestProcessor, \
+    ConnectedUser, WSConnectionManager
 from swipe.swipe_server.users.schemas import UserOutGlobalChatPreviewORM
 from swipe.swipe_server.users.services import UserService, RedisUserService
+from firebase_admin import messaging as firebase
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +93,33 @@ async def websocket_endpoint(
                     payload.sender_id, payload.dict(
                         by_alias=True, exclude_unset=True))
             else:
-                await connection_manager.send(
-                    payload.recipient_id, payload.dict(
-                        by_alias=True, exclude_unset=True))
+                await _send_payload(payload, connection_manager, user_service)
         except:
             logger.exception(f"Error processing message: {raw_data}")
+
+
+async def _send_payload(payload: BasePayload,
+                        connection_manager: WSConnectionManager,
+                        user_service: UserService):
+    recipient_id = payload.recipient_id
+    out_payload = payload.dict(by_alias=True, exclude_unset=True)
+
+    # sending message/create_chat to offline users
+    if not connection_manager.is_connected(recipient_id):
+        if isinstance(payload.payload, MessagePayload) \
+                or isinstance(payload.payload, CreateChatPayload):
+            logger.info(
+                f"{recipient_id} is offline, sending push "
+                f"notification for '{payload.payload.type_}' payload")
+            # TODO cache token
+            firebase_token = user_service.get_firebase_token(recipient_id)
+            if not firebase_token:
+                logger.error(
+                    f"User {recipient_id} does not have a firebase token "
+                    f"which is weird")
+                return
+
+            firebase.send(firebase.Message(
+                data=out_payload, token=firebase_token))
+    else:
+        await connection_manager.send(recipient_id, out_payload)

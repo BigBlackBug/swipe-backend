@@ -15,9 +15,8 @@ from uvicorn import Config, Server
 
 from swipe.matchmaking.schemas import MMBasePayload, MMMatchPayload, \
     MMResponseAction
-from swipe.matchmaking.services import MatchMakerConnection, \
-    WSConnectionManager, \
-    ConnectedUser
+from swipe.matchmaking.connections import MatchMakerConnection
+from swipe.chat_server.services import ConnectedUser, WSConnectionManager
 from swipe.settings import settings
 from swipe.swipe_server.users.schemas import UserOutGlobalChatPreviewORM
 from swipe.swipe_server.users.services import UserService
