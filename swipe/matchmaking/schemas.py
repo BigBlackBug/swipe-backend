@@ -14,12 +14,12 @@ Match = Tuple[str, str]
 
 class MMSDPPayload(BaseModel):
     type_: str = Field('sdp', alias='type', const=True)
-    sdp: str
+    sdp: dict[str, Any]
 
 
 class MMICEPayload(BaseModel):
     type_: str = Field('ice', alias='type', const=True)
-    ice: str
+    ice: dict[str, Any]
 
 
 class MMResponseAction(str, Enum):
