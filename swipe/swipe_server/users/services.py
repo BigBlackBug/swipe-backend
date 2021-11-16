@@ -139,6 +139,7 @@ class UserService:
             .scalar_one_or_none()
 
     def get_users(self, user_ids: Optional[IDList] = None) -> list[User]:
+        # TODO use load_only for card preview
         clause = True if user_ids is None else User.id.in_(user_ids)
         return self.db.execute(select(User).where(clause)). \
             scalars().all()

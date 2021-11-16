@@ -8,9 +8,9 @@ from starlette.responses import Response
 
 import swipe.swipe_server.misc.dependencies
 from swipe.swipe_server.misc import security
-from swipe.swipe_server.users import schemas
 from swipe.swipe_server.users.models import User, IDList
-from swipe.swipe_server.users.schemas import SortType
+from swipe.swipe_server.users.schemas import SortType, UserCardPreviewOut, \
+    FilterBody, UserOut, UserOutGlobalChatPreviewORM
 from swipe.swipe_server.users.services import UserService, RedisUserService
 
 logger = logging.getLogger(__name__)
@@ -25,9 +25,9 @@ router = APIRouter()
         200: {'description': 'List of users according to filter'},
         400: {'description': 'Bad Request'},
     },
-    response_model=list[schemas.UserOutSmall])
+    response_model=list[UserCardPreviewOut])
 async def fetch_list_of_users(
-        filter_params: schemas.FilterBody = Body(...),
+        filter_params: FilterBody = Body(...),
         user_service: UserService = Depends(),
         redis_service: RedisUserService = Depends(),
         current_user: User = Depends(security.get_current_user)):
@@ -81,7 +81,7 @@ async def fetch_list_of_users(
         collected_users = sorted(collected_users,
                                  key=lambda user: user.rating, reverse=True)
     return [
-        schemas.UserOutSmall.patched_from_orm(user)
+        UserCardPreviewOut.patched_from_orm(user)
         for user in collected_users[:filter_params.limit]
     ]
 
@@ -119,20 +119,20 @@ async def block_user(
 @router.get(
     '/{user_id}',
     name='Get a single user',
-    response_model=schemas.UserOut)
+    response_model=UserOut)
 async def fetch_user(
         user_id: UUID,
         user_service: UserService = Depends(),
         current_user: User = Depends(security.get_current_user)):
     user = user_service.get_user(user_id)
-    user_out: schemas.UserOut = schemas.UserOut.patched_from_orm(user)
+    user_out: UserOut = UserOut.patched_from_orm(user)
     return user_out
 
 
 @router.get(
     '/{user_id}/preview',
     name='Get users global chat preview',
-    response_model=schemas.UserOutGlobalChatPreviewORM)
+    response_model=UserOutGlobalChatPreviewORM)
 async def fetch_user_preview(
         user_id: UUID,
         user_service: UserService = Depends(),

@@ -44,7 +44,7 @@ class UserBase(BaseModel):
     enabled_notifications: Optional[NotificationTypes] = None
 
 
-class UserOutSmall(BaseModel):
+class UserCardPreviewOut(BaseModel):
     id: UUID
     name: str
     date_of_birth: datetime.date
