@@ -66,6 +66,7 @@ async def websocket_endpoint(
 
     logger.info(f"{user_id} connected from {websocket.client}, "
                 f"sending join event")
+    # TODO WTF, don't push avatars
     await connection_manager.broadcast(
         user_id,
         UserJoinPayloadOut.parse_obj(user.__dict__).dict(by_alias=True))

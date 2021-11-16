@@ -6,7 +6,7 @@ from PIL import Image
 
 from swipe.swipe_server.misc.errors import SwipeError
 
-AVATAR_WIDTH = 30
+AVATAR_SIZE = (60, 60)
 
 
 def compress_image(image_source: bytes):
@@ -22,7 +22,7 @@ def compress_image(image_source: bytes):
     else:
         cropped = image.crop(
             (0, height / 2 - width / 2, width, height / 2 + width / 2))
-    cropped.thumbnail((AVATAR_WIDTH, AVATAR_WIDTH))
+    cropped.thumbnail(AVATAR_SIZE)
     output_bytes = io.BytesIO()
     cropped.save(output_bytes, format='PNG')
     return output_bytes.getvalue()
