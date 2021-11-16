@@ -27,6 +27,7 @@ async def test_post_global_message(
         'sender_id': str(default_user.id),
         'payload': {
             'type': 'global_message',
+            'timestamp': NOW.isoformat(),
             'message_id': str(message_id),
             'text': 'hello'
         }
@@ -58,6 +59,7 @@ async def test_post_directed_message(
         'recipient_id': str(recipient.id),
         'payload': {
             'type': 'message',
+            'timestamp': NOW.isoformat(),
             'message_id': str(message_id),
             'text': 'hello'
         }
