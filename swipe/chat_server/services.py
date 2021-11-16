@@ -103,9 +103,11 @@ class ChatServerRequestProcessor:
             self.chat_service.delete_chat(chat_id=payload.chat_id)
 
 
-class UUIDEncoder(json.JSONEncoder):
+class PayloadEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, UUID):
+            return str(obj)
+        elif isinstance(obj, datetime.datetime):
             return str(obj)
         elif isinstance(obj, bytes):
             # avatars are b64 encoded byte strings
@@ -139,7 +141,7 @@ class WSConnectionManager:
             return
 
         await self.active_connections[user_id].connection.send_text(
-            json.dumps(payload, cls=UUIDEncoder))
+            json.dumps(payload, cls=PayloadEncoder))
 
     async def broadcast(self, sender_id: UUID, payload: dict):
         for user_id, user in self.active_connections.items():
@@ -147,7 +149,7 @@ class WSConnectionManager:
                 continue
             logger.info(f"Sending payload to {user_id}")
             await user.connection.send_text(
-                json.dumps(payload, cls=UUIDEncoder))
+                json.dumps(payload, cls=PayloadEncoder))
 
     def is_connected(self, user_id: UUID):
         return user_id in self.active_connections
