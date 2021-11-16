@@ -71,9 +71,15 @@ class User(ModelBase):
     blacklist = relationship(
         "User",
         secondary=blacklist_table,
-        backref="blocked_by",
-        primaryjoin=id == blacklist_table.c.blocked_by_id,  # noqa
+        back_populates="blocked_by",
+        primaryjoin=id == blacklist_table.c.blocked_by_id, # noqa
         secondaryjoin=id == blacklist_table.c.blocked_user_id)  # noqa
+    blocked_by = relationship(
+        "User",
+        secondary=blacklist_table,
+        back_populates="blacklist",
+        primaryjoin=id == blacklist_table.c.blocked_user_id,  # noqa
+        secondaryjoin=id == blacklist_table.c.blocked_by_id)  # noqa
 
     def set_location(self, location: dict[str, str]):
         # location rows are unique with regards to city/country
