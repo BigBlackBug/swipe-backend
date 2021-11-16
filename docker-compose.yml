@@ -61,6 +61,8 @@ services:
     build: .
     env_file:
       - env/docker.env
+    ports:
+      - "50505:50505"
     environment:
       - MATCHMAKER_HOST=matchmaker
       - MATCHMAKER_PORT=50505

@@ -13,7 +13,7 @@ import alembic.command
 import alembic.config
 import uvicorn
 
-from swipe.settings import settings
+from swipe.settings import settings, constants
 from swipe.swipe_server import swipe_app
 
 logger = logging.getLogger(__name__)
@@ -22,9 +22,8 @@ app = swipe_app.init_app()
 
 
 def run_migrations():
-    root_dir = Path('.').absolute()
-    migrations_dir = str(root_dir.joinpath('migrations').absolute())
-    alembic_cfg_dir = str(root_dir.joinpath('alembic.ini').absolute())
+    migrations_dir = str(constants.BASE_DIR.joinpath('migrations').absolute())
+    alembic_cfg_dir = str(constants.BASE_DIR.joinpath('alembic.ini').absolute())
 
     logger.info(
         f'Running DB migrations in {migrations_dir}, {alembic_cfg_dir} '

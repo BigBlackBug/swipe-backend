@@ -4,19 +4,19 @@ import logging
 from asyncio import StreamReader
 from uuid import UUID
 
-from fastapi import FastAPI, Depends, Body
+from fastapi import FastAPI, Depends, Body, Query
 from fastapi import WebSocket
 from pydantic import BaseModel
 from starlette.websockets import WebSocketDisconnect
 from uvicorn import Config, Server
 
 from swipe.chat_server.services import ConnectedUser, WSConnectionManager
-from swipe.matchmaking.connections import MatchMakerConnection
+from swipe.matchmaking.connections import WS2MMConnection
 from swipe.matchmaking.schemas import MMBasePayload, MMMatchPayload, \
-    MMResponseAction
+    MMResponseAction, MMPreview, MMSettings
+from swipe.matchmaking.services import MMUserService
 from swipe.settings import settings
-from swipe.swipe_server.users.schemas import UserOutGlobalChatPreviewORM
-from swipe.swipe_server.users.services import UserService
+from swipe.swipe_server.users.enums import Gender
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ for cls in BaseModel.__subclasses__():
         _supported_payloads.append(cls.__name__)
 
 loop = asyncio.get_event_loop()
-mm_connection: MatchMakerConnection
+matchmaker: WS2MMConnection
 
 
 @app.get("/connect/docs")
@@ -54,20 +54,22 @@ async def docs(json_data: MMBasePayload = Body(..., examples={
 async def matchmaker_endpoint(
         user_id: UUID,
         websocket: WebSocket,
+        gender: Gender = Query(None),
         connection_manager: WSConnectionManager = Depends(),
-        user_service: UserService = Depends()):
-    if (user := user_service.get_global_chat_preview_one(user_id)) is None:
+        user_service: MMUserService = Depends()):
+    if (user := user_service.get_matchmaking_preview(user_id)) is None:
         logger.info(f"User {user_id} not found")
         await websocket.close(1003)
         return
 
     logger.info(f"{user_id} connected")
-    user = UserOutGlobalChatPreviewORM.from_orm(user)
-    user = ConnectedUser(user_id=user_id, name=user.name,
-                         avatar=user.avatar, connection=websocket)
-    await connection_manager.connect(user)
 
-    await mm_connection.connect(str(user_id))
+    user_data: MMPreview = MMPreview.from_orm(user)
+    user = ConnectedUser(user_id=user_id,
+                         age=user_data.age, connection=websocket)
+    await connection_manager.connect(user)
+    await matchmaker.connect(
+        str(user_id), settings=MMSettings(age=user.age, gender=gender))
 
     while True:
         try:
@@ -76,7 +78,7 @@ async def matchmaker_endpoint(
         except WebSocketDisconnect as e:
             logger.exception(f"{user_id} disconnected with code {e.code}")
             await connection_manager.disconnect(user_id)
-            await mm_connection.disconnect(str(user_id))
+            await matchmaker.disconnect(str(user_id))
             return
 
         try:
@@ -87,8 +89,13 @@ async def matchmaker_endpoint(
                     logger.info(
                         f"Placing {payload.sender_id} "
                         f"and {payload.recipient_id} back to matchmaker")
-                    await mm_connection.connect(payload.sender_id)
-                    await mm_connection.connect(payload.recipient_id)
+                    await matchmaker.connect(
+                        payload.sender_id,
+                        settings=MMSettings(age=user.age, gender=gender))
+                    # TODO fetch these settings here or store in MM
+                    await matchmaker.connect(
+                        payload.recipient_id,
+                        settings=MMSettings(age=user.age, gender=gender))
 
             await connection_manager.send(
                 UUID(hex=payload.recipient_id),
@@ -119,8 +126,12 @@ async def match_sender(mm_reader: StreamReader):
             if connection_manager.is_connected(user_a) \
                     and connection_manager.is_connected(user_b):
                 # TODO what if one of them is gone by this time?
-                await connection_manager.send(user_a, {'match': user_b})
-                await connection_manager.send(user_b, {'match': user_a})
+                await connection_manager.send(user_a, {
+                    'match': user_b, 'host': True
+                })
+                await connection_manager.send(user_b, {
+                    'match': user_a, 'host': False
+                })
         except:
             logger.exception("Error reading from pipe, matchmaker down?")
             break
@@ -130,8 +141,8 @@ async def connect_to_matchmaker():
     logger.info("Connecting to matchmaker server")
     reader, writer = await asyncio.open_connection(
         settings.MATCHMAKER_HOST, settings.MATCHMAKER_PORT, loop=loop)
-    global mm_connection
-    mm_connection = MatchMakerConnection(writer)
+    global matchmaker
+    matchmaker = WS2MMConnection(writer)
 
     loop.create_task(match_sender(reader))
 

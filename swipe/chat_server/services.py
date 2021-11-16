@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 from dataclasses import dataclass
+from typing import Optional
 from uuid import UUID
 
 from fastapi import Depends
@@ -118,9 +119,10 @@ class PayloadEncoder(json.JSONEncoder):
 @dataclass
 class ConnectedUser:
     user_id: UUID
-    name: str
-    avatar: bytes
     connection: WebSocket
+    name: str = None
+    avatar: Optional[bytes] = None
+    age: Optional[int] = None
 
 
 class WSConnectionManager:

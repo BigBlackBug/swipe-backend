@@ -60,7 +60,6 @@ class RedisUserService:
             f'{constants.FREE_SWIPES_REDIS_PREFIX}{user_object.id}')
         return int(reap_timestamp) if reap_timestamp else None
 
-    # TODO hello, copy/paste style
     async def filter_online_users(self, user_ids: IDList,
                                   status: bool = True) -> IDList:
         result: IDList = []

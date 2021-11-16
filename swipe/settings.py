@@ -13,7 +13,7 @@ class Constants(BaseSettings):
 
     FREE_SWIPES_REDIS_PREFIX = 'free_swipes_cooldown_'
 
-    BASE_DIR: Path = Path('..')
+    BASE_DIR: Path = Path('.')
 
 
 class Settings(BaseSettings):
