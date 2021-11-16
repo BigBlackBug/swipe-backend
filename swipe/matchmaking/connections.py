@@ -40,3 +40,11 @@ class WS2MMConnection:
         }).encode('utf-8'))
         self.writer.write(b'\n')
         await self.writer.drain()
+
+    async def reconnect(self, user_id: str):
+        self.writer.write(json.dumps({
+            'user_id': user_id,
+            'operation': 'reconnect'
+        }).encode('utf-8'))
+        self.writer.write(b'\n')
+        await self.writer.drain()

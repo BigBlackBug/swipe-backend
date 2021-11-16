@@ -76,7 +76,7 @@ async def matchmaker_endpoint(
             data: dict = await websocket.receive_json()
             logger.info(f"Received data {data} from {user_id}")
         except WebSocketDisconnect as e:
-            logger.exception(f"{user_id} disconnected with code {e.code}")
+            logger.info(f"{user_id} disconnected with code {e.code}")
             await connection_manager.disconnect(user_id)
             await matchmaker.disconnect(str(user_id))
             return
@@ -89,13 +89,8 @@ async def matchmaker_endpoint(
                     logger.info(
                         f"Placing {payload.sender_id} "
                         f"and {payload.recipient_id} back to matchmaker")
-                    await matchmaker.connect(
-                        payload.sender_id,
-                        settings=MMSettings(age=user.age, gender=gender))
-                    # TODO fetch these settings here or store in MM
-                    await matchmaker.connect(
-                        payload.recipient_id,
-                        settings=MMSettings(age=user.age, gender=gender))
+                    await matchmaker.reconnect(payload.sender_id)
+                    await matchmaker.reconnect(payload.recipient_id)
 
             await connection_manager.send(
                 UUID(hex=payload.recipient_id),

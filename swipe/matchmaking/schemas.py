@@ -76,6 +76,16 @@ class MMPreview(BaseModel):
 
 class MMSettings(BaseModel):
     age: int
-    age_diff: int = 20
+    age_diff: int = 10
     max_age_diff: int = 20
+    current_weight: int = 0
     gender: Optional[Gender] = None
+
+    def increase_age_diff(self):
+        self.age_diff = min(self.age_diff + 1, self.max_age_diff)
+
+    def reset_weight(self):
+        self.current_weight = 0
+
+    def increase_weight(self):
+        self.current_weight += 1

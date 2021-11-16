@@ -23,7 +23,7 @@ class MMUserService:
                       current_user_id: str,
                       age: int,
                       age_difference,
-                      online_users: Optional[list[str]],
+                      online_users: set[str],
                       gender: Optional[Gender] = None,
                       ) -> IDList:
         gender_clause = True if not gender else User.gender == gender
@@ -32,14 +32,12 @@ class MMUserService:
         max_age = datetime.datetime.utcnow() + relativedelta(
             years=age + age_difference)
 
-        # all users are filtered by country
         query = select(User.id). \
             where(gender_clause). \
             where(User.date_of_birth.between(min_age, max_age)). \
             where(User.id != current_user_id). \
-            where(User.id.in_(online_users))
-            # TODO wtf?? type object User has no attribute blocked_by
-            # where(~User.blocked_by.any(id=current_user_id))
+            where(User.id.in_(online_users)). \
+            where(~User.blocked_by.any(id=current_user_id))
         return self.db.execute(query).scalars().all()
 
     def get_matchmaking_preview(self, user_id: UUID):

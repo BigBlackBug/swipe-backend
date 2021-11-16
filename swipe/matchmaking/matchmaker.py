@@ -4,6 +4,7 @@ import json
 import logging
 import time
 from asyncio import StreamReader, StreamWriter
+from dataclasses import dataclass
 from typing import Optional
 from uuid import UUID
 
@@ -11,7 +12,6 @@ from swipe.matchmaking.connections import MM2WSConnection
 from swipe.matchmaking.schemas import Match, MMSettings
 from swipe.matchmaking.services import MMUserService
 from swipe.settings import settings
-# keep SessionLocal import on top
 from swipe.swipe_server.misc.database import SessionLocal
 from swipe.swipe_server.users.models import IDList
 
@@ -33,15 +33,35 @@ class Vertex:
         return self.edges.get(user_id)
 
     def __repr__(self):
-        return f'{self.user_id}, {self.edges}, processed:{self.processed}'
+        return f'{self.user_id}, {self.edges}, processed: {self.processed}'
+
+
+@dataclass
+class HeapItem:
+    user_id: str
+    weight: int
+
+    def __lt__(self, other: 'HeapItem'):
+        # yes they are fucking inverted, because I need a maxheap
+        return self.weight > other.weight
+
+    def __eq__(self, other: 'HeapItem'):
+        return self.weight == other.weight
+
+    def __str__(self):
+        return f"'{self.user_id}' weight: {self.weight}"
 
 
 class Matchmaker:
     def __init__(self, user_service: MMUserService):
         self._user_service = user_service
 
-        self._current_round_pool: dict[str, MMSettings] = {}
-        self._next_round_pool: dict[str, MMSettings] = {}
+        # stores settings for users who haven't found a match yet
+        # item removed when a match is found and accepted
+        self._mm_settings: dict[str, MMSettings] = {}
+
+        self._current_round_pool: set[str] = set()
+        self._next_round_pool: set[str] = set()
 
         # self._next_round_heap: list[str] = []
         # a -> {b->{a:True, c:False}}, c->{b:False}}
@@ -53,61 +73,113 @@ class Matchmaker:
         if len(self._next_round_pool) < 2:
             logger.info("Not enough users for matchmaking")
             # TODO send a signal about that? like no more users?
-            return
+            return []
 
+        self.init_pools()
+        # generate connectivity graph based on their filters
+        self.build_graph()
+
+        matches: list[Match] = self.run_matchmaking_round()
+        return matches
+
+    def init_pools(self):
         self._current_round_pool = self._next_round_pool
         # TODO might break because of concurrency?
-        self._next_round_pool = {}
+        self._next_round_pool = set()
 
-        current_round_heap = list(self._current_round_pool.keys())
-        heapq.heapify(current_round_heap)
-
-        # generate connectivity graph based on their filters
-        for user_id, mm_settings in self._current_round_pool.items():
-            # TODO increase age limit for next rounds if none were found
+    def build_graph(self):
+        for user_id in self._current_round_pool:
+            mm_settings = self._mm_settings[user_id]
+            # TODO cache the fuck out of it, including queries and blacklists
             connections: IDList = \
                 self._user_service.find_user_ids(
-                    user_id, mm_settings.age,
-                    mm_settings.age_diff,
-                    list(self._current_round_pool.keys()),
-                    mm_settings.gender)
+                    user_id,
+                    age=mm_settings.age,
+                    age_difference=mm_settings.age_diff,
+                    online_users=self._current_round_pool,
+                    gender=mm_settings.gender)
             logger.info(f"Found connections for {user_id}: {connections}")
-            self.build_graph(user_id, connections)
+            if not connections:
+                # increasing age diff for next rounds if none were found
+                mm_settings.increase_age_diff()
 
-        matches = []
+            self.add_to_graph(user_id, connections)
+
+    def run_matchmaking_round(self) -> list[Match]:
+        matches: list[Match] = []
+
+        # TODO do we need a copy?
+        current_round_heap: list[HeapItem] = [
+            HeapItem(user, self._mm_settings[user].current_weight)
+            for user in self._current_round_pool
+        ]
+        heapq.heapify(current_round_heap)
         heap_size = len(current_round_heap)
         while heap_size:
             logger.info(f"current heap {current_round_heap}")
-            # pick heap top (C)
+            # pick heap top
             current_user = heapq.heappop(current_round_heap)
+            current_user_id = current_user.user_id
             heap_size -= 1
 
             logger.info(f"heap head: {current_user}")
-            pair = self.find_match(current_user)
-            if pair:
-                self._connection_graph[pair[0]].processed = True
-                self._connection_graph[pair[1]].processed = True
-                matches.append(pair)
+            if current_user_id not in self._current_round_pool:
+                logger.info(f"{current_user_id} is not in current pool, "
+                            f"match already found?")
+                continue
 
-        for user_a, user_b in matches:
-            logger.info(f"Removing {user_a}, {user_b} from MM pool")
-            del self._current_round_pool[user_a]
-            del self._current_round_pool[user_b]
+            match: str = self.find_match(current_user_id)
+            if match:
+                logger.info(f"Found match {match} for {current_user_id}")
+                # set both weights to 0 for next round
+                self._mm_settings[current_user_id].reset_weight()
+                self._mm_settings[match].reset_weight()
+                # mark both as processed, so they are skipped next iteration
+                self._connection_graph[current_user_id].processed = True
+                self._connection_graph[match].processed = True
 
-            logger.info(f"Returning match {user_a}-{user_b}")
-            yield user_a, user_b
+                logger.info(f"Removing {current_user_id} and "
+                            f"{match} from MM pool")
+                self._current_round_pool.remove(current_user_id)
+                self._current_round_pool.remove(match)
+
+                matches.append((current_user_id, match))
+            else:
+                # TODO increase current_user weight for next round
+                logger.info(f"No matches found for {current_user}, "
+                            f"increasing weight")
+                self._mm_settings[current_user_id].increase_weight()
+
+        return matches
 
     def remove_user(self, user_id: str):
+        """
+        Called when the user disconnects from the MM server, meaning
+        he either accepted a match or gone from the lobby
+        """
         if user_id in self._current_round_pool:
             logger.info(
-                f"Current users in MM: {self._current_round_pool}, removing {user_id}")
-            del self._current_round_pool[user_id]
+                f"Current users in MM: {self._current_round_pool}, "
+                f"removing {user_id}")
+            self._current_round_pool.remove(user_id)
+        if user_id in self._mm_settings:
+            logger.info(
+                f"removing {user_id} from settings. The dude's gone for good")
+            del self._mm_settings[user_id]
 
-    def add_user(self, user_id: str, mm_settings: MMSettings):
+    def add_user(self, user_id: str, mm_settings: Optional[MMSettings] = None):
+        """
+        Adds a user to the next round pool.
+        If `mm_settings` is None, he's a returning user
+        """
         logger.info(f"Adding {user_id} to next round pool")
-        self._next_round_pool[user_id] = mm_settings
+        self._next_round_pool.add(user_id)
+        if mm_settings:
+            self._mm_settings[user_id] = mm_settings
+        elif user_id not in self._mm_settings:
+            raise Exception(f"Returning client {user_id} must have mm_settings")
 
-    def build_graph(self, user_id: str, connections: list[UUID]):
+    def add_to_graph(self, user_id: str, connections: list[UUID]):
         vertex = Vertex(user_id)
         for connection_user_id in connections:
             # TODO stupid UUID
@@ -124,27 +196,21 @@ class Matchmaker:
         self._connection_graph[user_id] = vertex
 
     def find_match(self, user_id: str):
-        # put C to used
-        # pick a random double connection for him (F)
-        logger.info(f"Finding match for {user_id}")
+        logger.info(f"Looking for match for {user_id}")
 
         current_vertex = self._connection_graph[user_id]
-        # TODO gotta go breadth first on priority queue
-        # and find candidate with the most weight instead of iterating
-        for potential_match, bidirectional in current_vertex.edges.items():
-            logger.info(f"Checking {potential_match}")
-            # if bidirectional -> got a match
-            if bidirectional and \
-                    not self._connection_graph[potential_match].processed:
-                logger.info(f"{potential_match} is a match")
-                # if such connection F exists
-                # put F to 'used'
-                # TODO set C,F weight to 0 for next round
-                return user_id, potential_match
+        # getting candidate with the most weight
+        potential_edges = sorted(
+            current_vertex.edges.keys(),
+            key=lambda x: self._mm_settings[x].current_weight,
+            reverse=True)
+        for potential_match_id in potential_edges:
+            logger.info(f"Checking {potential_match_id}")
+            # if the edge is bidirectional -> we got a match
+            if current_vertex.connects_to(potential_match_id) and \
+                    not self._connection_graph[potential_match_id].processed:
+                return potential_match_id
 
-        logger.info(f"No matches found for {user_id}")
-        # increase C weight for next round
-        # increase C age diff
         return None
 
     def get_vertex(self, user_a):
@@ -182,6 +248,8 @@ async def user_event_handler(reader: StreamReader, matchmaker: Matchmaker):
         if user_event['operation'] == 'connect':
             matchmaker.add_user(
                 user_id, MMSettings.parse_obj(user_event['settings']))
+        elif user_event['operation'] == 'reconnect':
+            matchmaker.add_user(user_id)
         elif user_event['operation'] == 'disconnect':
             matchmaker.remove_user(user_id)
 
@@ -193,6 +261,7 @@ async def match_generator(writer: StreamWriter, matchmaker: Matchmaker):
     while True:
         cycle_start = time.time()
 
+        # TODO think of a more reliable delay between matches
         for user_a, user_b in matchmaker.generate_matches():
             await ws_connection.send_match(user_a, user_b)
 
