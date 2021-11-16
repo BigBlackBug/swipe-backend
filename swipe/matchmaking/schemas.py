@@ -13,6 +13,11 @@ class MMSDPPayload(BaseModel):
     sdp: str
 
 
+class MMICEPayload(BaseModel):
+    type_: str = Field('ice', alias='type', const=True)
+    ice: str
+
+
 class MMResponseAction(str, Enum):
     ACCEPT = 'accept'
     DECLINE = 'decline'
@@ -27,13 +32,15 @@ class MMBasePayload(BaseModel):
     sender_id: str
     recipient_id: str
     payload: Union[
-        MMSDPPayload, MMMatchPayload
+        MMSDPPayload, MMMatchPayload, MMICEPayload
     ]
 
     @classmethod
     def payload_type(cls, payload_type: str) -> Type[BaseModel]:
         if payload_type == 'sdp':
             return MMSDPPayload
+        elif payload_type == 'ice':
+            return MMICEPayload
         elif payload_type == 'match':
             return MMMatchPayload
 
