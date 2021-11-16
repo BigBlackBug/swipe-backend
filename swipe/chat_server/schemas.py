@@ -21,12 +21,14 @@ class ChatMessagePayload(BaseModel):
 class MessagePayload(BaseModel):
     type_: str = Field('message', alias='type', const=True)
     message_id: UUID
+    timestamp: datetime.datetime
     text: Optional[str]
     image_id: Optional[UUID]
 
 
 class GlobalMessagePayload(BaseModel):
     type_: str = Field('global_message', alias='type', const=True)
+    timestamp: datetime.datetime
     message_id: UUID
     text: str
 
