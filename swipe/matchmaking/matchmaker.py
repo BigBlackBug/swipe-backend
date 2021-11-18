@@ -18,7 +18,7 @@ from swipe.swipe_server.users.models import IDList
 
 logger = logging.getLogger(__name__)
 
-CYCLE_LENGTH_SEC = 10
+MIN_ROUND_LENGTH_SECS = 5
 
 
 class Vertex:
@@ -289,6 +289,6 @@ async def match_generator(writer: StreamWriter, matchmaker: Matchmaker):
         for user_a, user_b in matchmaker.generate_matches():
             await ws_connection.send_match(user_a, user_b)
 
-        diff = int(cycle_start + CYCLE_LENGTH_SEC - time.time())
+        diff = int(cycle_start + MIN_ROUND_LENGTH_SECS - time.time())
         logger.info(f"Seconds till the next cycle: {diff}")
         await asyncio.sleep(diff)
