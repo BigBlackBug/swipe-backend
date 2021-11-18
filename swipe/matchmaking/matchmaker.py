@@ -97,6 +97,7 @@ class Matchmaker:
     def init_pools(self):
         logger.info(f"Initializing pools, users "
                     f"in the next round pool: {self._next_round_pool}")
+        self._current_round_pool = set()
         # TODO are str passed by value?
         for user in self._next_round_pool:
             if user not in self._disconnected_users:
@@ -170,6 +171,8 @@ class Matchmaker:
                 self._connection_graph[match].processed = True
 
                 # remove both from next round
+                logger.info(f"Adding {match} and {current_user_id} "
+                            f"to disconnected")
                 self._disconnected_users.add(current_user_id)
                 self._disconnected_users.add(match)
                 yield current_user_id, match

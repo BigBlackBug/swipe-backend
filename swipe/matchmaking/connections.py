@@ -12,7 +12,7 @@ class MM2WSConnection:
         self.writer = writer
 
     async def send_match(self, user_a, user_b):
-        logger.info(f"Sending match {user_a}-{user_b} to ws handler")
+        logger.info(f"Sending match '{user_a}', '{user_b}' to ws handler")
         self.writer.write(json.dumps({
             'match': [user_a, user_b]
         }).encode('utf-8'))
