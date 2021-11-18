@@ -76,7 +76,8 @@ class MMPreview(BaseModel):
 
 class MMSettings(BaseModel):
     age: int
-    age_diff: int = 10
+    # TODO change in prod obviously
+    age_diff: int = 20
     max_age_diff: int = 20
     current_weight: int = 0
     gender: Optional[Gender] = None

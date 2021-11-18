@@ -137,7 +137,7 @@ class WSConnectionManager:
             del self.active_connections[user_id]
 
     async def send(self, user_id: UUID, payload: dict):
-        logger.info(f"Sending payload to {user_id}")
+        logger.info(f"Sending payload {payload} to {user_id}")
         if user_id not in self.active_connections:
             logger.info(f"{user_id} is not online, payload won't be sent")
             return
