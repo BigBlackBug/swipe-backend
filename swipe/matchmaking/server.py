@@ -86,24 +86,28 @@ async def matchmaker_endpoint(
             await connection_manager.disconnect(user_id)
             await matchmaker.disconnect(user_id_str)
 
-            sent_match_id: str = sent_matches[user_id_str]
-            logger.info(
-                f"Removing {user_id_str} {sent_match_id} from sent matches")
-            del sent_matches[user_id_str]
-            del sent_matches[sent_match_id]
+            if sent_match_id := sent_matches.get(user_id_str):
+                logger.info(f"Removing {user_id_str} from sent matches")
+                del sent_matches[user_id_str]
 
-            logger.info(f"Sending decline to his match {sent_match_id}")
-            await connection_manager.send(
-                UUID(hex=sent_match_id),
-                MMBasePayload(
-                    sender_id=user_id_str,
-                    recipient_id=sent_match_id,
-                    payload=MMMatchPayload(
-                        action=MMResponseAction.DECLINE))
-                    .dict(by_alias=True))
+                if sent_match_id in sent_matches:
+                    logger.info(f"Removing {user_id_str} match {sent_match_id} "
+                                f"from sent matches")
+                    del sent_matches[sent_match_id]
 
-            logger.info(f"Reconnecting {sent_match_id} to matchmaker")
-            await matchmaker.reconnect(sent_match_id)
+                logger.info(
+                    f"Sending decline to {user_id_str} match {sent_match_id}")
+                await connection_manager.send(
+                    UUID(hex=sent_match_id),
+                    MMBasePayload(
+                        sender_id=user_id_str,
+                        recipient_id=sent_match_id,
+                        payload=MMMatchPayload(
+                            action=MMResponseAction.DECLINE))
+                        .dict(by_alias=True))
+
+                logger.info(f"Reconnecting {sent_match_id} to matchmaker")
+                await matchmaker.reconnect(sent_match_id)
             return
 
         try:
