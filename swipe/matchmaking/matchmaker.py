@@ -2,6 +2,7 @@ import asyncio
 import heapq
 import json
 import logging
+import threading
 import time
 from asyncio import StreamReader, StreamWriter
 from dataclasses import dataclass
@@ -17,7 +18,7 @@ from swipe.swipe_server.users.models import IDList
 
 logger = logging.getLogger(__name__)
 
-CYCLE_LENGTH_SEC = 6
+CYCLE_LENGTH_SEC = 10
 
 
 class Vertex:
@@ -48,7 +49,7 @@ class HeapItem:
     def __eq__(self, other: 'HeapItem'):
         return self.weight == other.weight
 
-    def __str__(self):
+    def __repr__(self):
         return f"'{self.user_id}' weight: {self.weight}"
 
 
@@ -65,29 +66,51 @@ class Matchmaker:
 
         # a -> {b->{a:True, c:False}}, c->{b:False}}
         self._connection_graph: dict[str, Vertex] = {}
+        # users that
+        self._skip_users = set()
+        self._user_lock = threading.Lock()
 
     def generate_matches(self) -> Iterator[Match]:
-        if len(self._next_round_pool) < 2:
-            logger.info("Not enough users for matchmaking")
-            # TODO send a signal about that? like no more users?
-            yield from []
+        logger.info("Locking and initializing pools")
+        with self._user_lock:
+            self.init_pools()
 
-        self.init_pools()
-        logger.info(f"Starting a matchmaking round "
-                    f"with pool: {self._current_round_pool}")
+        if len(self._current_round_pool) < 2:
+            logger.info("Not enough users for matchmaking")
+            # TODO send a signal to clients about that? like no more users?
+            return
+
         # generate connectivity graph based on their filters
         self.build_graph()
 
         yield from self.run_matchmaking_round()
 
+        logger.info("Round finished, locking and clearing settings")
+        with self._user_lock:
+            for user_id in self._skip_users:
+                logger.info(f"Removing {user_id} from settings")
+                del self._mm_settings[user_id]
+        logger.info("Unlocking")
+
     def init_pools(self):
-        self._current_round_pool = self._next_round_pool
+        logger.info(f"Initializing pools, current pool {self._current_round_pool}")
+        for user in self._next_round_pool:
+            if user in self._skip_users:
+                logger.info(f"{user} will not be added to "
+                            f"current pool as he was gone "
+                            f"during previous round")
+            else:
+                self._current_round_pool.add(user)
         self._next_round_pool = set()
+        self._skip_users = set()
 
     def build_graph(self):
-        # TODO a user might disconnect from the pool and mm_settings
-        # after a new round has started
+        logger.info(f"Building graph from "
+                    f"current pool: {self._current_round_pool}")
         for user_id in self._current_round_pool:
+            if user_id in self._skip_users:
+                logger.info(f"Skipping {user_id} because he's gone")
+                continue
             mm_settings = self._mm_settings[user_id]
             # TODO cache the fuck out of it, including queries and blacklists
             connections: IDList = \
@@ -106,11 +129,17 @@ class Matchmaker:
 
     def run_matchmaking_round(self) -> Iterator[Match]:
         # TODO do we need a copy?
-        current_round_heap: list[HeapItem] = [
-            HeapItem(user, self._mm_settings[user].current_weight)
-            for user in self._current_round_pool
-        ]
-        heapq.heapify(current_round_heap)
+        # building a heap out of all
+        with self._user_lock:
+            logger.info("Locking and building current round heap")
+            current_round_heap: list[HeapItem] = [
+                HeapItem(user, self._mm_settings[user].current_weight)
+                for user in self._current_round_pool
+                if user not in self._skip_users
+            ]
+            heapq.heapify(current_round_heap)
+        logger.info("Lock released")
+
         heap_size = len(current_round_heap)
         while heap_size:
             logger.info(f"current heap {current_round_heap}")
@@ -120,11 +149,7 @@ class Matchmaker:
             heap_size -= 1
 
             logger.info(f"heap head: {current_user}")
-            if current_user_id not in self._current_round_pool:
-                logger.info(f"{current_user_id} is not in current pool, "
-                            f"match already found?")
-                continue
-
+            # traverses connection graph
             match: str = self.find_match(current_user_id)
             if match:
                 logger.info(f"Found match {match} for {current_user_id}")
@@ -153,14 +178,16 @@ class Matchmaker:
         he either accepted a match or gone from the lobby
         """
         logger.info(f"User {user_id} disconnected from server")
-        if user_id in self._current_round_pool:
-            logger.info(
-                f"Current users in MM: {self._current_round_pool}, "
-                f"removing {user_id}")
-            self._current_round_pool.remove(user_id)
-        if user_id in self._mm_settings:
-            logger.info(f"Removing {user_id} from settings")
-            del self._mm_settings[user_id]
+        with self._user_lock:
+            self._skip_users.add(user_id)
+        # if user_id in self._next_round_pool:
+        #     logger.info(
+        #         f"Current users in MM: {self._current_round_pool}, "
+        #         f"removing {user_id}")
+        #     self._current_round_pool.remove(user_id)
+        # if user_id in self._mm_settings:
+        #     logger.info(f"Removing {user_id} from settings")
+        #     del self._mm_settings[user_id]
 
     def add_user(self, user_id: str, mm_settings: Optional[MMSettings] = None):
         """
@@ -173,6 +200,7 @@ class Matchmaker:
             self._mm_settings[user_id] = mm_settings
         elif user_id not in self._mm_settings:
             raise Exception(f"Returning client {user_id} must have mm_settings")
+        logger.info(f"Next round pool {self._next_round_pool}")
 
     def add_to_graph(self, user_id: str, connections: list[UUID]):
         vertex = Vertex(user_id)
@@ -257,6 +285,7 @@ async def match_generator(writer: StreamWriter, matchmaker: Matchmaker):
         cycle_start = time.time()
 
         # TODO think of a more reliable delay between matches
+        logger.info("Starting matchmaking round")
         for user_a, user_b in matchmaker.generate_matches():
             await ws_connection.send_match(user_a, user_b)
 

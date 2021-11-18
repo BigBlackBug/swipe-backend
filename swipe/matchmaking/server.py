@@ -51,6 +51,9 @@ async def docs(json_data: MMBasePayload = Body(..., examples={
     pass
 
 
+sent_matches: dict[str:str] = dict()
+
+
 @app.websocket("/connect/{user_id}")
 async def matchmaker_endpoint(
         user_id: UUID,
@@ -63,7 +66,7 @@ async def matchmaker_endpoint(
             logger.info(f"User {user_id} not found")
             await websocket.close(1003)
             return
-
+    user_id_str = str(user_id)
     logger.info(f"{user_id} connected")
 
     user_data: MMPreview = MMPreview.from_orm(user)
@@ -71,17 +74,36 @@ async def matchmaker_endpoint(
                          age=user_data.age, connection=websocket)
     await connection_manager.connect(user)
     await matchmaker.connect(
-        str(user_id), settings=MMSettings(age=user.age, gender=gender))
+        user_id_str, settings=MMSettings(age=user.age, gender=gender))
 
     while True:
         try:
             data: dict = await websocket.receive_json()
             logger.info(f"Received data {data} from {user_id}")
         except WebSocketDisconnect as e:
-            logger.info(f"{user_id} disconnected with code {e.code}")
+            logger.info(f"{user_id} disconnected with code {e.code}, "
+                        f"disconnecting him from matchmaking")
             await connection_manager.disconnect(user_id)
-            await matchmaker.disconnect(str(user_id))
-            # TODO send decline if the match was sent
+            await matchmaker.disconnect(user_id_str)
+
+            sent_match_id: str = sent_matches[user_id_str]
+            logger.info(
+                f"Removing {user_id_str} {sent_match_id} from sent matches")
+            del sent_matches[user_id_str]
+            del sent_matches[sent_match_id]
+
+            logger.info(f"Sending decline to his match {sent_match_id}")
+            await connection_manager.send(
+                UUID(hex=sent_match_id),
+                MMBasePayload(
+                    sender_id=user_id_str,
+                    recipient_id=sent_match_id,
+                    payload=MMMatchPayload(
+                        action=MMResponseAction.DECLINE))
+                    .dict(by_alias=True))
+
+            logger.info(f"Reconnecting {sent_match_id} to matchmaker")
+            await matchmaker.reconnect(sent_match_id)
             return
 
         try:
@@ -90,8 +112,11 @@ async def matchmaker_endpoint(
                 # one decline -> put both back to MM
                 if payload.payload.action == MMResponseAction.DECLINE:
                     logger.info(
-                        f"Placing {payload.sender_id} "
-                        f"and {payload.recipient_id} back to matchmaker")
+                        f"Got decline, placing {payload.sender_id} "
+                        f"and {payload.recipient_id} back to matchmaker, "
+                        f"removing from sent matches")
+                    del sent_matches[payload.sender_id]
+                    del sent_matches[payload.recipient_id]
                     await matchmaker.reconnect(payload.sender_id)
                     await matchmaker.reconnect(payload.recipient_id)
 
@@ -114,12 +139,15 @@ async def match_sender(mm_reader: StreamReader):
         if connection_manager.is_connected(user_a):
             if connection_manager.is_connected(user_b):
                 # both connected
+                logger.info(f"Sending matches to {user_a_id}, {user_b_id}")
                 await connection_manager.send(user_b, {
                     'match': user_a, 'host': False
                 })
                 await connection_manager.send(user_a, {
                     'match': user_b, 'host': True
                 })
+                sent_matches[user_a_id] = user_b_id
+                sent_matches[user_b_id] = user_a_id
             else:
                 # if B is gone, send decline to A
                 await connection_manager.send(
@@ -127,7 +155,7 @@ async def match_sender(mm_reader: StreamReader):
                     MMBasePayload(
                         sender_id=user_b_id,
                         recipient_id=user_a_id,
-                        payload=decline_payload).dict())
+                        payload=decline_payload).dict(by_alias=True))
         elif connection_manager.is_connected(user_b):
             # if A is gone, send decline to B
             await connection_manager.send(
@@ -135,7 +163,7 @@ async def match_sender(mm_reader: StreamReader):
                 MMBasePayload(
                     sender_id=user_a_id,
                     recipient_id=user_b_id,
-                    payload=decline_payload).dict())
+                    payload=decline_payload).dict(by_alias=True))
 
     reader: StreamReader
     while True:
