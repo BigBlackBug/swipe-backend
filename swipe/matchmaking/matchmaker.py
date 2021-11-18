@@ -80,7 +80,8 @@ class Matchmaker:
             logger.info(f"Not enough users for matchmaking in current pool "
                         f"{self._current_round_pool} "
                         "moving all to the next pool")
-            self._next_round_pool.update(self._current_round_pool)
+            with self._user_lock:
+                self._next_round_pool.update(self._current_round_pool)
             logger.info(f"Next round pool {self._next_round_pool}")
             # TODO send a signal to clients about that? like no more users?
             return
@@ -167,11 +168,11 @@ class Matchmaker:
             heap_size -= 1
 
             logger.info(f"Got heap head: {current_user}")
-            # traverses connection graph
             if self._connection_graph[current_user_id].processed:
-                logger.info(f"{current_user_id} already got a match, skipping")
+                logger.info(f"{current_user_id} already got a match this round")
                 continue
 
+            # traverses connection graph
             match: str = self.find_match(current_user_id)
             if match:
                 logger.info(f"Found match {match} for {current_user_id}")
@@ -189,9 +190,9 @@ class Matchmaker:
                 self._disconnected_users.add(match)
                 yield current_user_id, match
             else:
-                self._next_round_pool.add(current_user_id)
                 logger.info(f"No matches found for {current_user}, "
                             f"increasing weight, adding to next round pool")
+                self.add_user(current_user_id)
                 self._mm_settings[current_user_id].increase_weight()
 
     def remove_user(self, user_id: str):
@@ -200,8 +201,7 @@ class Matchmaker:
         he either accepted a match or gone from the lobby
         """
         logger.info(f"User {user_id} disconnected from server")
-        with self._user_lock:
-            self._disconnected_users.add(user_id)
+        self._disconnected_users.add(user_id)
 
     def add_user(self, user_id: str, mm_settings: Optional[MMSettings] = None):
         """
