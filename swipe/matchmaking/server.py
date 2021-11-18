@@ -4,7 +4,7 @@ import logging
 from asyncio import StreamReader
 from uuid import UUID
 
-from fastapi import FastAPI, Depends, Body, Query
+from fastapi import FastAPI, Body, Query
 from fastapi import WebSocket
 from pydantic import BaseModel
 from starlette.websockets import WebSocketDisconnect
@@ -51,21 +51,20 @@ async def docs(json_data: MMBasePayload = Body(..., examples={
     pass
 
 
-sent_matches: dict[str:str] = dict()
+sent_matches: dict[str, str] = dict()
+connection_manager = WSConnectionManager()
 
 
 @app.websocket("/connect/{user_id}")
 async def matchmaker_endpoint(
-        user_id: UUID,
-        websocket: WebSocket,
-        gender: Gender = Query(None),
-        connection_manager: WSConnectionManager = Depends()):
+        user_id: UUID, websocket: WebSocket, gender: Gender = Query(None)):
     with database.session_context() as db:
         user_service = MMUserService(db)
         if (user := user_service.get_matchmaking_preview(user_id)) is None:
             logger.info(f"User {user_id} not found")
             await websocket.close(1003)
             return
+
     user_id_str = str(user_id)
     logger.info(f"{user_id} connected with filter: {gender}")
 
@@ -135,43 +134,48 @@ async def matchmaker_endpoint(
             logger.exception(f"Error processing payload from {user_id}")
 
 
-async def match_sender(mm_reader: StreamReader):
-    # same main process, so we're safe with using a class variable
-    connection_manager = WSConnectionManager()
+async def _send_match_data(user_a_id: str, user_b_id: str):
+    user_a_uiud = UUID(hex=user_a_id)
+    user_b_uuid = UUID(hex=user_b_id)
 
-    async def _send_match_data(user_a_id: str, user_b_id: str):
-        user_a = UUID(hex=user_a_id)
-        user_b = UUID(hex=user_b_id)
-
-        decline_payload = MMMatchPayload(action=MMResponseAction.DECLINE)
-        if connection_manager.is_connected(user_a):
-            if connection_manager.is_connected(user_b):
-                # both connected
-                logger.info(f"Sending matches to {user_a_id}, {user_b_id}")
-                await connection_manager.send(user_b, {
-                    'match': user_a, 'host': False
-                })
-                await connection_manager.send(user_a, {
-                    'match': user_b, 'host': True
-                })
-                sent_matches[user_a_id] = user_b_id
-                sent_matches[user_b_id] = user_a_id
-            else:
-                # if B is gone, send decline to A
-                await connection_manager.send(
-                    user_a,
-                    MMBasePayload(
-                        sender_id=user_b_id,
-                        recipient_id=user_a_id,
-                        payload=decline_payload).dict(by_alias=True))
-        elif connection_manager.is_connected(user_b):
-            # if A is gone, send decline to B
+    decline_payload = MMMatchPayload(action=MMResponseAction.DECLINE)
+    if connection_manager.is_connected(user_a_uiud):
+        if connection_manager.is_connected(user_b_uuid):
+            # both connected
+            logger.info(f"Both are connected, "
+                        f"sending matches to {user_a_id}, {user_b_id}")
+            await connection_manager.send(user_b_uuid, {
+                'match': user_a_uiud, 'host': False
+            })
+            await connection_manager.send(user_a_uiud, {
+                'match': user_b_uuid, 'host': True
+            })
+            sent_matches[user_a_id] = user_b_id
+            sent_matches[user_b_id] = user_a_id
+        else:
+            logger.info(f"{user_b_uuid} is gone, "
+                        f"sending decline to {user_a_uiud}")
+            # if B is gone, send decline to A
             await connection_manager.send(
-                user_b,
+                user_a_uiud,
                 MMBasePayload(
-                    sender_id=user_a_id,
-                    recipient_id=user_b_id,
+                    sender_id=user_b_id,
+                    recipient_id=user_a_id,
                     payload=decline_payload).dict(by_alias=True))
+    elif connection_manager.is_connected(user_b_uuid):
+        logger.info(f"{user_a_uiud} is gone, "
+                    f"sending decline to {user_b_uuid}")
+        # if A is gone, send decline to B
+        await connection_manager.send(
+            user_b_uuid,
+            MMBasePayload(
+                sender_id=user_a_id,
+                recipient_id=user_b_id,
+                payload=decline_payload).dict(by_alias=True))
+
+
+async def match_sender(mm_reader: StreamReader):
+    # same main process, so we're safe with using a module level variable
 
     reader: StreamReader
     while True:

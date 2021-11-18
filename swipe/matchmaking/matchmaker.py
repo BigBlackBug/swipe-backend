@@ -6,7 +6,7 @@ import threading
 import time
 from asyncio import StreamReader, StreamWriter
 from dataclasses import dataclass
-from typing import Optional, Generator, Iterator
+from typing import Optional, Iterator
 from uuid import UUID
 
 from swipe.matchmaking.connections import MM2WSConnection
@@ -72,12 +72,12 @@ class Matchmaker:
         self._user_lock = threading.Lock()
 
     def generate_matches(self) -> Iterator[Match]:
-        logger.info("Locking and initializing pools")
+        logger.info("Round started")
         with self._user_lock:
             self.init_pools()
 
         if len(self._current_round_pool) < 2:
-            logger.info(f"Not enough users for matchmaking in current pool"
+            logger.info(f"Not enough users for matchmaking in current pool "
                         f"{self._current_round_pool} "
                         "moving all to the next pool")
             self._next_round_pool.update(self._current_round_pool)
@@ -106,6 +106,10 @@ class Matchmaker:
         for user in self._next_round_pool:
             if user not in self._disconnected_users:
                 self._current_round_pool.add(user)
+            else:
+                logger.info(
+                    f"{user} has disconnected before the round started, "
+                    f"not including him in the current pool")
 
         self._next_round_pool = set()
         self._disconnected_users = set()
