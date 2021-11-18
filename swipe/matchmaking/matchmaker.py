@@ -67,14 +67,14 @@ class Matchmaker:
         self._connection_graph: dict[str, Vertex] = {}
 
     def generate_matches(self) -> Iterator[Match]:
-        logger.info(
-            f"Starting a matchmaking round with pool: {self._next_round_pool}")
         if len(self._next_round_pool) < 2:
             logger.info("Not enough users for matchmaking")
             # TODO send a signal about that? like no more users?
             yield from []
 
         self.init_pools()
+        logger.info(f"Starting a matchmaking round "
+                    f"with pool: {self._current_round_pool}")
         # generate connectivity graph based on their filters
         self.build_graph()
 
@@ -82,10 +82,11 @@ class Matchmaker:
 
     def init_pools(self):
         self._current_round_pool = self._next_round_pool
-        # TODO might break because of concurrency?
         self._next_round_pool = set()
 
     def build_graph(self):
+        # TODO a user might disconnect from the pool and mm_settings
+        # after a new round has started
         for user_id in self._current_round_pool:
             mm_settings = self._mm_settings[user_id]
             # TODO cache the fuck out of it, including queries and blacklists
@@ -166,7 +167,7 @@ class Matchmaker:
         Adds a user to the next round pool.
         If `mm_settings` is None, he's a returning user
         """
-        logger.info(f"Adding {user_id} to next round pool")
+        logger.info(f"Adding {user_id} to next round pool, {mm_settings}")
         self._next_round_pool.add(user_id)
         if mm_settings:
             self._mm_settings[user_id] = mm_settings
@@ -222,7 +223,6 @@ async def _request_handler(reader: StreamReader, writer: StreamWriter):
     logger.info("Starting the matchmaker server")
     matchmaker = Matchmaker(MMUserService(SessionLocal()))
     loop = asyncio.get_running_loop()
-    # TODO read user identifier?
     loop.create_task(match_generator(writer, matchmaker))
     loop.create_task(user_event_handler(reader, matchmaker))
 
@@ -233,7 +233,8 @@ async def user_event_handler(reader: StreamReader, matchmaker: Matchmaker):
     while True:
         event_data_raw = await reader.readline()
         if not event_data_raw:
-            logger.info("Client died lol")
+            # TODO kill matchmaker loop
+            logger.exception("Matchmaking WS server died")
             break
 
         user_event = json.loads(event_data_raw)

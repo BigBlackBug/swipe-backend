@@ -15,6 +15,7 @@ def db() -> Session:
     try:
         yield session
     finally:
+        logging.info(f'Closing connection@{settings.DATABASE_URL}')
         session.close()
 
 

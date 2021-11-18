@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from starlette.websockets import WebSocketDisconnect
 from uvicorn import Config, Server
 
+import swipe.swipe_server.misc.database as database
 from swipe.chat_server.services import ConnectedUser, WSConnectionManager
 from swipe.matchmaking.connections import WS2MMConnection
 from swipe.matchmaking.schemas import MMBasePayload, MMMatchPayload, \
@@ -55,12 +56,13 @@ async def matchmaker_endpoint(
         user_id: UUID,
         websocket: WebSocket,
         gender: Gender = Query(None),
-        connection_manager: WSConnectionManager = Depends(),
-        user_service: MMUserService = Depends()):
-    if (user := user_service.get_matchmaking_preview(user_id)) is None:
-        logger.info(f"User {user_id} not found")
-        await websocket.close(1003)
-        return
+        connection_manager: WSConnectionManager = Depends()):
+    with database.session_context() as db:
+        user_service = MMUserService(db)
+        if (user := user_service.get_matchmaking_preview(user_id)) is None:
+            logger.info(f"User {user_id} not found")
+            await websocket.close(1003)
+            return
 
     logger.info(f"{user_id} connected")
 
@@ -79,6 +81,7 @@ async def matchmaker_endpoint(
             logger.info(f"{user_id} disconnected with code {e.code}")
             await connection_manager.disconnect(user_id)
             await matchmaker.disconnect(str(user_id))
+            # TODO send decline if the match was sent
             return
 
         try:
@@ -103,6 +106,37 @@ async def match_sender(mm_reader: StreamReader):
     # same main process, so we're safe with using a class variable
     connection_manager = WSConnectionManager()
 
+    async def _send_match_data(user_a_id: str, user_b_id: str):
+        user_a = UUID(hex=user_a_id)
+        user_b = UUID(hex=user_b_id)
+
+        decline_payload = MMMatchPayload(action=MMResponseAction.DECLINE)
+        if connection_manager.is_connected(user_a):
+            if connection_manager.is_connected(user_b):
+                # both connected
+                await connection_manager.send(user_b, {
+                    'match': user_a, 'host': False
+                })
+                await connection_manager.send(user_a, {
+                    'match': user_b, 'host': True
+                })
+            else:
+                # if B is gone, send decline to A
+                await connection_manager.send(
+                    user_a,
+                    MMBasePayload(
+                        sender_id=user_b_id,
+                        recipient_id=user_a_id,
+                        payload=decline_payload).dict())
+        elif connection_manager.is_connected(user_b):
+            # if A is gone, send decline to B
+            await connection_manager.send(
+                user_b,
+                MMBasePayload(
+                    sender_id=user_a_id,
+                    recipient_id=user_b_id,
+                    payload=decline_payload).dict())
+
     reader: StreamReader
     while True:
         try:
@@ -115,18 +149,7 @@ async def match_sender(mm_reader: StreamReader):
 
             match_data: dict = json.loads(raw_data)
             user_a_raw, user_b_raw = match_data['match']
-            user_a = UUID(hex=user_a_raw)
-            user_b = UUID(hex=user_b_raw)
-
-            if connection_manager.is_connected(user_a) \
-                    and connection_manager.is_connected(user_b):
-                # TODO what if one of them is gone by this time?
-                await connection_manager.send(user_a, {
-                    'match': user_b, 'host': True
-                })
-                await connection_manager.send(user_b, {
-                    'match': user_a, 'host': False
-                })
+            await _send_match_data(user_a_raw, user_b_raw)
         except:
             logger.exception("Error reading from pipe, matchmaker down?")
             break
