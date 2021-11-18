@@ -67,7 +67,7 @@ class Matchmaker:
         # a -> {b->{a:True, c:False}}, c->{b:False}}
         self._connection_graph: dict[str, Vertex] = {}
         # users that
-        self._skip_users = set()
+        self._skip_users_current_round = set()
         self._user_lock = threading.Lock()
 
     def generate_matches(self) -> Iterator[Match]:
@@ -87,7 +87,7 @@ class Matchmaker:
 
         logger.info("Round finished, locking and clearing settings")
         with self._user_lock:
-            for user_id in self._skip_users:
+            for user_id in self._skip_users_current_round:
                 logger.info(f"Removing {user_id} from settings")
                 del self._mm_settings[user_id]
         logger.info("Unlocking")
@@ -95,20 +95,15 @@ class Matchmaker:
     def init_pools(self):
         logger.info(f"Initializing pools, current pool {self._current_round_pool}")
         for user in self._next_round_pool:
-            if user in self._skip_users:
-                logger.info(f"{user} will not be added to "
-                            f"current pool as he was gone "
-                            f"during previous round")
-            else:
-                self._current_round_pool.add(user)
+            self._current_round_pool.add(user)
         self._next_round_pool = set()
-        self._skip_users = set()
+        self._skip_users_current_round = set()
 
     def build_graph(self):
         logger.info(f"Building graph from "
                     f"current pool: {self._current_round_pool}")
         for user_id in self._current_round_pool:
-            if user_id in self._skip_users:
+            if user_id in self._skip_users_current_round:
                 logger.info(f"Skipping {user_id} because he's gone")
                 continue
             mm_settings = self._mm_settings[user_id]
@@ -135,7 +130,7 @@ class Matchmaker:
             current_round_heap: list[HeapItem] = [
                 HeapItem(user, self._mm_settings[user].current_weight)
                 for user in self._current_round_pool
-                if user not in self._skip_users
+                if user not in self._skip_users_current_round
             ]
             heapq.heapify(current_round_heap)
         logger.info("Lock released")
@@ -179,15 +174,8 @@ class Matchmaker:
         """
         logger.info(f"User {user_id} disconnected from server")
         with self._user_lock:
-            self._skip_users.add(user_id)
-        # if user_id in self._next_round_pool:
-        #     logger.info(
-        #         f"Current users in MM: {self._current_round_pool}, "
-        #         f"removing {user_id}")
-        #     self._current_round_pool.remove(user_id)
-        # if user_id in self._mm_settings:
-        #     logger.info(f"Removing {user_id} from settings")
-        #     del self._mm_settings[user_id]
+            self._skip_users_current_round.add(user_id)
+
 
     def add_user(self, user_id: str, mm_settings: Optional[MMSettings] = None):
         """

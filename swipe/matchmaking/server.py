@@ -86,41 +86,45 @@ async def matchmaker_endpoint(
             await connection_manager.disconnect(user_id)
             await matchmaker.disconnect(user_id_str)
 
-            if sent_match_id := sent_matches.get(user_id_str):
+            if match_user_id := sent_matches.get(user_id_str):
                 logger.info(f"Removing {user_id_str} from sent matches")
-                del sent_matches[user_id_str]
-
-                if sent_match_id in sent_matches:
-                    logger.info(f"Removing {user_id_str} match {sent_match_id} "
-                                f"from sent matches")
-                    del sent_matches[sent_match_id]
+                sent_matches.pop(user_id_str, None)
 
                 logger.info(
-                    f"Sending decline to {user_id_str} match {sent_match_id}")
+                    f"Removing {match_user_id}, match of {user_id_str}"
+                    f"from sent matches")
+                sent_matches.pop(match_user_id, None)
+
+                logger.info(f"Sending decline to {match_user_id}, "
+                            f"match of {user_id_str}")
                 await connection_manager.send(
-                    UUID(hex=sent_match_id),
+                    UUID(hex=match_user_id),
                     MMBasePayload(
                         sender_id=user_id_str,
-                        recipient_id=sent_match_id,
+                        recipient_id=match_user_id,
                         payload=MMMatchPayload(
                             action=MMResponseAction.DECLINE))
                         .dict(by_alias=True))
 
-                logger.info(f"Reconnecting {sent_match_id} to matchmaker")
-                await matchmaker.reconnect(sent_match_id)
+                logger.info(f"Reconnecting {match_user_id} to matchmaker")
+                await matchmaker.reconnect(match_user_id)
             return
 
         try:
             payload: MMBasePayload = MMBasePayload.validate(data)
             if isinstance(payload.payload, MMMatchPayload):
-                # one decline -> put both back to MM
-                if payload.payload.action == MMResponseAction.DECLINE:
+                if payload.payload.action == MMResponseAction.ACCEPT:
+                    logger.info(f"{payload.sender_id} accepted match, "
+                                f"removing from sent_matches")
+                    sent_matches.pop(payload.sender_id, None)
+                elif payload.payload.action == MMResponseAction.DECLINE:
+                    # one decline -> put both back to MM
                     logger.info(
-                        f"Got decline, placing {payload.sender_id} "
+                        f"Got decline from {payload.sender_id}, placing him "
                         f"and {payload.recipient_id} back to matchmaker, "
                         f"removing from sent matches")
-                    del sent_matches[payload.sender_id]
-                    del sent_matches[payload.recipient_id]
+                    sent_matches.pop(payload.sender_id, None)
+                    sent_matches.pop(payload.recipient_id, None)
                     await matchmaker.reconnect(payload.sender_id)
                     await matchmaker.reconnect(payload.recipient_id)
 
