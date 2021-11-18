@@ -77,7 +77,11 @@ class Matchmaker:
             self.init_pools()
 
         if len(self._current_round_pool) < 2:
-            logger.info("Not enough users for matchmaking")
+            logger.info(f"Not enough users for matchmaking in current pool"
+                        f"{self._current_round_pool} "
+                        "moving all to the next pool")
+            self._next_round_pool.update(self._current_round_pool)
+            logger.info(f"Next round pool {self._next_round_pool}")
             # TODO send a signal to clients about that? like no more users?
             return
 
@@ -290,7 +294,7 @@ async def match_generator(writer: StreamWriter, matchmaker: Matchmaker):
         cycle_start = time.time()
 
         # TODO think of a more reliable delay between matches
-        logger.info("Starting matchmaking round")
+        logger.info("--------------------------------------------------")
         for user_a, user_b in matchmaker.generate_matches():
             await ws_connection.send_match(user_a, user_b)
 
