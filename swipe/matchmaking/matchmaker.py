@@ -67,7 +67,8 @@ class Matchmaker:
         # a -> {b->{a:True, c:False}}, c->{b:False}}
         self._connection_graph: dict[str, Vertex] = {}
         # users that are gone during current round
-        self._skip_users_current_round = set()
+        self._disconnected_users = set()
+
         self._user_lock = threading.Lock()
 
     def generate_matches(self) -> Iterator[Match]:
@@ -87,28 +88,34 @@ class Matchmaker:
 
         logger.info("Round finished, locking and clearing settings")
         with self._user_lock:
-            for user_id in self._skip_users_current_round:
+            for user_id in self._disconnected_users:
                 logger.info(f"Removing {user_id} from settings")
                 del self._mm_settings[user_id]
         logger.info("Unlocking")
 
     def init_pools(self):
-        logger.info(f"Initializing pools, current pool {self._current_round_pool}")
+        logger.info(f"Initializing pools, users "
+                    f"in the next round pool: {self._next_round_pool}")
+        # TODO are str passed by value?
         for user in self._next_round_pool:
-            self._current_round_pool.add(user)
+            if user not in self._disconnected_users:
+                self._current_round_pool.add(user)
+
         self._next_round_pool = set()
-        self._skip_users_current_round = set()
+        self._disconnected_users = set()
 
     def build_graph(self):
         logger.info(f"Building graph from "
                     f"current pool: {self._current_round_pool}")
         for user_id in self._current_round_pool:
-            if user_id in self._skip_users_current_round:
+            if user_id in self._disconnected_users:
                 logger.info(f"Skipping {user_id} because he's gone")
                 continue
 
             mm_settings = self._mm_settings[user_id]
             # TODO cache the fuck out of it, including queries and blacklists
+            logger.info(f"Fetching connections for {user_id}, "
+                        f"settings:{mm_settings}")
             connections: IDList = \
                 self._user_service.find_user_ids(
                     user_id,
@@ -136,7 +143,7 @@ class Matchmaker:
             current_round_heap: list[HeapItem] = [
                 HeapItem(user, self._mm_settings[user].current_weight)
                 for user in self._current_round_pool
-                if user not in self._skip_users_current_round
+                if user not in self._disconnected_users
             ]
             heapq.heapify(current_round_heap)
         logger.info("Lock released")
@@ -161,10 +168,13 @@ class Matchmaker:
                 self._connection_graph[current_user_id].processed = True
                 self._connection_graph[match].processed = True
 
+                # remove both from next round
+                self._disconnected_users.add(current_user_id)
+                self._disconnected_users.add(match)
                 yield current_user_id, match
             else:
                 logger.info(f"No matches found for {current_user}, "
-                            f"increasing weight")
+                            f"increasing weight, adding to next round pool")
                 self._mm_settings[current_user_id].increase_weight()
 
     def remove_user(self, user_id: str):
@@ -174,7 +184,8 @@ class Matchmaker:
         """
         logger.info(f"User {user_id} disconnected from server")
         with self._user_lock:
-            self._skip_users_current_round.add(user_id)
+            self._disconnected_users.add(user_id)
+            # self._users_to_be_removed.add(user_id)
 
     def add_user(self, user_id: str, mm_settings: Optional[MMSettings] = None):
         """
@@ -183,10 +194,13 @@ class Matchmaker:
         """
         logger.info(f"Adding {user_id} to next round pool, {mm_settings}")
         self._next_round_pool.add(user_id)
+        # they might have returned before this round ended, HOW?
+        if user_id in self._disconnected_users:
+            self._disconnected_users.remove(user_id)
+
         if mm_settings:
             self._mm_settings[user_id] = mm_settings
-        elif user_id not in self._mm_settings:
-            raise Exception(f"Returning client {user_id} must have mm_settings")
+
         logger.info(f"Next round pool {self._next_round_pool}")
 
     def add_to_graph(self, user_id: str, connections: list[UUID]):
