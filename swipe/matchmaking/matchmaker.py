@@ -168,6 +168,10 @@ class Matchmaker:
 
             logger.info(f"Got heap head: {current_user}")
             # traverses connection graph
+            if self._connection_graph[current_user_id].processed:
+                logger.info(f"{current_user_id} already got a match, skipping")
+                continue
+
             match: str = self.find_match(current_user_id)
             if match:
                 logger.info(f"Found match {match} for {current_user_id}")
@@ -185,6 +189,7 @@ class Matchmaker:
                 self._disconnected_users.add(match)
                 yield current_user_id, match
             else:
+                self._next_round_pool.add(current_user_id)
                 logger.info(f"No matches found for {current_user}, "
                             f"increasing weight, adding to next round pool")
                 self._mm_settings[current_user_id].increase_weight()
@@ -241,10 +246,13 @@ class Matchmaker:
             key=lambda x: self._mm_settings[x].current_weight,
             reverse=True)
         for potential_match_id in potential_edges:
-            logger.info(f"Checking {potential_match_id}")
+            vertex_processed = \
+                self._connection_graph[potential_match_id].processed
+            logger.info(f"Checking {potential_match_id}, "
+                        f"processed: {vertex_processed}")
             # if the edge is bidirectional -> we got a match
-            if current_vertex.connects_to(potential_match_id) and \
-                    not self._connection_graph[potential_match_id].processed:
+            if not vertex_processed and \
+                    current_vertex.connects_to(potential_match_id) :
                 return potential_match_id
 
         return None
