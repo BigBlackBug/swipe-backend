@@ -50,6 +50,10 @@ LOGGING_CONFIG: dict = {
             "handlers": ["default"],
             "propagate": False,
         },
+        "websockets": {
+            "handlers": ["default"],
+            "propagate": False,
+        },
         "root": {
             "handlers": ["default"], "level": "INFO",
         },

@@ -66,7 +66,7 @@ class Matchmaker:
 
         # a -> {b->{a:True, c:False}}, c->{b:False}}
         self._connection_graph: dict[str, Vertex] = {}
-        # users that
+        # users that are gone during current round
         self._skip_users_current_round = set()
         self._user_lock = threading.Lock()
 
@@ -106,6 +106,7 @@ class Matchmaker:
             if user_id in self._skip_users_current_round:
                 logger.info(f"Skipping {user_id} because he's gone")
                 continue
+
             mm_settings = self._mm_settings[user_id]
             # TODO cache the fuck out of it, including queries and blacklists
             connections: IDList = \
@@ -115,10 +116,15 @@ class Matchmaker:
                     age_difference=mm_settings.age_diff,
                     online_users=self._current_round_pool,
                     gender=mm_settings.gender)
-            logger.info(f"Found connections for {user_id}: {connections}")
+
             if not connections:
+                logger.info(f"No connections found for {user_id}, "
+                            f"increasing age diff")
                 # increasing age diff for next rounds if none were found
                 mm_settings.increase_age_diff()
+            else:
+                logger.info(f"Found {len(connections)} connections "
+                            f"for {user_id}: {connections}")
 
             self.add_to_graph(user_id, connections)
 
@@ -137,13 +143,13 @@ class Matchmaker:
 
         heap_size = len(current_round_heap)
         while heap_size:
-            logger.info(f"current heap {current_round_heap}")
+            logger.info(f"Current heap {current_round_heap}")
             # pick heap top
             current_user = heapq.heappop(current_round_heap)
             current_user_id = current_user.user_id
             heap_size -= 1
 
-            logger.info(f"heap head: {current_user}")
+            logger.info(f"Got heap head: {current_user}")
             # traverses connection graph
             match: str = self.find_match(current_user_id)
             if match:
@@ -155,14 +161,8 @@ class Matchmaker:
                 self._connection_graph[current_user_id].processed = True
                 self._connection_graph[match].processed = True
 
-                logger.info(f"Removing {current_user_id} and "
-                            f"{match} from MM pool")
-                self._current_round_pool.remove(current_user_id)
-                self._current_round_pool.remove(match)
-
                 yield current_user_id, match
             else:
-                # TODO increase current_user weight for next round
                 logger.info(f"No matches found for {current_user}, "
                             f"increasing weight")
                 self._mm_settings[current_user_id].increase_weight()
@@ -175,7 +175,6 @@ class Matchmaker:
         logger.info(f"User {user_id} disconnected from server")
         with self._user_lock:
             self._skip_users_current_round.add(user_id)
-
 
     def add_user(self, user_id: str, mm_settings: Optional[MMSettings] = None):
         """

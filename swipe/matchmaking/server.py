@@ -67,7 +67,7 @@ async def matchmaker_endpoint(
             await websocket.close(1003)
             return
     user_id_str = str(user_id)
-    logger.info(f"{user_id} connected")
+    logger.info(f"{user_id} connected with filter: {gender}")
 
     user_data: MMPreview = MMPreview.from_orm(user)
     user = ConnectedUser(user_id=user_id,
@@ -82,7 +82,7 @@ async def matchmaker_endpoint(
             logger.info(f"Received data {data} from {user_id}")
         except WebSocketDisconnect as e:
             logger.info(f"{user_id} disconnected with code {e.code}, "
-                        f"disconnecting him from matchmaking")
+                        f"removing him from matchmaking")
             await connection_manager.disconnect(user_id)
             await matchmaker.disconnect(user_id_str)
 
