@@ -193,13 +193,14 @@ class Matchmaker:
         If `mm_settings` is None, he's a returning user
         """
         logger.info(f"Adding {user_id} to next round pool, {mm_settings}")
-        self._next_round_pool.add(user_id)
-        # they might have returned before this round ended, HOW?
-        if user_id in self._disconnected_users:
-            self._disconnected_users.remove(user_id)
+        with self._user_lock:
+            self._next_round_pool.add(user_id)
+            # they might have returned before this round ended, HOW?
+            if user_id in self._disconnected_users:
+                self._disconnected_users.remove(user_id)
 
-        if mm_settings:
-            self._mm_settings[user_id] = mm_settings
+            if mm_settings:
+                self._mm_settings[user_id] = mm_settings
 
         logger.info(f"Next round pool {self._next_round_pool}")
 
