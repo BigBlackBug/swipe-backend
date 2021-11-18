@@ -16,7 +16,8 @@ from swipe.settings import settings
 from swipe.swipe_server.misc.database import SessionLocal
 from swipe.swipe_server.users.models import IDList
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('matchmaker')
+user_event_logger = logging.getLogger('user_event')
 
 MIN_ROUND_LENGTH_SECS = 5
 
@@ -69,18 +70,18 @@ class Matchmaker:
         # users that are gone during current round
         self._disconnected_users = set()
 
-        self._user_lock = threading.Lock()
+        self._pool_update_lock = threading.Lock()
 
     def generate_matches(self) -> Iterator[Match]:
         logger.info("Round started")
-        with self._user_lock:
+        with self._pool_update_lock:
             self.init_pools()
 
         if len(self._current_round_pool) < 2:
             logger.info(f"Not enough users for matchmaking in current pool "
                         f"{self._current_round_pool} "
                         "moving all to the next pool")
-            with self._user_lock:
+            with self._pool_update_lock:
                 self._next_round_pool.update(self._current_round_pool)
             logger.info(f"Next round pool {self._next_round_pool}")
             # TODO send a signal to clients about that? like no more users?
@@ -149,7 +150,7 @@ class Matchmaker:
     def run_matchmaking_round(self) -> Iterator[Match]:
         # TODO do we need a copy?
         # building a heap out of all
-        with self._user_lock:
+        with self._pool_update_lock:
             logger.info("Locking and building current round heap")
             current_round_heap: list[HeapItem] = [
                 HeapItem(user, self._mm_settings[user].current_weight)
@@ -208,8 +209,7 @@ class Matchmaker:
         Adds a user to the next round pool.
         If `mm_settings` is None, he's a returning user
         """
-        logger.info(f"Adding {user_id} to next round pool, {mm_settings}")
-        with self._user_lock:
+        with self._pool_update_lock:
             self._next_round_pool.add(user_id)
             # they might have returned before this round ended, HOW?
             if user_id in self._disconnected_users:
@@ -252,7 +252,7 @@ class Matchmaker:
                         f"processed: {vertex_processed}")
             # if the edge is bidirectional -> we got a match
             if not vertex_processed and \
-                    current_vertex.connects_to(potential_match_id) :
+                    current_vertex.connects_to(potential_match_id):
                 return potential_match_id
 
         return None
@@ -277,24 +277,29 @@ async def _request_handler(reader: StreamReader, writer: StreamWriter):
 
 
 async def user_event_handler(reader: StreamReader, matchmaker: Matchmaker):
-    logger.info("Starting user event reader")
+    user_event_logger.info("Starting user event reader")
 
     while True:
         event_data_raw = await reader.readline()
         if not event_data_raw:
             # TODO kill matchmaker loop
-            logger.exception("Matchmaking WS server died")
+            user_event_logger.exception("Matchmaking WS server died")
             break
 
         user_event = json.loads(event_data_raw)
 
         user_id = user_event['user_id']
         if user_event['operation'] == 'connect':
-            matchmaker.add_user(
-                user_id, MMSettings.parse_obj(user_event['settings']))
+            mm_settings = MMSettings.parse_obj(user_event['settings'])
+
+            user_event_logger.info(
+                f"Connecting {user_id} to next round pool, {mm_settings}")
+            matchmaker.add_user(user_id, mm_settings)
         elif user_event['operation'] == 'reconnect':
+            user_event_logger.info(f"Reconnecting {user_id} to next round pool")
             matchmaker.add_user(user_id)
         elif user_event['operation'] == 'disconnect':
+            user_event_logger.info(f"Removing {user_id} from machmaking")
             matchmaker.remove_user(user_id)
 
 
@@ -310,6 +315,9 @@ async def match_generator(writer: StreamWriter, matchmaker: Matchmaker):
         for user_a, user_b in matchmaker.generate_matches():
             await ws_connection.send_match(user_a, user_b)
 
-        diff = int(cycle_start + MIN_ROUND_LENGTH_SECS - time.time())
-        logger.info(f"Seconds till the next cycle: {diff}")
-        await asyncio.sleep(diff)
+        time_taken = time.time() - cycle_start
+        sleep_time = MIN_ROUND_LENGTH_SECS - time_taken
+        logger.info(
+            f"Round took {time_taken}s, "
+            f"time till the next cycle: {sleep_time}")
+        await asyncio.sleep(sleep_time)

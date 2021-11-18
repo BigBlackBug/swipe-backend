@@ -12,7 +12,7 @@ LOGGING_CONFIG: dict = {
     "formatters": {
         "default": {
             "format": "[%(asctime)s %(levelname)s|%(processName)s] | "
-                      "%(module)s@%(lineno)d | %(message)s"
+                      "%(name)s | %(module)s@%(lineno)d | %(message)s"
         },
         "access": {
             "()": "uvicorn.logging.AccessFormatter",

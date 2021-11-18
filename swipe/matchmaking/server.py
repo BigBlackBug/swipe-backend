@@ -86,6 +86,9 @@ async def matchmaker_endpoint(
             await matchmaker.disconnect(user_id_str)
             await connection_manager.disconnect(user_id)
 
+            # we need to keep track of sent matches so that we could
+            # send decline events if one of the users disconnects
+            # on the match screen
             if match_user_id := sent_matches.get(user_id_str):
                 logger.info(f"Removing {user_id_str} from sent matches")
                 sent_matches.pop(user_id_str, None)
@@ -102,8 +105,7 @@ async def matchmaker_endpoint(
                     MMBasePayload(
                         sender_id=user_id_str,
                         recipient_id=match_user_id,
-                        payload=MMMatchPayload(
-                            action=MMResponseAction.DECLINE))
+                        payload=MMMatchPayload(action=MMResponseAction.DECLINE))
                         .dict(by_alias=True))
 
                 logger.info(f"Reconnecting {match_user_id} to matchmaker")
