@@ -35,46 +35,50 @@ jobs:
     # In this step, this action saves a list of existing images,
     # the cache is created without them in the post run.
     # It also restores the cache if it exists.
-    - uses: satackey/action-docker-layer-caching@v0.0.11
-      # Ignore the failure of a step and avoid terminating the job.
+   - name: Set up Docker cache
+      uses: satackey/action-docker-layer-caching@v0.0.11
       continue-on-error: true
+      with:
+        key: teste2e-docker-cache-{hash}
+        restore-keys: |
+          teste2e-docker-cache-
 
     - name: Build the Docker image
       run: docker build . --file Dockerfile --tag ${{ env.SWIPE_LOCAL_IMAGE }}
 
-    - name: Push image to registry
-      run: |
-        doctl registry login
-        docker tag ${{ env.SWIPE_LOCAL_IMAGE }} ${{ env.SWIPE_IMAGE }}
-        docker push ${{ env.SWIPE_IMAGE }}
+#    - name: Push image to registry
+#      run: |
+#        doctl registry login
+#        docker tag ${{ env.SWIPE_LOCAL_IMAGE }} ${{ env.SWIPE_IMAGE }}
+#        docker push ${{ env.SWIPE_IMAGE }}
 
-    - name: Copy docker-compose
-      uses: appleboy/scp-action@master
-      with:
-        host: ${{ secrets.DO_DROPLET_HOST }}
-        username: root
-        port: 22
-        key: ${{ secrets.DO_SSH_KEY }}
-        source: "docker-compose-do.yml"
-        target: ${{ env.APP_DIR }}
-
-    - name: Start swipe
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.DO_DROPLET_HOST }}
-        username: root
-        port: 22
-        key: ${{ secrets.DO_SSH_KEY }}
-        script: |
-          set -e
-          docker login \
-            -u ${{ secrets.DO_ACCESS_TOKEN }} \
-            -p ${{ secrets.DO_ACCESS_TOKEN }} \
-            registry.digitalocean.com
-
-          export SWIPE_IMAGE=${{env.SWIPE_IMAGE}}
-          export JANUS_IMAGE=${{env.JANUS_IMAGE}}
-          export APP_DIR=${{env.APP_DIR}}
-
-          docker-compose -f ${{ env.APP_DIR }}/docker-compose-do.yml pull
-          docker-compose -f ${{ env.APP_DIR }}/docker-compose-do.yml up -d
+#    - name: Copy docker-compose
+#      uses: appleboy/scp-action@master
+#      with:
+#        host: ${{ secrets.DO_DROPLET_HOST }}
+#        username: root
+#        port: 22
+#        key: ${{ secrets.DO_SSH_KEY }}
+#        source: "docker-compose-do.yml"
+#        target: ${{ env.APP_DIR }}
+#
+#    - name: Start swipe
+#      uses: appleboy/ssh-action@master
+#      with:
+#        host: ${{ secrets.DO_DROPLET_HOST }}
+#        username: root
+#        port: 22
+#        key: ${{ secrets.DO_SSH_KEY }}
+#        script: |
+#          set -e
+#          docker login \
+#            -u ${{ secrets.DO_ACCESS_TOKEN }} \
+#            -p ${{ secrets.DO_ACCESS_TOKEN }} \
+#            registry.digitalocean.com
+#
+#          export SWIPE_IMAGE=${{env.SWIPE_IMAGE}}
+#          export JANUS_IMAGE=${{env.JANUS_IMAGE}}
+#          export APP_DIR=${{env.APP_DIR}}
+#
+#          docker-compose -f ${{ env.APP_DIR }}/docker-compose-do.yml pull
+#          docker-compose -f ${{ env.APP_DIR }}/docker-compose-do.yml up -d
