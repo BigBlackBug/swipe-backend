@@ -32,11 +32,21 @@ class MMMatchPayload(BaseModel):
     action: MMResponseAction
 
 
+class MMLobbyAction(str, Enum):
+    CONNECT = 'connect'
+    DISCONNECT = 'disconnect'
+
+
+class MMLobbyPayload(BaseModel):
+    type_: str = Field('lobby', alias='type', const=True)
+    action: MMLobbyAction
+
+
 class MMBasePayload(BaseModel):
     sender_id: str
-    recipient_id: str
+    recipient_id: Optional[str] = None
     payload: Union[
-        MMSDPPayload, MMMatchPayload, MMICEPayload
+        MMSDPPayload, MMMatchPayload, MMICEPayload, MMLobbyPayload
     ]
 
     @classmethod
@@ -47,6 +57,8 @@ class MMBasePayload(BaseModel):
             return MMICEPayload
         elif payload_type == 'match':
             return MMMatchPayload
+        elif payload_type == 'lobby':
+            return MMLobbyPayload
 
     @classmethod
     def validate(cls: MMBasePayload, value: Any) -> MMBasePayload:

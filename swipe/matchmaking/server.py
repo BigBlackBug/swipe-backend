@@ -14,7 +14,7 @@ import swipe.swipe_server.misc.database as database
 from swipe.chat_server.services import ConnectedUser, WSConnectionManager
 from swipe.matchmaking.connections import WS2MMConnection
 from swipe.matchmaking.schemas import MMBasePayload, MMMatchPayload, \
-    MMResponseAction, MMPreview, MMSettings
+    MMResponseAction, MMPreview, MMLobbyPayload, MMLobbyAction, MMSettings
 from swipe.matchmaking.services import MMUserService
 from swipe.settings import settings
 from swipe.swipe_server.users.enums import Gender
@@ -29,9 +29,6 @@ for cls in BaseModel.__subclasses__():
             and cls.__name__.startswith('MM') \
             and 'type_' in cls.__fields__:
         _supported_payloads.append(cls.__name__)
-
-loop = asyncio.get_event_loop()
-matchmaker: WS2MMConnection
 
 
 @app.get("/connect/docs")
@@ -51,6 +48,8 @@ async def docs(json_data: MMBasePayload = Body(..., examples={
     pass
 
 
+loop = asyncio.get_event_loop()
+matchmaker: WS2MMConnection
 sent_matches: dict[str, str] = dict()
 connection_manager = WSConnectionManager()
 
@@ -65,15 +64,15 @@ async def matchmaker_endpoint(
             await websocket.close(1003)
             return
 
-    user_id_str = str(user_id)
     logger.info(f"{user_id} connected with filter: {gender}")
 
     user_data: MMPreview = MMPreview.from_orm(user)
-    user = ConnectedUser(user_id=user_id,
-                         age=user_data.age, connection=websocket)
+
+    # TODO these motherfuckers are saved here, right? memory eater
+    user = ConnectedUser(user_id=user_id, age=user_data.age,
+                         connection=websocket)
+    mm_settings = MMSettings(age=user.age, gender=gender)
     await connection_manager.connect(user)
-    await matchmaker.connect(
-        user_id_str, settings=MMSettings(age=user.age, gender=gender))
 
     while True:
         try:
@@ -82,8 +81,10 @@ async def matchmaker_endpoint(
         except WebSocketDisconnect as e:
             logger.info(f"{user_id} disconnected with code {e.code}, "
                         f"removing him from matchmaking")
-            await connection_manager.disconnect(user_id)
+
+            user_id_str = str(user_id)
             await matchmaker.disconnect(user_id_str)
+            await connection_manager.disconnect(user_id)
 
             if match_user_id := sent_matches.get(user_id_str):
                 logger.info(f"Removing {user_id_str} from sent matches")
@@ -110,60 +111,83 @@ async def matchmaker_endpoint(
             return
 
         try:
-            payload: MMBasePayload = MMBasePayload.validate(data)
-            if isinstance(payload.payload, MMMatchPayload):
-                if payload.payload.action == MMResponseAction.ACCEPT:
-                    logger.info(f"{payload.sender_id} accepted match, "
-                                f"removing from sent_matches")
-                    sent_matches.pop(payload.sender_id, None)
-                elif payload.payload.action == MMResponseAction.DECLINE:
-                    # one decline -> put both back to MM
-                    logger.info(
-                        f"Got decline from {payload.sender_id}, placing him "
-                        f"and {payload.recipient_id} back to matchmaker, "
-                        f"removing from sent matches")
-                    sent_matches.pop(payload.sender_id, None)
-                    sent_matches.pop(payload.recipient_id, None)
-                    await matchmaker.reconnect(payload.sender_id)
-                    await matchmaker.reconnect(payload.recipient_id)
+            base_payload: MMBasePayload = MMBasePayload.validate(data)
+            await _process_payload(base_payload, mm_settings)
 
-            await connection_manager.send(
-                UUID(hex=payload.recipient_id),
-                payload.dict(by_alias=True, exclude_unset=True))
+            if base_payload.recipient_id:
+                await connection_manager.send(
+                    UUID(hex=base_payload.recipient_id),
+                    base_payload.dict(by_alias=True, exclude_unset=True))
         except:
             logger.exception(f"Error processing payload from {user_id}")
 
 
+async def _process_payload(base_payload: MMBasePayload,
+                           mm_settings: MMSettings):
+    data_payload = base_payload.payload
+    sender_id = base_payload.sender_id
+    recipient_id = base_payload.recipient_id
+
+    if isinstance(data_payload, MMMatchPayload):
+        if data_payload.action == MMResponseAction.ACCEPT:
+            logger.info(f"{sender_id} accepted match, "
+                        f"removing from sent_matches")
+            sent_matches.pop(sender_id, None)
+        elif data_payload.action == MMResponseAction.DECLINE:
+            # one decline -> put both back to MM
+            logger.info(
+                f"Got decline from {sender_id}, "
+                f"placing him and {recipient_id} "
+                f"back to matchmaker, removing from sent matches")
+            sent_matches.pop(sender_id, None)
+            sent_matches.pop(recipient_id, None)
+
+            await matchmaker.reconnect(sender_id)
+            await matchmaker.reconnect(recipient_id)
+    elif isinstance(data_payload, MMLobbyPayload):
+        if data_payload.action == MMLobbyAction.CONNECT:
+            # user joined or pressed next, connect to matchmaking
+            logger.info(f"Connecting {sender_id} to matchmaking")
+            await matchmaker.connect(sender_id, settings=mm_settings)
+        elif data_payload.action == MMLobbyAction.DISCONNECT:
+            # call has started, disconnect from matchmaking
+            logger.info(f"Call has started, disconnecting "
+                        f"{sender_id} from matchmaking")
+            await matchmaker.disconnect(sender_id)
+
+
+# same main process, so we're safe with using a module level connection_manager
 async def _send_match_data(user_a_id: str, user_b_id: str):
-    user_a_uiud = UUID(hex=user_a_id)
+    user_a_uuid = UUID(hex=user_a_id)
     user_b_uuid = UUID(hex=user_b_id)
 
     decline_payload = MMMatchPayload(action=MMResponseAction.DECLINE)
-    if connection_manager.is_connected(user_a_uiud):
+    if connection_manager.is_connected(user_a_uuid):
         if connection_manager.is_connected(user_b_uuid):
             # both connected
             logger.info(f"Both are connected, "
                         f"sending matches to {user_a_id}, {user_b_id}")
             await connection_manager.send(user_b_uuid, {
-                'match': user_a_uiud, 'host': False
-            })
-            await connection_manager.send(user_a_uiud, {
-                'match': user_b_uuid, 'host': True
+                'match': user_a_uuid, 'host': False
             })
             sent_matches[user_a_id] = user_b_id
+
+            await connection_manager.send(user_a_uuid, {
+                'match': user_b_uuid, 'host': True
+            })
             sent_matches[user_b_id] = user_a_id
         else:
             logger.info(f"{user_b_uuid} is gone, "
-                        f"sending decline to {user_a_uiud}")
+                        f"sending decline to {user_a_uuid}")
             # if B is gone, send decline to A
             await connection_manager.send(
-                user_a_uiud,
+                user_a_uuid,
                 MMBasePayload(
                     sender_id=user_b_id,
                     recipient_id=user_a_id,
                     payload=decline_payload).dict(by_alias=True))
     elif connection_manager.is_connected(user_b_uuid):
-        logger.info(f"{user_a_uiud} is gone, "
+        logger.info(f"{user_a_uuid} is gone, "
                     f"sending decline to {user_b_uuid}")
         # if A is gone, send decline to B
         await connection_manager.send(
@@ -175,8 +199,6 @@ async def _send_match_data(user_a_id: str, user_b_id: str):
 
 
 async def match_sender(mm_reader: StreamReader):
-    # same main process, so we're safe with using a module level variable
-
     reader: StreamReader
     while True:
         try:
