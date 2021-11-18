@@ -110,7 +110,7 @@ async def match_sender(mm_reader: StreamReader):
             raw_data = await mm_reader.readline()
             logger.info(f"Read raw match data {raw_data} from matchmaker")
             if not raw_data:
-                logger.info("No match data from matchmaker")
+                logger.exception("Matchmaker down")
                 break
 
             match_data: dict = json.loads(raw_data)

@@ -11,6 +11,13 @@ import firebase_admin
 from firebase_admin import credentials
 from swipe.settings import settings
 
+if settings.SENTRY_CHAT_SERVER_URL:
+    import sentry_sdk
+    sentry_sdk.init(
+        settings.SENTRY_CHAT_SERVER_URL,
+        # TODO change in prod
+        traces_sample_rate=settings.SENTRY_SAMPLE_RATE
+    )
 if __name__ == '__main__':
     cred = credentials.Certificate(settings.GOOGLE_APPLICATION_CREDENTIALS)
     firebase_admin.initialize_app(cred)

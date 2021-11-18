@@ -7,7 +7,6 @@ from swipe import config
 
 config.configure_logging()
 import logging
-from pathlib import Path
 
 import alembic.command
 import alembic.config
@@ -15,7 +14,14 @@ import uvicorn
 
 from swipe.settings import settings, constants
 from swipe.swipe_server import swipe_app
+import sentry_sdk
 
+if settings.SENTRY_SWIPE_SERVER_URL:
+    sentry_sdk.init(
+        settings.SENTRY_SWIPE_SERVER_URL,
+        # TODO change in prod
+        traces_sample_rate=settings.SENTRY_SAMPLE_RATE
+    )
 logger = logging.getLogger(__name__)
 
 app = swipe_app.init_app()

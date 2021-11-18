@@ -41,6 +41,13 @@ class Settings(BaseSettings):
 
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
 
+    SENTRY_SWIPE_SERVER_URL: Optional[str] = None
+    SENTRY_MATCHMAKER_URL: Optional[str] = None
+    SENTRY_MATCHMAKING_SERVER_URL: Optional[str] = None
+    SENTRY_CHAT_SERVER_URL: Optional[str] = None
+
+    SENTRY_SAMPLE_RATE = 1.0
+
     class Config:
         case_sensitive = True
         env_file = os.environ.get('SWIPE_ENV_FILE', '.env')

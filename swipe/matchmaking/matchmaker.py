@@ -5,7 +5,7 @@ import logging
 import time
 from asyncio import StreamReader, StreamWriter
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Generator, Iterator
 from uuid import UUID
 
 from swipe.matchmaking.connections import MM2WSConnection
@@ -63,24 +63,22 @@ class Matchmaker:
         self._current_round_pool: set[str] = set()
         self._next_round_pool: set[str] = set()
 
-        # self._next_round_heap: list[str] = []
         # a -> {b->{a:True, c:False}}, c->{b:False}}
         self._connection_graph: dict[str, Vertex] = {}
 
-    def generate_matches(self) -> list[Match]:
+    def generate_matches(self) -> Iterator[Match]:
         logger.info(
             f"Starting a matchmaking round with pool: {self._next_round_pool}")
         if len(self._next_round_pool) < 2:
             logger.info("Not enough users for matchmaking")
             # TODO send a signal about that? like no more users?
-            return []
+            yield from []
 
         self.init_pools()
         # generate connectivity graph based on their filters
         self.build_graph()
 
-        matches: list[Match] = self.run_matchmaking_round()
-        return matches
+        yield from self.run_matchmaking_round()
 
     def init_pools(self):
         self._current_round_pool = self._next_round_pool
@@ -105,9 +103,7 @@ class Matchmaker:
 
             self.add_to_graph(user_id, connections)
 
-    def run_matchmaking_round(self) -> list[Match]:
-        matches: list[Match] = []
-
+    def run_matchmaking_round(self) -> Iterator[Match]:
         # TODO do we need a copy?
         current_round_heap: list[HeapItem] = [
             HeapItem(user, self._mm_settings[user].current_weight)
@@ -143,28 +139,26 @@ class Matchmaker:
                 self._current_round_pool.remove(current_user_id)
                 self._current_round_pool.remove(match)
 
-                matches.append((current_user_id, match))
+                yield current_user_id, match
             else:
                 # TODO increase current_user weight for next round
                 logger.info(f"No matches found for {current_user}, "
                             f"increasing weight")
                 self._mm_settings[current_user_id].increase_weight()
 
-        return matches
-
     def remove_user(self, user_id: str):
         """
         Called when the user disconnects from the MM server, meaning
         he either accepted a match or gone from the lobby
         """
+        logger.info(f"User {user_id} disconnected from server")
         if user_id in self._current_round_pool:
             logger.info(
                 f"Current users in MM: {self._current_round_pool}, "
                 f"removing {user_id}")
             self._current_round_pool.remove(user_id)
         if user_id in self._mm_settings:
-            logger.info(
-                f"removing {user_id} from settings. The dude's gone for good")
+            logger.info(f"Removing {user_id} from settings")
             del self._mm_settings[user_id]
 
     def add_user(self, user_id: str, mm_settings: Optional[MMSettings] = None):
