@@ -87,10 +87,11 @@ class Matchmaker:
         yield from self.run_matchmaking_round()
 
         logger.info("Round finished, locking and clearing settings")
-        with self._user_lock:
-            for user_id in self._disconnected_users:
-                logger.info(f"Removing {user_id} from settings")
-                del self._mm_settings[user_id]
+        # TODO when do I clear settings?
+        # with self._user_lock:
+        #     for user_id in self._disconnected_users:
+        #         logger.info(f"Removing {user_id} from settings")
+        #         del self._mm_settings[user_id]
         logger.info("Unlocking")
 
     def init_pools(self):
@@ -185,7 +186,6 @@ class Matchmaker:
         logger.info(f"User {user_id} disconnected from server")
         with self._user_lock:
             self._disconnected_users.add(user_id)
-            # self._users_to_be_removed.add(user_id)
 
     def add_user(self, user_id: str, mm_settings: Optional[MMSettings] = None):
         """
