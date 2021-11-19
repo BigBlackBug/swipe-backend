@@ -198,7 +198,7 @@ def test_full_matchmaking(mocker: MockerFixture):
     # 3 - run matchmaking
     mm.init_pools()
     # ----------------------------------------
-    all_matches = list(mm.run_matchmaking_round())
+    all_matches = list(mm.generate_matches())
     user_a, user_b = all_matches[0]
     assert user_a == 'F'
     assert user_b == 'C'

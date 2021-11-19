@@ -78,9 +78,13 @@ class MMSharedData:
         Called when the user disconnects from the MM server, meaning
         he either accepted a match or gone from the lobby
         """
-        logger.info(f"Adding {user_id} to disconnected")
+        logger.info(f"Adding {user_id} to disconnected "
+                    f"and removing from wait list")
         with self.user_lock:
             self.disconnected_users[user_id] = remove_settings
+            if user_id in self.wait_list:
+                # TODO make it a dict
+                self.wait_list.remove(user_id)
 
 
 class Matchmaker:
@@ -98,7 +102,7 @@ class Matchmaker:
         # a -> {b->{a:True, c:False}}, c->{b:False}}
         self._connection_graph: dict[str, Vertex] = {}
 
-    def generate_matches(self) -> Iterator[Match]:
+    def run_matchmaking_round(self) -> Iterator[Match]:
         logger.info("Round started")
         with self.incoming_data.user_lock:
             self.init_pools()
@@ -127,7 +131,7 @@ class Matchmaker:
         # generate connectivity graph based on their filters
         self.build_graph()
 
-        yield from self.run_matchmaking_round()
+        yield from self.generate_matches()
 
         with self.incoming_data.user_lock:
             logger.info(f"Flushing wait_list {self.incoming_data.wait_list}")
@@ -138,10 +142,12 @@ class Matchmaker:
 
     def init_pools(self):
         logger.info(
-            f"Initializing pools, users in the next round pool: "
-            f"{self.incoming_data.incoming_users}, "
-            f"disconnected users {self.incoming_data.disconnected_users},"
-            f"settings {self._mm_settings}")
+            f"Initializing pools, \n"
+            f"users in the next round pool: "
+            f"{self.incoming_data.incoming_users}, \n"
+            f"disconnected users {self.incoming_data.disconnected_users}, \n"
+            f"settings {self._mm_settings},\n"
+            f"wait list {self.incoming_data.wait_list}")
 
         self._current_round_pool = set()
         for user, mm_settings in self.incoming_data.incoming_users.items():
@@ -154,13 +160,16 @@ class Matchmaker:
                     # it's a new dude, so his settings are not stored
                     self._mm_settings[user] = mm_settings
             else:
-                # oh no
+                # user's gone for good
                 if user_removed:
-                    self._mm_settings.pop(user, None)
                     logger.info(
                         f"{user} has disconnected from the lobby, "
-                        f"removing his settings "
+                        f"removing his settings, removing from wait list"
                         f"and excluding from the current pool")
+                    if user in self.incoming_data.wait_list:
+                        self.incoming_data.wait_list.remove(user)
+
+                    self._mm_settings.pop(user, None)
                 else:
                     logger.info(
                         f"{user} has received a match and has disconnected "
@@ -202,7 +211,7 @@ class Matchmaker:
 
             self.add_to_graph(user_id, connections)
 
-    def run_matchmaking_round(self) -> Iterator[Match]:
+    def generate_matches(self) -> Iterator[Match]:
         # TODO do we need a copy?
         # building a heap out of all
         with self.incoming_data.user_lock:

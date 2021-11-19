@@ -21,5 +21,7 @@ if settings.SENTRY_MATCHMAKER_URL:
 from swipe.matchmaking import mm_main_server
 
 if __name__ == '__main__':
+    # Yeah, that's a stupid workaround
+    # But we need the matchmaker process to start first
     time.sleep(1)
     asyncio.run(mm_main_server.run_server())

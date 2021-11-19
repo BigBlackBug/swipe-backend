@@ -98,14 +98,17 @@ def match_generator(mm_ws_writer: AioPipeWriter):
                 # TODO think of a more reliable delay between matches
                 logger.info(
                     "--------------------------------------------------")
-                for user_a, user_b in matchmaker.generate_matches():
-                    logger.info(f"Sending match '{user_a}', '{user_b}' "
-                                f"to ws handler")
-                    _mm_ws_writer.write(json.dumps({
-                        'match': [user_a, user_b]
-                    }).encode('utf-8'))
-                    _mm_ws_writer.write(b'\n')
-                    await _mm_ws_writer.drain()
+                try:
+                    for user_a, user_b in matchmaker.run_matchmaking_round():
+                        logger.info(f"Sending match '{user_a}', '{user_b}' "
+                                    f"to ws handler")
+                        _mm_ws_writer.write(json.dumps({
+                            'match': [user_a, user_b]
+                        }).encode('utf-8'))
+                        _mm_ws_writer.write(b'\n')
+                        await _mm_ws_writer.drain()
+                except:
+                    logger.exception("Error during a matchmaking round")
 
                 time_taken = time.time() - cycle_start
                 sleep_time = MIN_ROUND_LENGTH_SECS - time_taken
