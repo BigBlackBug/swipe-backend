@@ -2,6 +2,8 @@ import os
 import sys
 
 # TODO WTF
+import time
+
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from swipe import config
 
@@ -19,4 +21,5 @@ if settings.SENTRY_MATCHMAKER_URL:
 from swipe.matchmaking import mm_main_server
 
 if __name__ == '__main__':
+    time.sleep(1)
     asyncio.run(mm_main_server.run_server())

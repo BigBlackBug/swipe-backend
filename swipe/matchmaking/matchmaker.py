@@ -46,9 +46,12 @@ class HeapItem:
 
 class MMSharedData:
     def __init__(self, incoming_users: dict[str, Optional[MMSettings]],
-                 removed_users: dict[str, bool], user_lock: threading.Lock):
+                 removed_users: dict[str, bool],
+                 wait_list: list[str],
+                 user_lock: threading.Lock):
         self.incoming_users = incoming_users
         self.disconnected_users = removed_users
+        self.wait_list = wait_list
         self.user_lock = user_lock
 
     def add_user(self, user_id: str, mm_settings: Optional[MMSettings] = None):
@@ -60,16 +63,15 @@ class MMSharedData:
             logger.info(
                 f"Adding {user_id} to next round pool, "
                 f"new settings: {mm_settings}")
-            self.incoming_users[user_id] = mm_settings
-            # they might have returned before this round ended
-            # if they clicked decline too fast
             if user_id in self.disconnected_users:
-                # TODO make these dudes skip one round
                 logger.info(f"{user_id} is back before the round ended, "
-                            f"okay, let's put him in this round")
-                del self.disconnected_users[user_id]
+                            f"okay, let's make him skip one round")
+                self.wait_list.append(user_id)
+            else:
+                self.incoming_users[user_id] = mm_settings
 
-        logger.info(f"All incoming users: {self.incoming_users}")
+        logger.info(f"All incoming users: {self.incoming_users}, "
+                    f"skipping a round: {self.wait_list}")
 
     def remove_user(self, user_id: str, remove_settings: bool):
         """
@@ -102,13 +104,20 @@ class Matchmaker:
             self.init_pools()
 
         if len(self._current_round_pool) < 2:
-            logger.info(f"Not enough users for matchmaking in current pool "
-                        f"{self._current_round_pool} "
-                        "moving all to the next pool")
             with self.incoming_data.user_lock:
+                logger.info(
+                    f"Not enough users for matchmaking in current pool "
+                    f"{self._current_round_pool} "
+                    "moving all to the next pool")
                 for user_id in self._current_round_pool:
                     self.incoming_data.incoming_users[user_id] \
                         = self._mm_settings[user_id]
+
+                logger.info(f"Flushing wait_list {self.incoming_data.wait_list}")
+                for user_id in self.incoming_data.wait_list:
+                    self.incoming_data.incoming_users[user_id] \
+                        = self._mm_settings[user_id]
+                self.incoming_data.wait_list[:] = []
 
                 logger.info(f"Next round pool "
                             f"{self.incoming_data.incoming_users}")
@@ -119,6 +128,13 @@ class Matchmaker:
         self.build_graph()
 
         yield from self.run_matchmaking_round()
+
+        with self.incoming_data.user_lock:
+            logger.info(f"Flushing wait_list {self.incoming_data.wait_list}")
+            for user_id in self.incoming_data.wait_list:
+                self.incoming_data.incoming_users[user_id] \
+                    = self._mm_settings[user_id]
+            self.incoming_data.wait_list[:] = []
 
     def init_pools(self):
         logger.info(
@@ -234,7 +250,9 @@ class Matchmaker:
             else:
                 logger.info(f"No matches found for {current_user}, "
                             f"increasing weight, adding to next round pool")
-                self.incoming_data.add_user(current_user_id)
+                self.incoming_data.incoming_users[current_user_id] \
+                    = self._mm_settings[current_user_id]
+
                 self._mm_settings[current_user_id].increase_weight()
 
     def add_to_graph(self, user_id: str, connections: list[UUID]):

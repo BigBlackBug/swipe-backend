@@ -20,7 +20,11 @@ user_event_logger = logging.getLogger('matchmaking.user_events')
 MIN_ROUND_LENGTH_SECS = 5
 
 manager = mp.Manager()
-incoming_data = MMSharedData(manager.dict(), manager.dict(), manager.Lock())
+incoming_data = MMSharedData(
+    incoming_users=manager.dict(),
+    removed_users=manager.dict(),
+    wait_list=manager.list(),
+    user_lock=manager.Lock())
 mm_writer: AioPipeWriter
 mm_reader: AioPipeReader
 # pipe between matchmaker process and the matchmaker main server
