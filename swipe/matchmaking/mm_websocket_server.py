@@ -53,6 +53,8 @@ matchmaker: WS2MMConnection
 sent_matches: dict[str, str] = dict()
 connection_manager = WSConnectionManager()
 
+DECLINE_PAYLOAD = MMMatchPayload(action=MMResponseAction.DECLINE)
+
 
 @app.websocket("/connect/{user_id}")
 async def matchmaker_endpoint(
@@ -98,18 +100,19 @@ async def matchmaker_endpoint(
                     f"from sent matches")
                 sent_matches.pop(match_user_id, None)
 
-                logger.info(f"Sending decline to {match_user_id}, "
-                            f"match of {user_id_str}")
-                await connection_manager.send(
-                    UUID(hex=match_user_id),
-                    MMBasePayload(
-                        sender_id=user_id_str,
-                        recipient_id=match_user_id,
-                        payload=MMMatchPayload(action=MMResponseAction.DECLINE))
-                        .dict(by_alias=True))
+                match_user_uuid = UUID(hex=match_user_id)
+                if match_user_uuid in connection_manager.active_connections:
+                    logger.info(f"Sending decline to {match_user_id}, "
+                                f"match of {user_id_str} and reconnecting "
+                                f"to matchmaker")
+                    await connection_manager.send(
+                        match_user_uuid,
+                        MMBasePayload(
+                            sender_id=user_id_str,
+                            recipient_id=match_user_id,
+                            payload=DECLINE_PAYLOAD).dict(by_alias=True))
 
-                logger.info(f"Reconnecting {match_user_id} to matchmaker")
-                await matchmaker.reconnect(match_user_id)
+                    await matchmaker.reconnect(match_user_id)
             return
 
         try:
@@ -163,7 +166,6 @@ async def _send_match_data(user_a_id: str, user_b_id: str):
     user_a_uuid = UUID(hex=user_a_id)
     user_b_uuid = UUID(hex=user_b_id)
 
-    decline_payload = MMMatchPayload(action=MMResponseAction.DECLINE)
     if connection_manager.is_connected(user_a_uuid):
         if connection_manager.is_connected(user_b_uuid):
             # both connected
@@ -187,7 +189,7 @@ async def _send_match_data(user_a_id: str, user_b_id: str):
                 MMBasePayload(
                     sender_id=user_b_id,
                     recipient_id=user_a_id,
-                    payload=decline_payload).dict(by_alias=True))
+                    payload=DECLINE_PAYLOAD).dict(by_alias=True))
     elif connection_manager.is_connected(user_b_uuid):
         logger.info(f"{user_a_uuid} is gone, "
                     f"sending decline to {user_b_uuid}")
@@ -197,7 +199,7 @@ async def _send_match_data(user_a_id: str, user_b_id: str):
             MMBasePayload(
                 sender_id=user_a_id,
                 recipient_id=user_b_id,
-                payload=decline_payload).dict(by_alias=True))
+                payload=DECLINE_PAYLOAD).dict(by_alias=True))
 
 
 async def match_sender(mm_reader: StreamReader):
