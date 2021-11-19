@@ -23,7 +23,7 @@ manager = mp.Manager()
 incoming_data = MMSharedData(
     incoming_users=manager.dict(),
     removed_users=manager.dict(),
-    wait_list=manager.list(),
+    wait_list=manager.dict(),
     user_lock=manager.Lock())
 mm_writer: AioPipeWriter
 mm_reader: AioPipeReader
@@ -73,7 +73,8 @@ async def user_event_handler(reader: StreamReader):
             mm_settings = MMSettings.parse_obj(user_event['settings'])
 
             user_event_logger.info(
-                f"Connecting {user_id} to next round pool, {mm_settings}")
+                f"Connecting {user_id} to matchmaking, "
+                f"settings: {mm_settings}")
             incoming_data.add_user(user_id, mm_settings)
         elif user_event['operation'] == 'reconnect':
             user_event_logger.info(f"{user_id} got a decline, "

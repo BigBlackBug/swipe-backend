@@ -47,7 +47,7 @@ class HeapItem:
 class MMSharedData:
     def __init__(self, incoming_users: dict[str, Optional[MMSettings]],
                  removed_users: dict[str, bool],
-                 wait_list: list[str],
+                 wait_list: dict[str, MMSettings],
                  user_lock: threading.Lock):
         self.incoming_users = incoming_users
         self.disconnected_users = removed_users
@@ -60,31 +60,35 @@ class MMSharedData:
         If `mm_settings` is None, he's a returning user
         """
         with self.user_lock:
-            logger.info(
-                f"Adding {user_id} to next round pool, "
-                f"new settings: {mm_settings}")
             if user_id in self.disconnected_users:
                 logger.info(f"{user_id} is back before the round ended, "
-                            f"okay, let's make him skip one round")
-                self.wait_list.append(user_id)
+                            f"putting him to wait list")
+                self.wait_list[user_id] = mm_settings
             else:
+                logger.info(
+                    f"Adding {user_id} to incoming users, "
+                    f"new settings: {mm_settings}")
                 self.incoming_users[user_id] = mm_settings
 
         logger.info(f"All incoming users: {self.incoming_users}, "
-                    f"skipping a round: {self.wait_list}")
+                    f"wait list: {self.wait_list}")
 
     def remove_user(self, user_id: str, remove_settings: bool):
         """
         Called when the user disconnects from the MM server, meaning
         he either accepted a match or gone from the lobby
         """
-        logger.info(f"Adding {user_id} to disconnected "
+        logger.info(f"Adding {user_id} to disconnected, "
+                    f"remove_settings: {remove_settings} "
                     f"and removing from wait list")
         with self.user_lock:
             self.disconnected_users[user_id] = remove_settings
-            if user_id in self.wait_list:
-                # TODO make it a dict
-                self.wait_list.remove(user_id)
+            self.wait_list.pop(user_id, None)
+
+    def flush_wait_list(self):
+        logger.info(f"Flushing wait_list {self.wait_list}")
+        self.incoming_users.update(self.wait_list)
+        self.wait_list.clear()
 
 
 class Matchmaker:
@@ -117,11 +121,7 @@ class Matchmaker:
                     self.incoming_data.incoming_users[user_id] \
                         = self._mm_settings[user_id]
 
-                logger.info(f"Flushing wait_list {self.incoming_data.wait_list}")
-                for user_id in self.incoming_data.wait_list:
-                    self.incoming_data.incoming_users[user_id] \
-                        = self._mm_settings[user_id]
-                self.incoming_data.wait_list[:] = []
+                self.incoming_data.flush_wait_list()
 
                 logger.info(f"Next round pool "
                             f"{self.incoming_data.incoming_users}")
@@ -134,11 +134,7 @@ class Matchmaker:
         yield from self.generate_matches()
 
         with self.incoming_data.user_lock:
-            logger.info(f"Flushing wait_list {self.incoming_data.wait_list}")
-            for user_id in self.incoming_data.wait_list:
-                self.incoming_data.incoming_users[user_id] \
-                    = self._mm_settings[user_id]
-            self.incoming_data.wait_list[:] = []
+            self.incoming_data.flush_wait_list()
 
     def init_pools(self):
         logger.info(
@@ -166,9 +162,7 @@ class Matchmaker:
                         f"{user} has disconnected from the lobby, "
                         f"removing his settings, removing from wait list"
                         f"and excluding from the current pool")
-                    if user in self.incoming_data.wait_list:
-                        self.incoming_data.wait_list.remove(user)
-
+                    self.incoming_data.wait_list.pop(user, None)
                     self._mm_settings.pop(user, None)
                 else:
                     logger.info(
