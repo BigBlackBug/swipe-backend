@@ -83,7 +83,7 @@ async def matchmaker_endpoint(
                         f"removing him from matchmaking")
 
             user_id_str = str(user_id)
-            await matchmaker.disconnect(user_id_str)
+            await matchmaker.disconnect(user_id_str, remove_settings=True)
             await connection_manager.disconnect(user_id)
 
             # we need to keep track of sent matches so that we could
@@ -223,6 +223,7 @@ async def connect_to_matchmaker():
     logger.info("Connecting to matchmaker server")
     reader, writer = await asyncio.open_connection(
         settings.MATCHMAKER_HOST, settings.MATCHMAKER_PORT, loop=loop)
+    logger.info("Connected to matchmaking server")
     global matchmaker
     matchmaker = WS2MMConnection(writer)
 

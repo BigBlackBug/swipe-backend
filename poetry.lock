@@ -1,4 +1,15 @@
 [[package]]
+name = "aiopipe"
+version = "0.2.2"
+description = "Multiprocess communication pipes for asyncio"
+category = "main"
+optional = false
+python-versions = "~=3.7"
+
+[package.extras]
+dev = ["tox (>=3.9,<4.0)"]
+
+[[package]]
 name = "aioredis"
 version = "2.0.0"
 description = "asyncio (PEP 3156) Redis support"
@@ -1159,9 +1170,13 @@ python-versions = ">=3.7"
 [metadata]
 lock-version = "1.1"
 python-versions = "3.9.7"
-content-hash = "3852fcc5143672f9a2a07c67c5544e00033abe4ddb8974a2655703b7efd90d8b"
+content-hash = "a003f068a60a309bbc190a4210b06979a58ec96c79f082dedfdf80e5dca41733"
 
 [metadata.files]
+aiopipe = [
+    {file = "aiopipe-0.2.2-py3-none-any.whl", hash = "sha256:4796341a4352167452e436f77696e5596ebf9728eb4e4adbc02c8bb66d3349ed"},
+    {file = "aiopipe-0.2.2.tar.gz", hash = "sha256:666282e6e94b8bbd3a49330cd5d4ac95dc217a0d7c2597fb3f43753893a3154d"},
+]
 aioredis = [
     {file = "aioredis-2.0.0-py3-none-any.whl", hash = "sha256:9921d68a3df5c5cdb0d5b49ad4fc88a4cfdd60c108325df4f0066e8410c55ffb"},
     {file = "aioredis-2.0.0.tar.gz", hash = "sha256:3a2de4b614e6a5f8e104238924294dc4e811aefbe17ddf52c04a93cbf06e67db"},

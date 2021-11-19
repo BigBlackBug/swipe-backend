@@ -1,25 +1,15 @@
-import asyncio
 import heapq
-import json
 import logging
 import threading
-import time
-from asyncio import StreamReader, StreamWriter
 from dataclasses import dataclass
 from typing import Optional, Iterator
 from uuid import UUID
 
-from swipe.matchmaking.connections import MM2WSConnection
 from swipe.matchmaking.schemas import Match, MMSettings
 from swipe.matchmaking.services import MMUserService
-from swipe.settings import settings
-from swipe.swipe_server.misc.database import SessionLocal
 from swipe.swipe_server.users.models import IDList
 
 logger = logging.getLogger('matchmaker')
-user_event_logger = logging.getLogger('user_event')
-
-MIN_ROUND_LENGTH_SECS = 5
 
 
 class Vertex:
@@ -54,36 +44,74 @@ class HeapItem:
         return f"'{self.user_id}' weight: {self.weight}"
 
 
+class MMSharedData:
+    def __init__(self, incoming_users: dict[str, Optional[MMSettings]],
+                 removed_users: dict[str, bool], user_lock: threading.Lock):
+        self.incoming_users = incoming_users
+        self.disconnected_users = removed_users
+        self.user_lock = user_lock
+
+    def add_user(self, user_id: str, mm_settings: Optional[MMSettings] = None):
+        """
+        Adds a user to the next round pool.
+        If `mm_settings` is None, he's a returning user
+        """
+        with self.user_lock:
+            logger.info(
+                f"Adding {user_id} to next round pool, "
+                f"new settings: {mm_settings}")
+            self.incoming_users[user_id] = mm_settings
+            # they might have returned before this round ended
+            # if they clicked decline too fast
+            if user_id in self.disconnected_users:
+                # TODO make these dudes skip one round
+                logger.info(f"{user_id} is back before the round ended, "
+                            f"okay, let's put him in this round")
+                del self.disconnected_users[user_id]
+
+        logger.info(f"All incoming users: {self.incoming_users}")
+
+    def remove_user(self, user_id: str, remove_settings: bool):
+        """
+        Called when the user disconnects from the MM server, meaning
+        he either accepted a match or gone from the lobby
+        """
+        logger.info(f"Adding {user_id} to disconnected")
+        with self.user_lock:
+            self.disconnected_users[user_id] = remove_settings
+
+
 class Matchmaker:
-    def __init__(self, user_service: MMUserService):
+    def __init__(self, incoming_data: MMSharedData,
+                 user_service: MMUserService):
         self._user_service = user_service
 
+        self.incoming_data = incoming_data
         # stores settings for users who haven't found a match yet
         # item removed when a match is found and accepted
         self._mm_settings: dict[str, MMSettings] = {}
 
         self._current_round_pool: set[str] = set()
-        self._next_round_pool: set[str] = set()
 
         # a -> {b->{a:True, c:False}}, c->{b:False}}
         self._connection_graph: dict[str, Vertex] = {}
-        # users that are gone during current round
-        self._disconnected_users = set()
-
-        self._pool_update_lock = threading.Lock()
 
     def generate_matches(self) -> Iterator[Match]:
         logger.info("Round started")
-        with self._pool_update_lock:
+        with self.incoming_data.user_lock:
             self.init_pools()
 
         if len(self._current_round_pool) < 2:
             logger.info(f"Not enough users for matchmaking in current pool "
                         f"{self._current_round_pool} "
                         "moving all to the next pool")
-            with self._pool_update_lock:
-                self._next_round_pool.update(self._current_round_pool)
-            logger.info(f"Next round pool {self._next_round_pool}")
+            with self.incoming_data.user_lock:
+                for user_id in self._current_round_pool:
+                    self.incoming_data.incoming_users[user_id] \
+                        = self._mm_settings[user_id]
+
+                logger.info(f"Next round pool "
+                            f"{self.incoming_data.incoming_users}")
             # TODO send a signal to clients about that? like no more users?
             return
 
@@ -92,36 +120,47 @@ class Matchmaker:
 
         yield from self.run_matchmaking_round()
 
-        logger.info("Round finished, locking and clearing settings")
-        # TODO when do I clear settings?
-        # with self._user_lock:
-        #     for user_id in self._disconnected_users:
-        #         logger.info(f"Removing {user_id} from settings")
-        #         del self._mm_settings[user_id]
-        logger.info("Unlocking")
-
     def init_pools(self):
-        logger.info(f"Initializing pools, users "
-                    f"in the next round pool: {self._next_round_pool}")
-        self._current_round_pool = set()
-        # TODO are str passed by value?
-        for user in self._next_round_pool:
-            if user not in self._disconnected_users:
-                self._current_round_pool.add(user)
-            else:
-                logger.info(
-                    f"{user} has disconnected before the round started, "
-                    f"not including him in the current pool")
+        logger.info(
+            f"Initializing pools, users in the next round pool: "
+            f"{self.incoming_data.incoming_users}, "
+            f"disconnected users {self.incoming_data.disconnected_users},"
+            f"settings {self._mm_settings}")
 
-        self._next_round_pool = set()
-        self._disconnected_users = set()
+        self._current_round_pool = set()
+        for user, mm_settings in self.incoming_data.incoming_users.items():
+            # True if the user is gone for good and I should remove his settings
+            user_removed = self.incoming_data.disconnected_users.get(user)
+            if user_removed is None:
+                # he's still here
+                self._current_round_pool.add(user)
+                if mm_settings:
+                    # it's a new dude, so his settings are not stored
+                    self._mm_settings[user] = mm_settings
+            else:
+                # oh no
+                if user_removed:
+                    self._mm_settings.pop(user, None)
+                    logger.info(
+                        f"{user} has disconnected from the lobby, "
+                        f"removing his settings "
+                        f"and excluding from the current pool")
+                else:
+                    logger.info(
+                        f"{user} has received a match and has disconnected "
+                        f"from matchmaking, "
+                        f"not including him in the current pool")
+
+        self.incoming_data.incoming_users.clear()
+        self.incoming_data.disconnected_users.clear()
 
     def build_graph(self):
         logger.info(f"Building graph from "
                     f"current pool: {self._current_round_pool}")
         for user_id in self._current_round_pool:
-            if user_id in self._disconnected_users:
-                logger.info(f"Skipping {user_id} because he's gone")
+            if user_id in self.incoming_data.disconnected_users:
+                logger.info(f"Skipping {user_id} because he's gone "
+                            f"from the current round")
                 continue
 
             mm_settings = self._mm_settings[user_id]
@@ -150,12 +189,12 @@ class Matchmaker:
     def run_matchmaking_round(self) -> Iterator[Match]:
         # TODO do we need a copy?
         # building a heap out of all
-        with self._pool_update_lock:
+        with self.incoming_data.user_lock:
             logger.info("Locking and building current round heap")
             current_round_heap: list[HeapItem] = [
                 HeapItem(user, self._mm_settings[user].current_weight)
                 for user in self._current_round_pool
-                if user not in self._disconnected_users
+                if user not in self.incoming_data.disconnected_users
             ]
             heapq.heapify(current_round_heap)
         logger.info("Lock released")
@@ -187,38 +226,16 @@ class Matchmaker:
                 # remove both from next round
                 logger.info(f"Adding {match} and {current_user_id} "
                             f"to disconnected")
-                self._disconnected_users.add(current_user_id)
-                self._disconnected_users.add(match)
+                with self.incoming_data.user_lock:
+                    self.incoming_data.disconnected_users[
+                        current_user_id] = False
+                    self.incoming_data.disconnected_users[match] = False
                 yield current_user_id, match
             else:
                 logger.info(f"No matches found for {current_user}, "
                             f"increasing weight, adding to next round pool")
-                self.add_user(current_user_id)
+                self.incoming_data.add_user(current_user_id)
                 self._mm_settings[current_user_id].increase_weight()
-
-    def remove_user(self, user_id: str):
-        """
-        Called when the user disconnects from the MM server, meaning
-        he either accepted a match or gone from the lobby
-        """
-        logger.info(f"User {user_id} disconnected from server")
-        self._disconnected_users.add(user_id)
-
-    def add_user(self, user_id: str, mm_settings: Optional[MMSettings] = None):
-        """
-        Adds a user to the next round pool.
-        If `mm_settings` is None, he's a returning user
-        """
-        with self._pool_update_lock:
-            self._next_round_pool.add(user_id)
-            # they might have returned before this round ended, HOW?
-            if user_id in self._disconnected_users:
-                self._disconnected_users.remove(user_id)
-
-            if mm_settings:
-                self._mm_settings[user_id] = mm_settings
-
-        logger.info(f"Next round pool {self._next_round_pool}")
 
     def add_to_graph(self, user_id: str, connections: list[UUID]):
         vertex = Vertex(user_id)
@@ -259,65 +276,3 @@ class Matchmaker:
 
     def get_vertex(self, user_a):
         return self._connection_graph[user_a]
-
-
-async def run_server():
-    server = await asyncio.start_server(
-        _request_handler, settings.MATCHMAKER_HOST, settings.MATCHMAKER_PORT)
-    async with server:
-        await server.serve_forever()
-
-
-async def _request_handler(reader: StreamReader, writer: StreamWriter):
-    logger.info("Starting the matchmaker server")
-    matchmaker = Matchmaker(MMUserService(SessionLocal()))
-    loop = asyncio.get_running_loop()
-    loop.create_task(match_generator(writer, matchmaker))
-    loop.create_task(user_event_handler(reader, matchmaker))
-
-
-async def user_event_handler(reader: StreamReader, matchmaker: Matchmaker):
-    user_event_logger.info("Starting user event reader")
-
-    while True:
-        event_data_raw = await reader.readline()
-        if not event_data_raw:
-            # TODO kill matchmaker loop
-            user_event_logger.exception("Matchmaking WS server died")
-            break
-
-        user_event = json.loads(event_data_raw)
-
-        user_id = user_event['user_id']
-        if user_event['operation'] == 'connect':
-            mm_settings = MMSettings.parse_obj(user_event['settings'])
-
-            user_event_logger.info(
-                f"Connecting {user_id} to next round pool, {mm_settings}")
-            matchmaker.add_user(user_id, mm_settings)
-        elif user_event['operation'] == 'reconnect':
-            user_event_logger.info(f"Reconnecting {user_id} to next round pool")
-            matchmaker.add_user(user_id)
-        elif user_event['operation'] == 'disconnect':
-            user_event_logger.info(f"Removing {user_id} from machmaking")
-            matchmaker.remove_user(user_id)
-
-
-async def match_generator(writer: StreamWriter, matchmaker: Matchmaker):
-    logger.info("Starting match generator")
-
-    ws_connection = MM2WSConnection(writer)
-    while True:
-        cycle_start = time.time()
-
-        # TODO think of a more reliable delay between matches
-        logger.info("--------------------------------------------------")
-        for user_a, user_b in matchmaker.generate_matches():
-            await ws_connection.send_match(user_a, user_b)
-
-        time_taken = time.time() - cycle_start
-        sleep_time = MIN_ROUND_LENGTH_SECS - time_taken
-        logger.info(
-            f"Round took {time_taken}s, "
-            f"time till the next cycle: {sleep_time}")
-        await asyncio.sleep(sleep_time)

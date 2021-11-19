@@ -9,7 +9,7 @@ from swipe import config
 
 config.configure_logging()
 from swipe.settings import settings
-from swipe.matchmaking import server as matchmaking_server
+from swipe.matchmaking import mm_websocket_server as matchmaking_server
 
 if settings.SENTRY_MATCHMAKING_SERVER_URL:
     sentry_sdk.init(

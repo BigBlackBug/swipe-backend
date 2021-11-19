@@ -16,7 +16,7 @@ if settings.SENTRY_MATCHMAKER_URL:
         # TODO change in prod
         traces_sample_rate=settings.SENTRY_SAMPLE_RATE
     )
-from swipe.matchmaking import matchmaker
+from swipe.matchmaking import mm_main_server
 
 if __name__ == '__main__':
-    asyncio.run(matchmaker.run_server())
+    asyncio.run(mm_main_server.run_server())
