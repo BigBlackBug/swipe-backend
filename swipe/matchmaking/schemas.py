@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import datetime
 from enum import Enum
 from typing import Union, Type, Tuple, Any, Optional
-from uuid import UUID
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 
 from swipe.swipe_server.users.enums import Gender
 
@@ -46,7 +44,7 @@ class MMBasePayload(BaseModel):
     sender_id: str
     recipient_id: Optional[str] = None
     payload: Union[
-        MMSDPPayload, MMMatchPayload, MMICEPayload, MMLobbyPayload
+        MMLobbyPayload, MMSDPPayload, MMMatchPayload, MMICEPayload
     ]
 
     @classmethod
@@ -66,24 +64,6 @@ class MMBasePayload(BaseModel):
         payload_type = cls.payload_type(value['payload']['type'])
         result.payload = payload_type.parse_obj(value['payload'])
         return result
-
-
-class MMPreview(BaseModel):
-    id: UUID
-    date_of_birth: datetime.date
-    age: Optional[int]
-
-    @validator('age', pre=True, always=True)
-    def validate_age(cls, value: int,
-                     values: dict[str, Any]):
-        # TODO WTF!!! make a listener event on the model which sets the field
-        value = int((datetime.date.today()
-                     - values['date_of_birth']).days / 365)
-        values['age'] = value
-        return value
-
-    class Config:
-        orm_mode = True
 
 
 class MMSettings(BaseModel):

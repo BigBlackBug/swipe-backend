@@ -16,6 +16,7 @@ from swipe.swipe_server.chats.models import MessageStatus, ChatSource, \
     ChatStatus
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.errors import SwipeError
+from swipe.swipe_server.users.enums import Gender
 
 logger = logging.getLogger(__name__)
 
@@ -118,25 +119,24 @@ class PayloadEncoder(json.JSONEncoder):
 
 @dataclass
 class ConnectedUser:
-    user_id: UUID
+    user_id: str
     connection: WebSocket
-    name: str = None
-    avatar: Optional[bytes] = None
     age: Optional[int] = None
+    gender_filter: Optional[Gender] = None
 
 
 class WSConnectionManager:
-    active_connections: dict[UUID, ConnectedUser] = {}
+    active_connections: dict[str, ConnectedUser] = {}
 
     async def connect(self, user: ConnectedUser):
         await user.connection.accept()
         self.active_connections[user.user_id] = user
 
-    async def disconnect(self, user_id: UUID):
+    async def disconnect(self, user_id: str):
         if user_id in self.active_connections:
             del self.active_connections[user_id]
 
-    async def send(self, user_id: UUID, payload: dict):
+    async def send(self, user_id: str, payload: dict):
         logger.info(f"Sending payload {payload} to {user_id}")
         if user_id not in self.active_connections:
             logger.info(f"{user_id} is not online, payload won't be sent")
@@ -145,7 +145,7 @@ class WSConnectionManager:
         await self.active_connections[user_id].connection.send_text(
             json.dumps(payload, cls=PayloadEncoder))
 
-    async def broadcast(self, sender_id: UUID, payload: dict):
+    async def broadcast(self, sender_id: str, payload: dict):
         for user_id, user in self.active_connections.items():
             if user_id == sender_id:
                 continue
@@ -153,5 +153,5 @@ class WSConnectionManager:
             await user.connection.send_text(
                 json.dumps(payload, cls=PayloadEncoder))
 
-    def is_connected(self, user_id: UUID):
+    def is_connected(self, user_id: str):
         return user_id in self.active_connections

@@ -40,6 +40,6 @@ class MMUserService:
             where(~User.blocked_by.any(id=current_user_id))
         return self.db.execute(query).scalars().all()
 
-    def get_matchmaking_preview(self, user_id: UUID):
-        return self.db.execute(select(User.id, User.date_of_birth).
-                               where(User.id == user_id)).one_or_none()
+    def user_exists(self, user_id: str):
+        return self.db.execute(
+            select(User.id).where(User.id == user_id)).one_or_none() is not None
