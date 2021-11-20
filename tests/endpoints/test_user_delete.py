@@ -1,6 +1,6 @@
 import datetime
 import uuid
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 from uuid import UUID
 
 import pytest
@@ -36,8 +36,12 @@ async def test_user_delete(
     await client.delete(
         f"{settings.API_V1_PREFIX}/me",
         headers=default_user_auth_headers)
+    calls = []
     for photo in photos:
-        mock_user_storage.delete_image.assert_called_with(photo)
+        calls.append(call(photo))
+    calls.append(call(default_user.avatar_id))
+    mock_user_storage.delete_image.assert_has_calls(
+        calls, any_order=True)
 
     assert not user_service.get_user(default_user.id)
     assert not session.execute(
@@ -91,8 +95,13 @@ async def test_user_delete_with_chats(
         f"{settings.API_V1_PREFIX}/me",
         headers=default_user_auth_headers)
 
+    calls = []
     for photo in photos:
-        mock_user_storage.delete_image.assert_called_with(photo)
+        calls.append(call(photo))
+    calls.append(call(default_user.avatar_id))
+    mock_user_storage.delete_image.assert_has_calls(
+        calls, any_order=True)
+
     mock_chat_storage.delete_chat_image.assert_called_with('345345.png')
 
     assert not user_service.get_user(default_user.id)
@@ -147,8 +156,12 @@ async def test_user_delete_with_global(
         f"{settings.API_V1_PREFIX}/me",
         headers=default_user_auth_headers)
 
+    calls = []
     for photo in photos:
-        mock_user_storage.delete_image.assert_called_with(photo)
+        calls.append(call(photo))
+    calls.append(call(default_user.avatar_id))
+    mock_user_storage.delete_image.assert_has_calls(
+        calls, any_order=True)
 
     assert not user_service.get_user(default_user.id)
     assert not session.execute(

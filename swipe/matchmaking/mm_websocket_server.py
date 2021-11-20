@@ -13,7 +13,8 @@ from starlette.websockets import WebSocketDisconnect
 from uvicorn import Config, Server
 
 import swipe.swipe_server.misc.database as database
-from swipe.chat_server.services import ConnectedUser, WSConnectionManager
+from swipe.chat_server.services import ConnectedUser, WSConnectionManager, \
+    MMUserData
 from swipe.matchmaking.connections import WS2MMConnection
 from swipe.matchmaking.schemas import MMBasePayload, MMMatchPayload, \
     MMResponseAction, MMLobbyPayload, MMLobbyAction, MMSettings
@@ -67,6 +68,7 @@ async def matchmaker_endpoint(user_id: str, websocket: WebSocket,
     except ValueError:
         logger.exception(f"Invalid user id: {user_id}")
         await websocket.close(1003)
+        return
 
     with database.session_context() as db:
         user_service = MMUserService(db)
@@ -81,7 +83,8 @@ async def matchmaker_endpoint(user_id: str, websocket: WebSocket,
     logger.info(f"{user_id}, rounded age: {age} "
                 f"connected with filter: {gender}")
 
-    user = ConnectedUser(user_id=user_id, age=age, connection=websocket)
+    user = ConnectedUser(user_id=user_id, connection=websocket,
+                         data=MMUserData(age=age, gender_filter=gender))
     await connection_manager.connect(user)
 
     while True:
@@ -124,7 +127,7 @@ async def matchmaker_endpoint(user_id: str, websocket: WebSocket,
 
         try:
             base_payload: MMBasePayload = MMBasePayload.validate(data)
-            await _process_payload(base_payload, user)
+            await _process_payload(base_payload, user.data)
 
             if base_payload.recipient_id:
                 await connection_manager.send(
@@ -134,7 +137,7 @@ async def matchmaker_endpoint(user_id: str, websocket: WebSocket,
             logger.exception(f"Error processing payload from {user_id}")
 
 
-async def _process_payload(base_payload: MMBasePayload, user: ConnectedUser):
+async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData):
     data_payload = base_payload.payload
     sender_id = base_payload.sender_id
     recipient_id = base_payload.recipient_id
@@ -160,7 +163,7 @@ async def _process_payload(base_payload: MMBasePayload, user: ConnectedUser):
             # user joined or pressed next, connect to matchmaking
             logger.info(f"Connecting {sender_id} to matchmaking")
             await matchmaker.connect(sender_id, settings=MMSettings(
-                age=user.age, gender=user.gender_filter))
+                age=user_data.age, gender=user_data.gender_filter))
         elif data_payload.action == MMLobbyAction.DISCONNECT:
             # call has started, disconnect from matchmaking
             logger.info(f"Call has started, disconnecting "

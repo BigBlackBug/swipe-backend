@@ -172,6 +172,7 @@ def default_user(randomizer: RandomEntityGenerator,
     new_user = randomizer.generate_random_user()
     new_user.name = 'default_user'
     new_user.photos = ['default_photo.png']
+    new_user.avatar_id = 'whatever_avatar.png'
     session.commit()
     return new_user
 

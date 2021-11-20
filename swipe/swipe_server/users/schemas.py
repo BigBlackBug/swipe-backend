@@ -162,7 +162,18 @@ class UserOutChatPreviewORM(BaseModel):
 class UserOutGlobalChatPreviewORM(BaseModel):
     id: UUID
     name: str
-    avatar: Optional[bytes]
+    avatar_id: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+    @classmethod
+    def patched_from_orm(cls: UserOutGlobalChatPreviewORM,
+                         obj: User | Row) -> UserOutGlobalChatPreviewORM:
+        orm_schema = UserOutGlobalChatPreviewORM.from_orm(obj)
+        schema_obj = cls.parse_obj(orm_schema)
+        if schema_obj.avatar_id:
+            schema_obj.avatar_url = \
+                storage_client.get_image_url(schema_obj.avatar_id)
+        return schema_obj
 
     class Config:
         orm_mode = True

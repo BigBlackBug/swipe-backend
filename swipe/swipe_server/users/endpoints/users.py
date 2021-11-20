@@ -127,18 +127,3 @@ async def fetch_user(
     user = user_service.get_user(user_id)
     user_out: UserOut = UserOut.patched_from_orm(user)
     return user_out
-
-
-@router.get(
-    '/{user_id}/preview',
-    name='Get users global chat preview',
-    response_model=UserOutGlobalChatPreviewORM)
-async def fetch_user_preview(
-        user_id: UUID,
-        user_service: UserService = Depends(),
-        current_user: User = Depends(security.get_current_user)):
-    user_preview = user_service.get_global_chat_preview_one(user_id)
-    if not user_preview:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f'User {user_id} not found')
-    return user_preview

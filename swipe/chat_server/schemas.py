@@ -72,7 +72,7 @@ class UserJoinPayloadOut(BaseModel):
     type_: str = Field('join', alias='type', const=True)
     user_id: UUID
     name: str
-    avatar: bytes
+    avatar_url: str
 
 
 class BasePayload(BaseModel):

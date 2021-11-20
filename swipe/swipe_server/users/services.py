@@ -159,11 +159,11 @@ class UserService:
             self, user_ids: Optional[IDList] = None) -> list[Row]:
         clause = True if user_ids is None else User.id.in_(user_ids)
         return self.db.execute(
-            select(User.id, User.name, User.avatar).where(clause)).all()
+            select(User.id, User.name, User.avatar_id).where(clause)).all()
 
     def get_global_chat_preview_one(self, user_id: UUID) -> Optional[Row]:
         return self.db.execute(
-            select(User.id, User.name, User.avatar).
+            select(User.id, User.name, User.avatar_id).
                 where(User.id == user_id)).one_or_none()
 
     def update_user(
@@ -176,10 +176,13 @@ class UserService:
             else:
                 setattr(user_object, k, v)
                 if k == 'photos':
+                    logger.info(f"Deleting old avatar image "
+                                f"{user_object.avatar_id}")
+                    storage_client.delete_image(user_object.avatar_id)
                     if len(v) > 0:
                         self._update_avatar(user_object, photo_id=v[0])
                     else:
-                        user_object.avatar = None
+                        user_object.avatar_id = None
         self.db.commit()
         self.db.refresh(user_object)
         return user_object
@@ -193,8 +196,11 @@ class UserService:
             raise SwipeError(
                 "Either photo_id or image_content must be provided")
 
+        avatar_id = f'{uuid.uuid4()}.png'
+
         compressed_image = utils.compress_image(image_content)
-        user.avatar = base64.b64encode(compressed_image)
+        storage_client.upload_image(avatar_id, compressed_image)
+        user.avatar_id = avatar_id
 
     def add_photo(self, user_object: User, file_content: bytes,
                   extension: str) -> str:

@@ -9,9 +9,9 @@ from pydantic import BaseModel
 from starlette.websockets import WebSocketDisconnect
 
 from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
-    UserJoinPayloadOut, MessagePayload, CreateChatPayload
+    MessagePayload, CreateChatPayload
 from swipe.chat_server.services import ChatServerRequestProcessor, \
-    ConnectedUser, WSConnectionManager
+    WSConnectionManager, ConnectedUser, ChatUserData
 from swipe.swipe_server.users.schemas import UserOutGlobalChatPreviewORM
 from swipe.swipe_server.users.services import UserService, RedisUserService
 
@@ -46,30 +46,41 @@ async def docs(json_data: BasePayload = Body(..., examples={
 
 @app.websocket("/connect/{user_id}")
 async def websocket_endpoint(
-        user_id: UUID,
+        user_id: str,
         websocket: WebSocket,
         connection_manager: WSConnectionManager = Depends(),
         user_service: UserService = Depends(),
         redis_service: RedisUserService = Depends(),
         request_processor: ChatServerRequestProcessor = Depends()):
-    if (user := user_service.get_global_chat_preview_one(user_id)) is None:
+    try:
+        user_uuid = UUID(hex=user_id)
+    except ValueError:
+        logger.exception(f"Invalid user id: {user_id}")
+        await websocket.close(1003)
+        return
+
+    if (user := user_service.get_global_chat_preview_one(user_uuid)) is None:
         logger.info(f"User {user_id} not found")
         await websocket.close(1003)
         return
 
-    user = UserOutGlobalChatPreviewORM.from_orm(user)
-    user = ConnectedUser(user_id=user_id, name=user.name,
-                         avatar=user.avatar, connection=websocket)
+    user = UserOutGlobalChatPreviewORM.patched_from_orm(user)
+    user = ConnectedUser(
+        user_id=user_id, connection=websocket,
+        data=ChatUserData(name=user.name, avatar_url=user.avatar_url))
 
     await connection_manager.connect(user)
-    await redis_service.refresh_online_status(user_id)
+    await redis_service.refresh_online_status(user_uuid)
 
     logger.info(f"{user_id} connected from {websocket.client}, "
                 f"sending join event")
-    # TODO WTF, don't push avatars
     await connection_manager.broadcast(
-        user_id,
-        UserJoinPayloadOut.parse_obj(user.__dict__).dict(by_alias=True))
+        user_id, {
+            'type': 'join',
+            'user_id': user.user_id,
+            'name': user.data.name,
+            'avatar_url': user.data.avatar_url
+        })
 
     while True:
         try:
@@ -78,7 +89,7 @@ async def websocket_endpoint(
         except WebSocketDisconnect as e:
             logger.exception(f"{user_id} disconnected with code {e.code}")
             await connection_manager.disconnect(user_id)
-            await redis_service.remove_online_user(user_id)
+            await redis_service.remove_online_user(user_uuid)
             break
 
         try:
@@ -88,7 +99,7 @@ async def websocket_endpoint(
             request_processor.process(payload)
             if isinstance(payload.payload, GlobalMessagePayload):
                 await connection_manager.broadcast(
-                    payload.sender_id, payload.dict(
+                    str(payload.sender_id), payload.dict(
                         by_alias=True, exclude_unset=True))
             else:
                 await _send_payload(payload, connection_manager, user_service)
@@ -103,7 +114,7 @@ async def _send_payload(payload: BasePayload,
     out_payload = payload.dict(by_alias=True, exclude_unset=True)
 
     # sending message/create_chat to offline users
-    if not connection_manager.is_connected(recipient_id):
+    if not connection_manager.is_connected(str(recipient_id)):
         if isinstance(payload.payload, MessagePayload) \
                 or isinstance(payload.payload, CreateChatPayload):
             logger.info(
@@ -120,4 +131,4 @@ async def _send_payload(payload: BasePayload,
             firebase.send(firebase.Message(
                 data=out_payload, token=firebase_token))
     else:
-        await connection_manager.send(recipient_id, out_payload)
+        await connection_manager.send(str(recipient_id), out_payload)

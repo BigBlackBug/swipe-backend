@@ -50,6 +50,9 @@ async def test_user_update_photo_list(
     default_user.photos = ['photo_1.png', 'photo_2.png']
     session.commit()
 
+    old_avatar_id = default_user.avatar_id
+    mock_storage: MagicMock = \
+        mocker.patch('swipe.swipe_server.users.services.storage_client')
     update_avatar_mock = MagicMock()
     mocker.patch('swipe.swipe_server.users.services.UserService._update_avatar',
                  update_avatar_mock)
@@ -62,6 +65,7 @@ async def test_user_update_photo_list(
         })
     assert response.status_code == 200
     update_avatar_mock.assert_called_with(default_user, photo_id='photo_2.png')
+    mock_storage.delete_image.assert_called_with(old_avatar_id)
 
 
 @pytest.mark.anyio

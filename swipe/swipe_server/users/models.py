@@ -4,7 +4,7 @@ import logging
 import uuid
 
 from sqlalchemy import Column, String, Boolean, Integer, Enum, ARRAY, \
-    ForeignKey, Date, UniqueConstraint, select, Table, LargeBinary
+    ForeignKey, Date, UniqueConstraint, select, Table
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, object_session
 
@@ -50,8 +50,7 @@ class User(ModelBase):
 
     interests = Column(ARRAY(Enum(UserInterests)), nullable=False, default=[])
     photos = Column(ARRAY(String(50)), nullable=False, default=[])
-    # base64 encoded 30x30 avatar
-    avatar = Column(LargeBinary)
+    avatar_id = Column(String)
 
     enabled_notifications = Column(Enum(NotificationTypes))
     instagram_profile = Column(String, nullable=False, default='')
@@ -72,7 +71,7 @@ class User(ModelBase):
         "User",
         secondary=blacklist_table,
         back_populates="blocked_by",
-        primaryjoin=id == blacklist_table.c.blocked_by_id, # noqa
+        primaryjoin=id == blacklist_table.c.blocked_by_id,  # noqa
         secondaryjoin=id == blacklist_table.c.blocked_user_id)  # noqa
     blocked_by = relationship(
         "User",
@@ -108,6 +107,7 @@ class User(ModelBase):
         logger.info(f"Deleting user {self.id} photos")
         for photo in self.photos:
             storage_client.delete_image(photo)
+        storage_client.delete_image(self.avatar_id)
 
     def __str__(self):
         return f'User {self.id}, name: {self.name}'

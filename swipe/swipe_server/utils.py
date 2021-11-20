@@ -9,7 +9,7 @@ from swipe.swipe_server.misc.errors import SwipeError
 AVATAR_SIZE = (60, 60)
 
 
-def compress_image(image_source: bytes):
+def compress_image(image_source: bytes) -> bytes:
     if not isinstance(image_source, bytes):
         raise SwipeError("Invalid image content, should be 'bytes'")
 

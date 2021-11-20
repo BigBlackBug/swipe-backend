@@ -1,7 +1,6 @@
 import datetime
 import logging
 from typing import Optional
-from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
 from fastapi import Depends

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import json
 import logging
@@ -118,11 +120,23 @@ class PayloadEncoder(json.JSONEncoder):
 
 
 @dataclass
+class ChatUserData:
+    name: str
+    avatar_url: str
+
+
+@dataclass
+class MMUserData:
+    age: int
+    gender_filter: Optional[Gender]
+
+
 class ConnectedUser:
-    user_id: str
-    connection: WebSocket
-    age: Optional[int] = None
-    gender_filter: Optional[Gender] = None
+    def __init__(self, user_id: str, connection: WebSocket,
+                 data: ChatUserData | MMUserData):
+        self.connection = connection
+        self.user_id = user_id
+        self.data = data
 
 
 class WSConnectionManager:
