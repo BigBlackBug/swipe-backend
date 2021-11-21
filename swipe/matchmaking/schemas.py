@@ -6,6 +6,7 @@ from typing import Union, Type, Tuple, Any, Optional
 from pydantic import BaseModel, Field
 
 from swipe.swipe_server.users.enums import Gender
+from swipe.swipe_server.users.models import IDList
 
 Match = Tuple[str, str]
 
@@ -32,7 +33,7 @@ class MMMatchPayload(BaseModel):
 
 class MMLobbyAction(str, Enum):
     CONNECT = 'connect'
-    DISCONNECT = 'disconnect'
+    RECONNECT = 'reconnect'
 
 
 class MMLobbyPayload(BaseModel):
@@ -72,13 +73,57 @@ class MMSettings(BaseModel):
     age_diff: int = 20
     max_age_diff: int = 20
     current_weight: int = 0
-    gender: Optional[Gender] = None
+    gender: Gender
+    gender_filter: Optional[Gender] = None
 
     def increase_age_diff(self):
-        self.age_diff = min(self.age_diff + 1, self.max_age_diff)
+        self.age_diff = min(self.age_diff + 2, self.max_age_diff)
 
     def reset_weight(self):
         self.current_weight = 0
 
     def increase_weight(self):
         self.current_weight += 1
+
+
+class VertexData(BaseModel):
+    user_id: str
+    mm_settings: MMSettings
+    edges: set[str] = set()
+
+
+class MMDataCache(BaseModel):
+    new_users: dict[str, VertexData] = {}
+    returning_users: set[str] = set()
+    disconnected_users: set[str] = set()
+    decline_pairs: list[Tuple[str, str]] = []
+
+    sent_matches: dict[str, str] = dict()
+    online_users: set[str] = set()
+
+    def clear(self):
+        self.new_users.clear()
+        self.returning_users.clear()
+        self.disconnected_users.clear()
+        self.decline_pairs.clear()
+
+    def disconnect(self, user_id: str):
+        self.disconnected_users.add(user_id)
+        self.online_users.remove(user_id)
+
+    def reconnect(self, user_id: str):
+        self.returning_users.add(user_id)
+
+    def reconnect_decline(self, user_a_id: str, user_b_id: str):
+        self.decline_pairs.append((user_a_id, user_b_id))
+        self.sent_matches.pop(user_a_id, None)
+        self.sent_matches.pop(user_b_id, None)
+
+    def connect(self, user_id: str, mm_settings: MMSettings,
+                connections: IDList):
+        self.online_users.add(user_id)
+
+        new_vertex = VertexData(user_id=user_id, mm_settings=mm_settings)
+        for connection in connections:
+            new_vertex.edges.add(str(connection))
+        self.new_users[user_id] = new_vertex

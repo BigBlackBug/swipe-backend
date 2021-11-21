@@ -1,7 +1,6 @@
 import os
 import sys
 
-# TODO WTF
 import sentry_sdk
 
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
@@ -9,7 +8,7 @@ from swipe import config
 
 config.configure_logging()
 from swipe.settings import settings
-from swipe.matchmaking import mm_websocket_server as matchmaking_server
+from swipe.matchmaking import matchmaking_server as matchmaking_server
 
 if settings.SENTRY_MATCHMAKING_SERVER_URL:
     sentry_sdk.init(

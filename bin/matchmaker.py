@@ -1,7 +1,6 @@
 import os
 import sys
 
-# TODO WTF
 import time
 
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
@@ -9,7 +8,6 @@ from swipe import config
 
 config.configure_logging()
 import sentry_sdk
-import asyncio
 from swipe.settings import settings
 
 if settings.SENTRY_MATCHMAKER_URL:
@@ -18,10 +16,11 @@ if settings.SENTRY_MATCHMAKER_URL:
         # TODO change in prod
         traces_sample_rate=settings.SENTRY_SAMPLE_RATE
     )
-from swipe.matchmaking import mm_main_server
+from swipe.matchmaking import matchmaker
 
 if __name__ == '__main__':
     # Yeah, that's a stupid workaround
-    # But we need the matchmaker process to start first
-    time.sleep(1)
-    asyncio.run(mm_main_server.run_server())
+    # But we need the matchmaker server to start first
+    time.sleep(5)
+    matchmaker.start_matchmaker(
+        round_length_secs=settings.MATCHMAKING_ROUND_LENGTH_SECS)

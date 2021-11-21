@@ -1,11 +1,12 @@
 import datetime
 import logging
-from typing import Optional
+from typing import Optional, Iterable
+from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
 from fastapi import Depends
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 import swipe.swipe_server.misc.dependencies as dependencies
 from swipe.swipe_server.users.enums import Gender
@@ -22,7 +23,7 @@ class MMUserService:
                       current_user_id: str,
                       age: int,
                       age_difference,
-                      online_users: set[str],
+                      online_users: Iterable[str],
                       gender: Optional[Gender] = None,
                       ) -> IDList:
         gender_clause = True if not gender else User.gender == gender
@@ -39,6 +40,10 @@ class MMUserService:
             where(~User.blocked_by.any(id=current_user_id))
         return self.db.execute(query).scalars().all()
 
-    def user_exists(self, user_id: str):
-        return self.db.execute(
-            select(User.id).where(User.id == user_id)).one_or_none() is not None
+    def get_matchmaking_preview(self, user_id: UUID):
+        return self.db.query(User).where(User.id == user_id).\
+            options(load_only(User.date_of_birth, User.gender)).one_or_none()
+
+    def update_blacklist(self, user_a_id: str, user_b_id:str):
+        # TODO update this bitch
+        pass

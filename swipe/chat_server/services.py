@@ -128,7 +128,8 @@ class ChatUserData:
 @dataclass
 class MMUserData:
     age: int
-    gender_filter: Optional[Gender]
+    gender: Gender
+    gender_filter: Optional[Gender] = None
 
 
 class ConnectedUser:

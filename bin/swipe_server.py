@@ -1,7 +1,6 @@
 import os
 import sys
 
-# TODO WTF
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from swipe import config
 

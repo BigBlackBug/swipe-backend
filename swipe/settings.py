@@ -32,10 +32,10 @@ class Settings(BaseSettings):
     ENABLE_SQL_ECHO: Optional[bool] = True
     ENABLE_WEB_SERVER_AUTORELOAD: Optional[bool] = False
 
-    MATCHMAKER_HOST: Optional[str]
-    MATCHMAKER_PORT: Optional[int]
     CHAT_SERVER_PORT: Optional[int]
+    MATCHMAKING_SERVER_HOST: Optional[str]
     MATCHMAKING_SERVER_PORT: Optional[int]
+    MATCHMAKING_ROUND_LENGTH_SECS = 5
 
     REDIS_URL: str
 

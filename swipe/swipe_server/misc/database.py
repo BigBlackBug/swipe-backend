@@ -1,8 +1,7 @@
 import logging
-from contextlib import contextmanager
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from sqlalchemy.orm import sessionmaker, declarative_base
 
 from swipe.settings import settings
 
@@ -19,14 +18,3 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False,
                             future=True, bind=engine)
 
 ModelBase = declarative_base()
-
-
-@contextmanager
-def session_context() -> Session:
-    logging.info(f'Connecting to a database@{settings.DATABASE_URL}')
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        logging.info(f'Closing connection@{settings.DATABASE_URL}')
-        session.close()
