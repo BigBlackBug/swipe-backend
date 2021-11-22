@@ -31,12 +31,12 @@ services:
     env_file:
       - env/docker.env
     environment:
-      - CHAT_SERVER_PORT=16000
+      - CHAT_SERVER_PORT=80
       - GOOGLE_APPLICATION_CREDENTIALS=/etc/swipe/google-credentials.json
     volumes:
       - './env/google-credentials.json:/etc/swipe/google-credentials.json:ro'
     ports:
-      - "16000:16000"
+      - "16000:80"
     entrypoint: python bin/chat_server.py
     depends_on:
       - server
@@ -49,6 +49,7 @@ services:
       - env/docker.env
     environment:
       - MATCHMAKING_SERVER_PORT=80
+      - CHAT_SERVER_HOST=http://chat_server:80
     ports:
       - "17000:80"
     entrypoint: python bin/matchmaking_server.py
@@ -69,6 +70,7 @@ services:
       - env/docker.env
     environment:
       - MATCHMAKING_SERVER_PORT=80
+      - CHAT_SERVER_HOST=http://chat_server:80
     ports:
       - "18000:80"
     entrypoint: python bin/matchmaking_server.py

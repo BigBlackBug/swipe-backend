@@ -34,9 +34,13 @@ class Settings(BaseSettings):
     ENABLE_MATCHMAKING_BLACKLIST: Optional[bool] = False
 
     CHAT_SERVER_PORT: Optional[int]
+    CHAT_SERVER_HOST: Optional[str]
     MATCHMAKING_SERVER_HOST: Optional[str]
     MATCHMAKING_SERVER_PORT: Optional[int]
+
     MATCHMAKING_ROUND_LENGTH_SECS = 5
+    MATCHMAKING_DEFAULT_AGE_DIFF = 20
+    MATCHMAKING_MAX_AGE_DIFF = 20
 
     REDIS_URL: str
 

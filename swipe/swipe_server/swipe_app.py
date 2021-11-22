@@ -1,11 +1,8 @@
 import logging
-import sys
 
 from fastapi import FastAPI
-from starlette import status
-from starlette.requests import Request
-from starlette.responses import JSONResponse
 
+from swipe import error_handlers
 from swipe.settings import settings
 from swipe.swipe_server import endpoints as misc_endpoints
 from swipe.swipe_server.chats.endpoints import router as chat_router
@@ -13,20 +10,6 @@ from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.users.endpoints import users, me, swipes
 
 logger = logging.getLogger(__name__)
-
-
-async def swipe_error_handler(request: Request, exc: SwipeError):
-    logger.exception("Something wrong", exc_info=sys.exc_info())
-    return JSONResponse({
-        'detail': str(exc)
-    }, status_code=status.HTTP_409_CONFLICT)
-
-
-async def global_error_handler(request: Request, exc: Exception):
-    logger.exception("Something wrong", exc_info=sys.exc_info())
-    return JSONResponse({
-        'detail': str(exc)
-    }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def init_app() -> FastAPI:
@@ -45,6 +28,6 @@ def init_app() -> FastAPI:
     app.include_router(chat_router,
                        prefix=f'{settings.API_V1_PREFIX}/me/chats',
                        tags=['my chats'])
-    app.add_exception_handler(SwipeError, swipe_error_handler)
-    app.add_exception_handler(Exception, global_error_handler)
+    app.add_exception_handler(SwipeError, error_handlers.swipe_error_handler)
+    app.add_exception_handler(Exception, error_handlers.global_error_handler)
     return app

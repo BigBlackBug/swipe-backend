@@ -3,6 +3,7 @@ import datetime
 import logging
 from uuid import UUID
 
+import requests
 from dateutil.relativedelta import relativedelta
 from fastapi import FastAPI, Body, Query, Depends
 from fastapi import WebSocket
@@ -15,7 +16,8 @@ from uvicorn import Config, Server
 from swipe.chat_server.services import ConnectedUser, WSConnectionManager, \
     MMUserData
 from swipe.matchmaking.schemas import MMBasePayload, MMMatchPayload, \
-    MMResponseAction, MMLobbyPayload, MMLobbyAction, MMSettings, MMDataCache
+    MMResponseAction, MMLobbyPayload, MMLobbyAction, MMSettings, MMDataCache, \
+    MMChatPayload, MMChatAction
 from swipe.matchmaking.services import MMUserService
 from swipe.settings import settings
 from swipe.swipe_server.users.enums import Gender
@@ -187,6 +189,24 @@ async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData,
         elif data_payload.action == MMLobbyAction.RECONNECT:
             logger.info(f"Reconnecting {sender_id} to matchmaking")
             matchmaking_data.reconnect(sender_id)
+    elif isinstance(data_payload, MMChatPayload):
+        if data_payload.action == MMChatAction.ACCEPT:
+            logger.info(
+                f"{sender_id} has accepted chat request from {recipient_id}, "
+                f"sending request to chat server")
+            url = f'{settings.CHAT_SERVER_HOST}/matchmaking/create_chat'
+            # yeah they are reversed
+            output_payload = {
+                'sender_id': base_payload.recipient_id,
+                'recipient_id': base_payload.sender_id,
+                'payload': {
+                    'type': 'create_chat',
+                    'source': data_payload.source.value,
+                    'chat_id': str(data_payload.chat_id)
+                }
+            }
+            # TODO use aiohttp?
+            requests.post(url, json=output_payload)
 
 
 @app.post('/send_match')

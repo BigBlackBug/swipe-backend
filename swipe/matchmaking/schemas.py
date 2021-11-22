@@ -3,9 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from typing import Union, Type, Tuple, Any, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from swipe.settings import settings
+from swipe.swipe_server.chats.models import ChatSource
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import IDList
 
@@ -37,16 +40,29 @@ class MMLobbyAction(str, Enum):
     RECONNECT = 'reconnect'
 
 
+class MMChatAction(str, Enum):
+    OFFER = 'offer'
+    ACCEPT = 'accept'
+
+
 class MMLobbyPayload(BaseModel):
     type_: str = Field('lobby', alias='type', const=True)
     action: MMLobbyAction
+
+
+class MMChatPayload(BaseModel):
+    type_: str = Field('chat', alias='type', const=True)
+    action: MMChatAction
+    chat_id: Optional[UUID] = None
+    source: Optional[ChatSource] = None
 
 
 class MMBasePayload(BaseModel):
     sender_id: str
     recipient_id: Optional[str] = None
     payload: Union[
-        MMLobbyPayload, MMSDPPayload, MMMatchPayload, MMICEPayload
+        MMLobbyPayload, MMSDPPayload, MMMatchPayload, MMICEPayload,
+        MMChatPayload
     ]
 
     @classmethod
@@ -59,6 +75,8 @@ class MMBasePayload(BaseModel):
             return MMMatchPayload
         elif payload_type == 'lobby':
             return MMLobbyPayload
+        elif payload_type == 'chat':
+            return MMChatPayload
 
     @classmethod
     def validate(cls: MMBasePayload, value: Any) -> MMBasePayload:
@@ -70,9 +88,8 @@ class MMBasePayload(BaseModel):
 
 class MMSettings(BaseModel):
     age: int
-    # TODO change in prod obviously
-    age_diff: int = 20
-    max_age_diff: int = 20
+    age_diff: int = settings.MATCHMAKING_DEFAULT_AGE_DIFF
+    max_age_diff: int = settings.MATCHMAKING_MAX_AGE_DIFF
     current_weight: int = 0
     gender: Gender
     gender_filter: Optional[Gender] = None

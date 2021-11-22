@@ -7,15 +7,18 @@ from fastapi import FastAPI, Depends, Body
 from fastapi import WebSocket
 from firebase_admin import messaging as firebase
 from pydantic import BaseModel
+from starlette.responses import Response
 from starlette.websockets import WebSocketDisconnect
 from uvicorn import Server, Config
 
+from swipe import error_handlers
 from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
     MessagePayload, CreateChatPayload
 from swipe.chat_server.services import ChatServerRequestProcessor, \
     WSConnectionManager, ConnectedUser, ChatUserData
 from swipe.settings import settings
 from swipe.swipe_server.chats.services import ChatService
+from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.users.schemas import UserOutGlobalChatPreviewORM
 from swipe.swipe_server.users.services import UserService, RedisUserService
 
@@ -59,7 +62,6 @@ async def websocket_endpoint(
         user_service: UserService = Depends(),
         chat_service: ChatService = Depends(),
         redis_service: RedisUserService = Depends()):
-    request_processor = ChatServerRequestProcessor(chat_service)
     try:
         user_uuid = UUID(hex=user_id)
     except ValueError:
@@ -90,6 +92,7 @@ async def websocket_endpoint(
             'avatar_url': user.data.avatar_url
         })
 
+    request_processor = ChatServerRequestProcessor(chat_service)
     while True:
         try:
             raw_data: str = await websocket.receive_text()
@@ -113,6 +116,28 @@ async def websocket_endpoint(
                 await _send_payload(payload, user_service)
         except:
             logger.exception(f"Error processing message: {raw_data}")
+
+
+@app.post("/matchmaking/create_chat")
+async def create_chat_from_matchmaking(
+        payload: BasePayload = Body(...),
+        chat_service: ChatService = Depends(),
+        user_service: UserService = Depends()):
+    request_processor = ChatServerRequestProcessor(chat_service)
+    if not isinstance(payload.payload, CreateChatPayload):
+        # TODO refactor
+        raise SwipeError("Unsupported payload")
+
+    logger.info(f"Creating chat from matchmaking: {payload}")
+    request_processor.process(payload)
+
+    out_payload = payload.dict(by_alias=True, exclude_unset=True)
+    logger.info(f"Sending data to {payload.recipient_id}")
+    await connection_manager.send(str(payload.recipient_id), out_payload)
+    logger.info(f"Sending data to {payload.sender_id}")
+    await connection_manager.send(str(payload.sender_id), out_payload)
+
+    return Response()
 
 
 async def _send_payload(payload: BasePayload, user_service: UserService):
@@ -141,6 +166,8 @@ async def _send_payload(payload: BasePayload, user_service: UserService):
 
 
 def start_server():
+    app.add_exception_handler(SwipeError, error_handlers.swipe_error_handler)
+    app.add_exception_handler(Exception, error_handlers.global_error_handler)
     server_config = Config(app=app, host='0.0.0.0',
                            port=settings.CHAT_SERVER_PORT,
                            workers=1, loop='asyncio')
