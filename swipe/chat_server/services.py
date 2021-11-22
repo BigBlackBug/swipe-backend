@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import Optional
 from uuid import UUID
 
-from fastapi import Depends
 from starlette.websockets import WebSocket
 
 from swipe.chat_server.schemas import BasePayload, MessagePayload, \
@@ -24,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class ChatServerRequestProcessor:
-    def __init__(self, chat_service: ChatService = Depends()):
+    def __init__(self, chat_service: ChatService):
         self.chat_service = chat_service
 
     def process(self, data: BasePayload):

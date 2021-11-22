@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from uuid import UUID
@@ -7,11 +8,14 @@ from fastapi import WebSocket
 from firebase_admin import messaging as firebase
 from pydantic import BaseModel
 from starlette.websockets import WebSocketDisconnect
+from uvicorn import Server, Config
 
 from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
     MessagePayload, CreateChatPayload
 from swipe.chat_server.services import ChatServerRequestProcessor, \
     WSConnectionManager, ConnectedUser, ChatUserData
+from swipe.settings import settings
+from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.users.schemas import UserOutGlobalChatPreviewORM
 from swipe.swipe_server.users.services import UserService, RedisUserService
 
@@ -44,14 +48,18 @@ async def docs(json_data: BasePayload = Body(..., examples={
     pass
 
 
+connection_manager = WSConnectionManager()
+loop = asyncio.get_event_loop()
+
+
 @app.websocket("/connect/{user_id}")
 async def websocket_endpoint(
         user_id: str,
         websocket: WebSocket,
-        connection_manager: WSConnectionManager = Depends(),
         user_service: UserService = Depends(),
-        redis_service: RedisUserService = Depends(),
-        request_processor: ChatServerRequestProcessor = Depends()):
+        chat_service: ChatService = Depends(),
+        redis_service: RedisUserService = Depends()):
+    request_processor = ChatServerRequestProcessor(chat_service)
     try:
         user_uuid = UUID(hex=user_id)
     except ValueError:
@@ -102,14 +110,12 @@ async def websocket_endpoint(
                     str(payload.sender_id), payload.dict(
                         by_alias=True, exclude_unset=True))
             else:
-                await _send_payload(payload, connection_manager, user_service)
+                await _send_payload(payload, user_service)
         except:
             logger.exception(f"Error processing message: {raw_data}")
 
 
-async def _send_payload(payload: BasePayload,
-                        connection_manager: WSConnectionManager,
-                        user_service: UserService):
+async def _send_payload(payload: BasePayload, user_service: UserService):
     recipient_id = payload.recipient_id
     out_payload = payload.dict(by_alias=True, exclude_unset=True)
 
@@ -132,3 +138,11 @@ async def _send_payload(payload: BasePayload,
                 data=out_payload, token=firebase_token))
     else:
         await connection_manager.send(str(recipient_id), out_payload)
+
+
+def start_server():
+    server_config = Config(app=app, host='0.0.0.0',
+                           port=settings.CHAT_SERVER_PORT,
+                           workers=1, loop='asyncio')
+    server = Server(server_config)
+    loop.run_until_complete(server.serve())
