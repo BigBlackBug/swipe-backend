@@ -21,6 +21,5 @@ from swipe.matchmaking import matchmaker
 if __name__ == '__main__':
     # Yeah, that's a stupid workaround
     # But we need the matchmaker server to start first
-    time.sleep(5)
     matchmaker.start_matchmaker(
         round_length_secs=settings.MATCHMAKING_ROUND_LENGTH_SECS)

@@ -138,3 +138,13 @@ class MMDataCache(BaseModel):
         return f'{self.repr_matchmaking()}, ' \
                f'sent_matches: {self.sent_matches}, ' \
                f'online_users: {self.online_users}'
+
+    def remove_match(self, user_id: str):
+        self.sent_matches.pop(user_id, None)
+
+    def add_match(self, user_a: str, user_b: str):
+        self.sent_matches[user_a] = user_b
+        self.sent_matches[user_b] = user_a
+
+    def get_match(self, user_id: str):
+        return self.sent_matches.get(user_id)

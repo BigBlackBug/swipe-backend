@@ -359,7 +359,8 @@ def start_matchmaker(round_length_secs: int = 5):
         try:
             logger.info("Fetching new data from matchmaker server")
             response = requests.get(
-                f'{settings.MATCHMAKING_SERVER_HOST}/new_round_data')
+                f'{settings.MATCHMAKING_SERVER_HOST}/new_round_data',
+                timeout=2)
             json_data = response.json()
 
             incoming_data = MMDataCache.parse_obj(json_data)

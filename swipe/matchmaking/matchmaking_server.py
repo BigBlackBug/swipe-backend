@@ -87,18 +87,17 @@ async def matchmaker_endpoint(user_id: UUID, websocket: WebSocket,
             user_id_str = str(user_id)
             matchmaking_data.disconnect(user_id_str)
             await connection_manager.disconnect(user_id)
-
             # we need to keep track of sent matches so that we could
             # send decline events if one of the users disconnects
             # on the match screen
-            if match_user_id := matchmaking_data.sent_matches.get(user_id_str):
+            if match_user_id := matchmaking_data.get_match(user_id_str):
                 logger.info(f"Removing {user_id_str} from sent matches")
-                matchmaking_data.sent_matches.pop(user_id_str, None)
+                matchmaking_data.remove_match(user_id_str)
 
                 logger.info(
                     f"Removing {match_user_id}, match of {user_id_str}"
                     f"from sent matches")
-                matchmaking_data.sent_matches.pop(match_user_id, None)
+                matchmaking_data.remove_match(match_user_id)
 
                 if match_user_id in connection_manager.active_connections:
                     logger.info(f"Sending decline to {match_user_id}, "
@@ -137,7 +136,7 @@ async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData,
         if data_payload.action == MMResponseAction.ACCEPT:
             logger.info(f"{sender_id} accepted match, "
                         f"removing from sent_matches")
-            matchmaking_data.sent_matches.pop(sender_id, None)
+            matchmaking_data.remove_match(sender_id)
         elif data_payload.action == MMResponseAction.DECLINE:
             # one decline -> put both back to MM
             logger.info(
@@ -183,8 +182,7 @@ async def send_match_data(request: Request):
             # both connected
             logger.info(f"Both are connected, "
                         f"sending matches to {user_a_id}, {user_b_id}")
-            matchmaking_data.sent_matches[user_a_id] = user_b_id
-            matchmaking_data.sent_matches[user_b_id] = user_a_id
+            matchmaking_data.add_match(user_a_id, user_b_id)
 
             await connection_manager.send(user_b_id, {
                 'match': user_a_id, 'host': False
