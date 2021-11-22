@@ -127,3 +127,14 @@ class MMDataCache(BaseModel):
         for connection in connections:
             new_vertex.edges.add(str(connection))
         self.new_users[user_id] = new_vertex
+
+    def repr_matchmaking(self):
+        return f'new: {self.new_users}, ' \
+               f'returning: {self.returning_users}, ' \
+               f'disconnected: {self.disconnected_users}, ' \
+               f'declines: {self.decline_pairs}'
+
+    def __repr__(self):
+        return f'{self.repr_matchmaking()}, ' \
+               f'sent_matches: {self.sent_matches}, ' \
+               f'online_users: {self.online_users}'

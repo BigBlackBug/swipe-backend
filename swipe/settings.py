@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     # TODO debug mode
     ENABLE_SQL_ECHO: Optional[bool] = True
     ENABLE_WEB_SERVER_AUTORELOAD: Optional[bool] = False
+    ENABLE_MATCHMAKING_BLACKLIST: Optional[bool] = False
 
     CHAT_SERVER_PORT: Optional[int]
     MATCHMAKING_SERVER_HOST: Optional[str]

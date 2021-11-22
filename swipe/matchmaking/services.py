@@ -5,12 +5,13 @@ from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
 from fastapi import Depends
-from sqlalchemy import select
+from sqlalchemy import select, insert
 from sqlalchemy.orm import Session, load_only
 
 import swipe.swipe_server.misc.dependencies as dependencies
+from swipe.settings import settings
 from swipe.swipe_server.users.enums import Gender
-from swipe.swipe_server.users.models import IDList, User
+from swipe.swipe_server.users.models import IDList, User, blacklist_table
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +42,12 @@ class MMUserService:
         return self.db.execute(query).scalars().all()
 
     def get_matchmaking_preview(self, user_id: UUID):
-        return self.db.query(User).where(User.id == user_id).\
+        return self.db.query(User).where(User.id == user_id). \
             options(load_only(User.date_of_birth, User.gender)).one_or_none()
 
-    def update_blacklist(self, user_a_id: str, user_b_id:str):
-        # TODO update this bitch
-        pass
+    def update_blacklist(self, blocker_id: str, blocked_user_id: str):
+        if settings.ENABLE_MATCHMAKING_BLACKLIST:
+            self.db.execute(insert(blacklist_table).values(
+                blocked_user_id=blocked_user_id,
+                blocked_by_id=blocker_id))
+            self.db.commit()

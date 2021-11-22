@@ -104,13 +104,13 @@ async def matchmaker_endpoint(user_id: UUID, websocket: WebSocket,
                     logger.info(f"Sending decline to {match_user_id}, "
                                 f"match of {user_id_str} and reconnecting "
                                 f"to matchmaker")
-                    payload = MMMatchPayload(action=MMResponseAction.DECLINE)
+                    decline = MMMatchPayload(action=MMResponseAction.DECLINE)
                     await connection_manager.send(
                         match_user_id,
                         MMBasePayload(
                             sender_id=user_id_str,
                             recipient_id=match_user_id,
-                            payload=payload).dict(by_alias=True))
+                            payload=decline).dict(by_alias=True))
                     # placing this guy back to next round
                     matchmaking_data.reconnect(match_user_id)
             return
@@ -203,10 +203,9 @@ async def send_match_data(request: Request):
 
 @app.get('/new_round_data', response_model=MMDataCache)
 async def fetch_new_round_data(request: Request):
-    logger.info("Got a request to fetch new round data")
     response_data = matchmaking_data.dict(
         exclude={'sent_matches', 'online_users'})
-    logger.info("Removing data before the next round")
+    logger.info("New round started, clearing cache")
     matchmaking_data.clear()
     return response_data
 

@@ -54,7 +54,7 @@ class Vertex:
 
     def __repr__(self):
         return f'[{self.user_id}, {self.edges}, ' \
-               f'matched: {self.matched}, waiting: {self.waiting}]'
+               f'matched: {self.matched}, waiting: {self.waiting}]\n'
 
 
 @dataclass
@@ -316,7 +316,7 @@ class Matchmaker:
             # because he disconnected
             vertex = self._connection_graph.get(user_id, None)
             if not vertex:
-                logger.info(f"{user_id} is not in the graph anymore")
+                logger.info(f"{user_id} is not in the graph anymore, skipping")
                 continue
 
             connections: IDList = \
@@ -357,13 +357,15 @@ def start_matchmaker(round_length_secs: int = 5):
 
         logger.info(bar)
         try:
-            logger.info("Fetching new data from matc¬hmaker server")
+            logger.info("Fetching new data from matchmaker server")
             response = requests.get(
                 f'{settings.MATCHMAKING_SERVER_HOST}/new_round_data')
             json_data = response.json()
 
-            logger.info(f"Got raw data {json_data}")
             incoming_data = MMDataCache.parse_obj(json_data)
+            logger.info(f"New round data\n"
+                        f"{incoming_data.repr_matchmaking()}")
+
             for user_a, user_b \
                     in matchmaker.run_matchmaking_round(incoming_data):
                 logger.info(f"Sending match {user_a}-{user_b}")
@@ -380,4 +382,4 @@ def start_matchmaker(round_length_secs: int = 5):
         logger.info(
             f"Round took {time_taken}s, "
             f"time till the next cycle: {sleep_time}")
-        time.sleep(max(0, sleep_time))
+        time.sleep(max(0.0, sleep_time))
