@@ -83,35 +83,7 @@ async def matchmaker_endpoint(user_id: UUID, websocket: WebSocket,
         except WebSocketDisconnect as e:
             logger.info(f"{user_id} disconnected with code {e.code}, "
                         f"removing him from matchmaking")
-
-            user_id_str = str(user_id)
-            matchmaking_data.disconnect(user_id_str)
-            await connection_manager.disconnect(user_id)
-            # we need to keep track of sent matches so that we could
-            # send decline events if one of the users disconnects
-            # on the match screen
-            if match_user_id := matchmaking_data.get_match(user_id_str):
-                logger.info(f"Removing {user_id_str} from sent matches")
-                matchmaking_data.remove_match(user_id_str)
-
-                logger.info(
-                    f"Removing {match_user_id}, match of {user_id_str}"
-                    f"from sent matches")
-                matchmaking_data.remove_match(match_user_id)
-
-                if match_user_id in connection_manager.active_connections:
-                    logger.info(f"Sending decline to {match_user_id}, "
-                                f"match of {user_id_str} and reconnecting "
-                                f"to matchmaker")
-                    decline = MMMatchPayload(action=MMResponseAction.DECLINE)
-                    await connection_manager.send(
-                        match_user_id,
-                        MMBasePayload(
-                            sender_id=user_id_str,
-                            recipient_id=match_user_id,
-                            payload=decline).dict(by_alias=True))
-                    # placing this guy back to next round
-                    matchmaking_data.reconnect(match_user_id)
+            await _process_disconnect(user_id)
             return
 
         try:
@@ -126,6 +98,49 @@ async def matchmaker_endpoint(user_id: UUID, websocket: WebSocket,
             logger.exception(f"Error processing payload from {user_id}")
 
 
+async def _process_disconnect(user_id: str):
+    matchmaking_data.disconnect(user_id)
+    await connection_manager.disconnect(user_id)
+    # we need to keep track of sent matches so that we could
+    # send decline/reconnect events if one of the users disconnects
+
+    # A disconnects on a match screen or on call
+    if match := matchmaking_data.get_match(user_id):
+        logger.info(f"{user_id} is matched with {match.user_id}")
+
+        match_status = matchmaking_data.get_match(match.user_id)
+        if match_status.accepted and match.accepted:
+            # they are on call, send B reconnect signal
+            logger.info(
+                f"{user_id} and {match.user_id} were on call, "
+                f"sending reconnect to {match.user_id}")
+            reconnect = MMLobbyPayload(action=MMLobbyAction.RECONNECT)
+            await connection_manager.send(
+                match.user_id,
+                MMBasePayload(
+                    sender_id=user_id,
+                    recipient_id=match.user_id,
+                    payload=reconnect).dict(by_alias=True))
+        else:
+            # B is also on the match screen
+            logger.info(f"{match.user_id} is on a match screen, "
+                        f"sending decline")
+            decline = MMMatchPayload(action=MMResponseAction.DECLINE)
+            await connection_manager.send(
+                match.user_id,
+                MMBasePayload(
+                    sender_id=user_id,
+                    recipient_id=match.user_id,
+                    payload=decline).dict(by_alias=True))
+        logger.info(f"Removing {user_id} from sent matches")
+        matchmaking_data.remove_match(user_id)
+
+        logger.info(
+            f"Removing {match.user_id}, match of {user_id}"
+            f"from sent matches")
+        matchmaking_data.remove_match(match.user_id)
+
+
 async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData,
                            user_service: MMUserService):
     data_payload = base_payload.payload
@@ -134,9 +149,8 @@ async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData,
 
     if isinstance(data_payload, MMMatchPayload):
         if data_payload.action == MMResponseAction.ACCEPT:
-            logger.info(f"{sender_id} accepted match, "
-                        f"removing from sent_matches")
-            matchmaking_data.remove_match(sender_id)
+            logger.info(f"{sender_id} accepted match")
+            matchmaking_data.accept_match(sender_id)
         elif data_payload.action == MMResponseAction.DECLINE:
             # one decline -> put both back to MM
             logger.info(
@@ -144,6 +158,9 @@ async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData,
                 f"placing him and {recipient_id} "
                 f"back to matchmaker, removing from sent matches")
             matchmaking_data.reconnect_decline(sender_id, recipient_id)
+            matchmaking_data.remove_match(sender_id)
+            matchmaking_data.remove_match(recipient_id)
+
             # a decline means we add them to each others blacklist
             user_service.update_blacklist(sender_id, recipient_id)
     elif isinstance(data_payload, MMLobbyPayload):
@@ -156,6 +173,7 @@ async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData,
             logger.info(f"Connecting {sender_id} to matchmaking, "
                         f"settings: {mm_settings}")
             logger.info(f"Current online users {matchmaking_data.online_users}")
+
             connections: IDList = \
                 user_service.find_user_ids(
                     sender_id,
@@ -167,8 +185,7 @@ async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData,
             matchmaking_data.connect(
                 sender_id, mm_settings, connections)
         elif data_payload.action == MMLobbyAction.RECONNECT:
-            # user tapped next or add to friends
-            logger.info(f"Reconnecting {sender_id} after a call")
+            logger.info(f"Reconnecting {sender_id} to matchmaking")
             matchmaking_data.reconnect(sender_id)
 
 
@@ -190,12 +207,7 @@ async def send_match_data(request: Request):
             await connection_manager.send(user_a_id, {
                 'match': user_b_id, 'host': True
             })
-            return Response()
-    # if at least one is not available -> put both back to lobby
-    logger.info(f"One of the matches is not online anymore, "
-                f"returning both {user_a_id} and {user_b_id} to matchmaking")
-    matchmaking_data.reconnect(user_a_id)
-    matchmaking_data.reconnect(user_b_id)
+
     return Response()
 
 

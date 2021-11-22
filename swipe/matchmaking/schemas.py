@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import Enum
 from typing import Union, Type, Tuple, Any, Optional
 
@@ -92,13 +93,20 @@ class VertexData(BaseModel):
     edges: set[str] = set()
 
 
+@dataclass
+class Match:
+    user_id: str
+    accepted: bool = False
+
+
 class MMDataCache(BaseModel):
     new_users: dict[str, VertexData] = {}
     returning_users: set[str] = set()
     disconnected_users: set[str] = set()
     decline_pairs: list[Tuple[str, str]] = []
 
-    sent_matches: dict[str, str] = dict()
+    # True means on call
+    sent_matches: dict[str, Match] = dict()
     online_users: set[str] = set()
 
     def clear(self):
@@ -116,8 +124,6 @@ class MMDataCache(BaseModel):
 
     def reconnect_decline(self, user_a_id: str, user_b_id: str):
         self.decline_pairs.append((user_a_id, user_b_id))
-        self.sent_matches.pop(user_a_id, None)
-        self.sent_matches.pop(user_b_id, None)
 
     def connect(self, user_id: str, mm_settings: MMSettings,
                 connections: IDList):
@@ -143,8 +149,11 @@ class MMDataCache(BaseModel):
         self.sent_matches.pop(user_id, None)
 
     def add_match(self, user_a: str, user_b: str):
-        self.sent_matches[user_a] = user_b
-        self.sent_matches[user_b] = user_a
+        self.sent_matches[user_a] = Match(user_id=user_b)
+        self.sent_matches[user_b] = Match(user_id=user_a)
 
     def get_match(self, user_id: str):
         return self.sent_matches.get(user_id)
+
+    def accept_match(self, user_id: str):
+        self.sent_matches[user_id].accepted = True
