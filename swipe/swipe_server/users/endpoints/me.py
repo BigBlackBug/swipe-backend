@@ -10,7 +10,7 @@ from swipe.swipe_server.misc import security
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.users import schemas
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.services import UserService
+from swipe.swipe_server.users.services import UserService, RedisUserService
 
 IMAGE_CONTENT_TYPE_REGEXP = 'image/(png|jpe?g)'
 
@@ -36,11 +36,16 @@ async def fetch_user(current_user: User = Depends(security.get_current_user)):
 async def patch_user(
         user_body: schemas.UserUpdate = Body(...),
         user_service: UserService = Depends(),
+        redis_service: RedisUserService = Depends(),
         current_user: User = Depends(security.get_current_user)):
     # TODO This is bs, this field should not be in the docs
     # but the solutions are ugly AF
     # https://github.com/tiangolo/fastapi/issues/1357
     user_object = user_service.update_user(current_user, user_body)
+
+    if user_body.location:
+        await redis_service.add_cities(
+            user_body.location.country, [user_body.location.city])
     return user_object
 
 

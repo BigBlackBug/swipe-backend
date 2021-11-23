@@ -1,8 +1,8 @@
-import base64
+import datetime
 import logging
 import time
 import uuid
-from typing import Optional
+from typing import Optional, Union, Tuple, AsyncGenerator
 from uuid import UUID
 
 import requests
@@ -11,9 +11,9 @@ from dateutil.relativedelta import relativedelta
 from fastapi import Depends
 from jose import jwt
 from jose.constants import ALGORITHMS
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func, desc, String, cast
 from sqlalchemy.engine import Row
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, Bundle
 
 import swipe.swipe_server.misc.dependencies
 from swipe.settings import settings, constants
@@ -23,6 +23,7 @@ from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users import schemas
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import IDList, User, AuthInfo, Location
+from swipe.swipe_server.users.schemas import PopularFilterBody
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,47 @@ class RedisUserService:
     async def remove_online_user(self, user_id: UUID):
         await self.redis.srem(self.ONLINE_USERS_SET, str(user_id))
 
+    async def add_cities(self, country: str, cities: list[str]):
+        await self.redis.lpush(f'country:{country}', *cities)
+
+    async def get_popular_users(self, filter_params: PopularFilterBody) \
+            -> list[str]:
+        gender = filter_params.gender if filter_params.gender else 'ALL'
+        if filter_params.country:
+            key = f'popular:{gender}:country:{filter_params.country}'
+        elif filter_params.city:
+            key = f'popular:{gender}:city:{filter_params.city}'
+        else:
+            raise SwipeError("either city or country must be set")
+
+        return await self.redis.lrange(
+            key, filter_params.offset,
+            filter_params.offset + filter_params.limit - 1)
+
+    async def fetch_locations(self) -> AsyncGenerator[Tuple[str, list[str]], None]:
+        countries = await self.redis.keys("country:*")
+        for country_key in countries:
+            country = country_key.split(":")[1]
+            yield country, await self.redis.lrange(country_key, 0, -1)
+
+    async def save_popular_users(self,
+                                 users: list[str],
+                                 gender: Optional[Gender] = None,
+                                 country: Optional[str] = None,
+                                 city: Optional[str] = None):
+        if not users:
+            return
+        gender = gender if gender else 'ALL'
+        if country:
+            if not city:
+                key = f'popular:{gender}:country:{country}'
+                await self.redis.delete(key)
+                await self.redis.rpush(key, *users)
+            else:
+                key = f'popular:{gender}:city:{city}'
+                await self.redis.delete(key)
+                await self.redis.rpush(key, *users)
+
 
 class UserService:
     def __init__(self,
@@ -127,9 +169,7 @@ class UserService:
             where(city_clause). \
             where(gender_clause). \
             where(User.date_of_birth.between(min_age, max_age)). \
-            where(User.id != current_user.id). \
-            where(~User.id.in_(ignore_users)). \
-            where(~User.blocked_by.any(id=current_user.id))
+            where(User.id != current_user.id)
         return self.db.execute(query).scalars().all()
 
     def get_user(self, user_id: UUID) -> Optional[User]:
@@ -137,7 +177,8 @@ class UserService:
             select(User).where(User.id == user_id)) \
             .scalar_one_or_none()
 
-    def get_users(self, user_ids: Optional[IDList] = None) -> list[User]:
+    def get_users(self, user_ids: Optional[Union[IDList, list[str]]] = None) \
+            -> list[User]:
         # TODO use load_only for card preview
         clause = True if user_ids is None else User.id.in_(user_ids)
         return self.db.execute(select(User).where(clause)). \
@@ -274,3 +315,68 @@ class UserService:
     def get_firebase_token(self, user_id: UUID):
         return self.db.execute(select(User.firebase_token).
                                where(User.id == user_id)).scalar_one_or_none()
+
+    def fetch_locations(self) -> dict[str, list]:
+        """
+        Returns rows of cities grouped by country.
+        Each row has two fields: row.country.country
+            and grouped cities: row.cities
+        :return: A list of rows.
+        """
+        query = select(Bundle("country", Location.country),
+                       Bundle("cities",
+                              func.array_agg(Location.city))).group_by(
+            Location.country)
+        query_result = self.db.execute(query)
+        result = dict()
+        for row in query_result.all():
+            result[row.country.country] = list(row.cities)[0]
+        return result
+
+    def fetch_popular(self, country: str,
+                      gender: Optional[Gender] = None,
+                      city: Optional[str] = None,
+                      limit: int = 100) -> list[str]:
+        city_clause = True if not city else Location.city == city
+        gender_clause = True if not gender else User.gender == gender
+        query = select(cast(User.id, String)).join(User.location). \
+            where(Location.country == country). \
+            where(gender_clause). \
+            where(city_clause).order_by(desc(User.rating)).limit(limit)
+        return self.db.execute(query).scalars().all()
+
+
+class CacheService:
+    def __init__(self, user_service: UserService,
+                 redis_service: RedisUserService):
+        self.user_service = user_service
+        self.redis_service = redis_service
+
+    async def _fill_cache(self, country, city: Optional[str] = None,
+                          gender: Optional[Gender] = None):
+        users = self.user_service.fetch_popular(
+            country=country, city=city, gender=gender)
+        # user_objects = self.user_service.get_users(users)
+        await self.redis_service.save_popular_users(
+            country=country, city=city, gender=gender, users=users)
+
+    async def populate_popular_cache(self):
+        logger.info("populating popular cache")
+
+        locations = self.redis_service.fetch_locations()
+        async for country, cities in locations:
+            await self._fill_cache(country, gender=Gender.MALE)
+            await self._fill_cache(country, gender=Gender.FEMALE)
+            await self._fill_cache(country)
+
+            for city in cities:
+                await self._fill_cache(country, city=city, gender=Gender.MALE)
+                await self._fill_cache(country, city=city, gender=Gender.FEMALE)
+                await self._fill_cache(country, city=city)
+
+    async def populate_country_cache(self):
+        locations = self.user_service.fetch_locations()
+
+        logger.info("Populating location cache")
+        for country, cities in locations.items():
+            await self.redis_service.add_cities(country, cities)

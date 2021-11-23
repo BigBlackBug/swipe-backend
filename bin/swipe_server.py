@@ -1,5 +1,8 @@
+import asyncio
 import os
 import sys
+
+from fastapi_utils.tasks import repeat_every
 
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from swipe import config
@@ -10,7 +13,9 @@ import logging
 import alembic.command
 import alembic.config
 import uvicorn
-
+from swipe.swipe_server.users.services import RedisUserService, UserService, \
+    CacheService
+from swipe.swipe_server.misc import dependencies
 from swipe.settings import settings, constants
 from swipe.swipe_server import swipe_app
 import sentry_sdk
@@ -38,8 +43,29 @@ def run_migrations():
     alembic.command.upgrade(alembic_cfg, 'head')
 
 
+async def populate_country_cache():
+    logger.info("Populating country cache")
+    with dependencies.db_context() as db:
+        redis_service = RedisUserService(await dependencies.redis())
+        user_service = UserService(db)
+        cache_service = CacheService(user_service, redis_service)
+        await cache_service.populate_country_cache()
+
+
+@app.on_event("startup")
+@repeat_every(seconds=60 * 60, logger=logger)
+async def populate_popular_cache():
+    logger.info("Populating popular cache")
+    with dependencies.db_context() as db:
+        redis_service = RedisUserService(await dependencies.redis())
+        user_service = UserService(db)
+        cache_service = CacheService(user_service, redis_service)
+        await cache_service.populate_popular_cache()
+
+
 if __name__ == '__main__':
     run_migrations()
+    asyncio.get_event_loop().run_until_complete(populate_country_cache())
     logger.info(f'Starting app at port {settings.SWIPE_PORT}')
     uvicorn.run('bin.swipe_server:app', host='0.0.0.0',  # noqa
                 port=settings.SWIPE_PORT, workers=1,

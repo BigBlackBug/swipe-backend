@@ -132,9 +132,12 @@ class JWTPayload(AuthenticationIn):
         return str(value)
 
 
-class SortType(str, enum.Enum):
-    RATING = 'rating'
-    AGE_DIFFERENCE = 'age_difference'
+class PopularFilterBody(BaseModel):
+    limit: Optional[int] = 15
+    offset: Optional[int] = 0
+    gender: Optional[Gender] = None
+    city: Optional[str] = None
+    country: str
 
 
 class FilterBody(BaseModel):
@@ -142,10 +145,7 @@ class FilterBody(BaseModel):
     gender: Optional[Gender] = None
     city: Optional[str] = None
     online: Optional[bool] = None
-    ignore_users: Optional[list[UUID]] = []
     max_age_difference: Optional[int] = 5
-
-    sort: Optional[SortType] = SortType.AGE_DIFFERENCE
 
 
 class UserOutChatPreviewORM(BaseModel):

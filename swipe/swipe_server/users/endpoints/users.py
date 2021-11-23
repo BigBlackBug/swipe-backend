@@ -9,13 +9,39 @@ from starlette.responses import Response
 import swipe.swipe_server.misc.dependencies
 from swipe.swipe_server.misc import security
 from swipe.swipe_server.users.models import User, IDList
-from swipe.swipe_server.users.schemas import SortType, UserCardPreviewOut, \
-    FilterBody, UserOut, UserOutGlobalChatPreviewORM
+from swipe.swipe_server.users.schemas import UserCardPreviewOut, \
+    FilterBody, UserOut, PopularFilterBody
 from swipe.swipe_server.users.services import UserService, RedisUserService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+@router.post(
+    '/fetch_popular',
+    name='Fetch users according to the filter',
+    responses={
+        200: {'description': 'List of users according to filter'},
+        400: {'description': 'Bad Request'},
+    },
+    response_model=list[UserCardPreviewOut])
+async def fetch_list_of_users(
+        filter_params: PopularFilterBody = Body(...),
+        user_service: UserService = Depends(),
+        redis_service: RedisUserService = Depends(),
+        current_user: User = Depends(security.get_current_user)):
+    # TODO maybe store whole users?
+    popular_users: list[str] = \
+        await redis_service.get_popular_users(filter_params)
+
+    collected_users = user_service.get_users(user_ids=popular_users)
+    collected_users = sorted(collected_users,
+                             key=lambda user: user.rating, reverse=True)
+    return [
+        UserCardPreviewOut.patched_from_orm(user)
+        for user in collected_users
+    ]
 
 
 @router.post(

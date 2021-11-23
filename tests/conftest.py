@@ -81,7 +81,7 @@ def test_app():
 
 @pytest.fixture
 async def fake_redis():
-    redis = FakeRedis()
+    redis = FakeRedis(decode_responses=True)
     yield redis
     await redis.close()
 
