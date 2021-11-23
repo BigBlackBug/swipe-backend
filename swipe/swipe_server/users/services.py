@@ -2,7 +2,8 @@ import datetime
 import logging
 import time
 import uuid
-from typing import Optional, Union, Tuple, AsyncGenerator
+from dataclasses import dataclass
+from typing import Optional, Union, Tuple, AsyncGenerator, Iterable
 from uuid import UUID
 
 import requests
@@ -11,8 +12,9 @@ from dateutil.relativedelta import relativedelta
 from fastapi import Depends
 from jose import jwt
 from jose.constants import ALGORITHMS
-from sqlalchemy import select, delete, func, desc, String, cast
+from sqlalchemy import select, delete, func, desc, String, cast, insert
 from sqlalchemy.engine import Row
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, Bundle
 
 import swipe.swipe_server.misc.dependencies
@@ -22,14 +24,30 @@ from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users import schemas
 from swipe.swipe_server.users.enums import Gender
-from swipe.swipe_server.users.models import IDList, User, AuthInfo, Location
+from swipe.swipe_server.users.models import IDList, User, AuthInfo, Location, \
+    blacklist_table
 from swipe.swipe_server.users.schemas import PopularFilterBody
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class UserRequestCacheSettings:
+    age: int
+    age_diff: int
+    current_country: str
+    gender_filter: str
+    city_filter: str
+
+    def cache_key(self):
+        return f'online:{self.age}:{self.age_diff}:' \
+               f'{self.current_country}:' \
+               f'{self.gender_filter}:{self.city_filter}'
+
+
 class RedisUserService:
     ONLINE_USERS_SET = 'online_users'
+    BLACKLIST_KEY = 'blacklist'
 
     def __init__(self,
                  redis: Redis = Depends(
@@ -61,24 +79,21 @@ class RedisUserService:
             f'{constants.FREE_SWIPES_REDIS_PREFIX}{user_object.id}')
         return int(reap_timestamp) if reap_timestamp else None
 
-    async def filter_online_users(self, user_ids: IDList,
-                                  status: bool = True) -> IDList:
-        result: IDList = []
-        for user_id in user_ids:
-            # TODO cache online users in memory and use set intersections
-            is_online = await self.is_online(user_id)
-            if is_online == status:
-                result.append(user_id)
-        return result
+    async def filter_online_users(self, user_ids: set[str]) -> set[str]:
+        online_users: set[str] = await self.redis.smembers(
+            self.ONLINE_USERS_SET)
+        return user_ids.intersection(online_users)
 
     async def is_online(self, user_id: UUID) -> bool:
         return await self.redis.sismember(self.ONLINE_USERS_SET, str(user_id))
 
-    async def refresh_online_status(self, user_id: UUID):
+    async def connect_user(self, user_id: UUID):
         await self.redis.sadd(self.ONLINE_USERS_SET, str(user_id))
 
-    async def remove_online_user(self, user_id: UUID):
+    async def disconnect_user(self, user_id: UUID):
         await self.redis.srem(self.ONLINE_USERS_SET, str(user_id))
+        # remove blacklist cache
+        await self.redis.delete(f'{self.BLACKLIST_KEY}:{user_id}')
 
     async def add_cities(self, country: str, cities: list[str]):
         await self.redis.lpush(f'country:{country}', *cities)
@@ -97,7 +112,8 @@ class RedisUserService:
             key, filter_params.offset,
             filter_params.offset + filter_params.limit - 1)
 
-    async def fetch_locations(self) -> AsyncGenerator[Tuple[str, list[str]], None]:
+    async def fetch_locations(self) \
+            -> AsyncGenerator[Tuple[str, list[str]], None]:
         countries = await self.redis.keys("country:*")
         for country_key in countries:
             country = country_key.split(":")[1]
@@ -121,6 +137,39 @@ class RedisUserService:
                 await self.redis.delete(key)
                 await self.redis.rpush(key, *users)
 
+    async def filter_blacklist(self, current_user_id: UUID,
+                               user_ids: set[str]) -> set[str]:
+        if settings.ENABLE_BLACKLIST:
+            blacklist: set[str] = await self.get_blacklist(current_user_id)
+            return user_ids.difference(blacklist)
+        return user_ids
+
+    async def get_blacklist(self, user_id: UUID) -> set[str]:
+        return await self.redis.smembers(f'{self.BLACKLIST_KEY}:{user_id}')
+
+    async def add_to_blacklist(self, current_user_id: str, user_id: str):
+        if settings.ENABLE_BLACKLIST:
+            await self.redis.sadd(f'{self.BLACKLIST_KEY}:{current_user_id}',
+                                  user_id)
+            await self.redis.sadd(f'{self.BLACKLIST_KEY}:{user_id}',
+                                  current_user_id)
+
+    async def populate_blacklist(self, user_id: str, blacklist: set[str]):
+        if settings.ENABLE_BLACKLIST:
+            await self.redis.sadd(f'{self.BLACKLIST_KEY}:{user_id}', *blacklist)
+
+    async def find_user_ids(self, cache_settings: UserRequestCacheSettings) \
+            -> set[str]:
+        return await self.redis.smembers(cache_settings.cache_key())
+
+    async def store_user_ids(self, cache_settings: UserRequestCacheSettings,
+                             current_user_ids: set[str]):
+        if current_user_ids:
+            await self.redis.delete(cache_settings.cache_key())
+            await self.redis.sadd(cache_settings.cache_key(), *current_user_ids)
+            await self.redis.expire(cache_settings.cache_key(),
+                                    time=constants.USER_CACHE_TTL_SECS)
+
 
 class UserService:
     def __init__(self,
@@ -143,8 +192,7 @@ class UserService:
     def find_user_ids(self, current_user: User,
                       gender: Optional[Gender] = None,
                       age_difference: int = 0,
-                      city: Optional[str] = None,
-                      ignore_users: Optional[IDList] = None) -> IDList:
+                      city: Optional[str] = None) -> set[str]:
         """
         Return a list of user ids with regards to supplied filters
 
@@ -152,10 +200,8 @@ class UserService:
         :param gender: ignore if None
         :param age_difference:
         :param city: ignore if None
-        :param ignore_users: user ids to exclude from query
         :return:
         """
-        ignore_users = ignore_users if ignore_users else []
         city_clause = True if not city else Location.city == city
         gender_clause = True if not gender else User.gender == gender
         min_age = current_user.date_of_birth - relativedelta(
@@ -163,13 +209,12 @@ class UserService:
         max_age = current_user.date_of_birth + relativedelta(
             years=age_difference)
 
-        # all users are filtered by country
-        query = select(User.id).join(User.location). \
+        query = select(cast(User.id, String)).join(User.location). \
             where(Location.country == current_user.location.country). \
             where(city_clause). \
             where(gender_clause). \
-            where(User.date_of_birth.between(min_age, max_age)). \
-            where(User.id != current_user.id)
+            where(User.date_of_birth.between(min_age, max_age))
+
         return self.db.execute(query).scalars().all()
 
     def get_user(self, user_id: UUID) -> Optional[User]:
@@ -177,11 +222,14 @@ class UserService:
             select(User).where(User.id == user_id)) \
             .scalar_one_or_none()
 
-    def get_users(self, user_ids: Optional[Union[IDList, list[str]]] = None) \
+    def get_users(self, current_user_id: UUID,
+                  user_ids: Optional[
+                      Union[Iterable[UUID], Iterable[str]]] = None) \
             -> list[User]:
         # TODO use load_only for card preview
         clause = True if user_ids is None else User.id.in_(user_ids)
-        return self.db.execute(select(User).where(clause)). \
+        return self.db.execute(select(User).where(clause)
+                               .where(User.id != current_user_id)). \
             scalars().all()
 
     def get_user_chat_preview(
@@ -344,6 +392,25 @@ class UserService:
             where(gender_clause). \
             where(city_clause).order_by(desc(User.rating)).limit(limit)
         return self.db.execute(query).scalars().all()
+
+    def update_blacklist(self, blocker_id: str, blocked_user_id: str):
+        if settings.ENABLE_BLACKLIST:
+            try:
+                self.db.execute(insert(blacklist_table).values(
+                    blocked_user_id=blocked_user_id,
+                    blocked_by_id=blocker_id))
+                self.db.commit()
+            except IntegrityError:
+                raise SwipeError(f"{blocked_user_id} is "
+                                 f"already blocked by {blocker_id}")
+
+    def fetch_blacklist(self, user_id: str) -> set[str]:
+        if settings.ENABLE_BLACKLIST:
+            return set(self.db.execute(
+                select(cast(blacklist_table.columns.blocked_user_id, String))
+                    .where(blacklist_table.columns.blocked_by_id == user_id)
+            ).scalars())
+        return set()
 
 
 class CacheService:

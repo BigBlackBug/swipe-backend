@@ -80,7 +80,9 @@ async def websocket_endpoint(
         data=ChatUserData(name=user.name, avatar_url=user.avatar_url))
 
     await connection_manager.connect(user)
-    await redis_service.refresh_online_status(user_uuid)
+    await redis_service.connect_user(user_uuid)
+    blacklist:set[str] = user_service.fetch_blacklist(user_id)
+    await redis_service.populate_blacklist(user_id, blacklist)
 
     logger.info(f"{user_id} connected from {websocket.client}, "
                 f"sending join event")
@@ -92,7 +94,7 @@ async def websocket_endpoint(
             'avatar_url': user.data.avatar_url
         })
 
-    request_processor = ChatServerRequestProcessor(chat_service)
+    request_processor = ChatServerRequestProcessor(chat_service, redis_service)
     while True:
         try:
             raw_data: str = await websocket.receive_text()
@@ -100,14 +102,14 @@ async def websocket_endpoint(
         except WebSocketDisconnect as e:
             logger.exception(f"{user_id} disconnected with code {e.code}")
             await connection_manager.disconnect(user_id)
-            await redis_service.remove_online_user(user_uuid)
+            await redis_service.disconnect_user(user_uuid)
             break
 
         try:
             payload: BasePayload = BasePayload.validate(json.loads(raw_data))
             logger.info(f"Payload type: {payload.payload.type_}")
 
-            request_processor.process(payload)
+            await request_processor.process(payload)
             if isinstance(payload.payload, GlobalMessagePayload):
                 await connection_manager.broadcast(
                     str(payload.sender_id), payload.dict(
@@ -122,14 +124,14 @@ async def websocket_endpoint(
 async def create_chat_from_matchmaking(
         payload: BasePayload = Body(...),
         chat_service: ChatService = Depends(),
-        user_service: UserService = Depends()):
-    request_processor = ChatServerRequestProcessor(chat_service)
+        redis_service: RedisUserService = Depends()):
+    request_processor = ChatServerRequestProcessor(chat_service, redis_service)
     if not isinstance(payload.payload, CreateChatPayload):
         # TODO refactor
         raise SwipeError("Unsupported payload")
 
     logger.info(f"Creating chat from matchmaking: {payload}")
-    request_processor.process(payload)
+    await request_processor.process(payload)
 
     out_payload = payload.dict(by_alias=True, exclude_unset=True)
     logger.info(f"Sending data to {payload.recipient_id}")

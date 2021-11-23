@@ -7,9 +7,11 @@ from pydantic import BaseSettings, PostgresDsn
 
 class Constants(BaseSettings):
     FREE_SWIPES_PER_TIME_PERIOD = 50
-    # TODO change in production
-    # FREE_SWIPES_COOLDOWN_SEC = 30 * 60
+    # TODO make it 30 mins
     FREE_SWIPES_COOLDOWN_SEC = 10
+
+    # TODO make it 20 mins
+    USER_CACHE_TTL_SECS = 5
 
     FREE_SWIPES_REDIS_PREFIX = 'free_swipes_cooldown_'
 
@@ -32,6 +34,7 @@ class Settings(BaseSettings):
     ENABLE_SQL_ECHO: Optional[bool] = True
     ENABLE_WEB_SERVER_AUTORELOAD: Optional[bool] = False
     ENABLE_MATCHMAKING_BLACKLIST: Optional[bool] = False
+    ENABLE_BLACKLIST: Optional[bool] = False
 
     CHAT_SERVER_PORT: Optional[int]
     CHAT_SERVER_HOST: Optional[str]

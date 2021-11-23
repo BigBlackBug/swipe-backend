@@ -22,6 +22,7 @@ from swipe.matchmaking.services import MMUserService
 from swipe.settings import settings
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import IDList
+from swipe.swipe_server.users.services import RedisUserService
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +145,7 @@ async def _process_disconnect(user_id: str):
 
 
 async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData,
-                           user_service: MMUserService):
+                           user_service: MMUserService, redis_service: RedisUserService):
     data_payload = base_payload.payload
     sender_id = base_payload.sender_id
     recipient_id = base_payload.recipient_id
@@ -164,7 +165,9 @@ async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData,
             matchmaking_data.remove_match(recipient_id)
 
             # a decline means we add them to each others blacklist
-            user_service.update_blacklist(sender_id, recipient_id)
+            if settings.ENABLE_MATCHMAKING_BLACKLIST:
+                user_service.update_blacklist(sender_id, recipient_id)
+                await redis_service.add_to_blacklist(sender_id, recipient_id)
     elif isinstance(data_payload, MMLobbyPayload):
         if data_payload.action == MMLobbyAction.CONNECT:
             # user joined the lobby

@@ -27,6 +27,7 @@ async def test_redis_fetch_online_country(
         location=LocationSchema(country='Russia', city='Saint Petersburg',
                                 flag='a')))
     user_r_s_m.gender = Gender.MALE
+    user_r_s_m.rating = 50
     session.add(user_r_s_m)
 
     user_r_s_m2 = randomizer.generate_random_user()
@@ -36,6 +37,14 @@ async def test_redis_fetch_online_country(
     user_r_s_m2.gender = Gender.MALE
     user_r_s_m2.rating = 500
     session.add(user_r_s_m2)
+
+    user_r_s_m3 = randomizer.generate_random_user()
+    user_service.update_user(user_r_s_m3, UserUpdate(
+        location=LocationSchema(country='Russia', city='Saint Petersburg',
+                                flag='a')))
+    user_r_s_m3.gender = Gender.MALE
+    user_r_s_m3.rating = 10
+    session.add(user_r_s_m3)
 
     user_r_s_f = randomizer.generate_random_user()
     user_service.update_user(user_r_s_f, UserUpdate(
@@ -65,11 +74,10 @@ async def test_redis_fetch_online_country(
 
     result: list[str] = await redis_service.get_popular_users(
         PopularFilterBody(gender=Gender.MALE, country='Russia'))
-    assert set(result) == {
-        str(user_r_s_m.id), str(user_r_s_m2.id)}
+    assert result == [str(user_r_s_m2.id), str(user_r_s_m.id), str(user_r_s_m3.id)]
 
     result: list[str] = await redis_service.get_popular_users(
-        PopularFilterBody(gender=Gender.FEMALE, city='New York'))
+        PopularFilterBody(gender=Gender.FEMALE, city='New York', country='USA'))
     assert set(result) == {
         str(user_u_n_f.id)}
 

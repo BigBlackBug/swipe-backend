@@ -12,6 +12,7 @@ from swipe.swipe_server.chats.models import GlobalChatMessage, Chat, \
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
+from swipe.swipe_server.users.services import UserService, RedisUserService
 
 NOW = datetime.datetime.now()
 
@@ -19,10 +20,11 @@ NOW = datetime.datetime.now()
 @pytest.mark.anyio
 async def test_post_global_message(
         default_user: models.User,
-        chat_service: ChatService,
+        chat_service: ChatService, user_service: UserService,
+        redis_service: RedisUserService,
         default_user_auth_headers: dict[str, str]):
     message_id = uuid.uuid4()
-    mp = ChatServerRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'payload': {
@@ -32,7 +34,7 @@ async def test_post_global_message(
             'text': 'hello'
         }
     })
-    mp.process(json_data)
+    await mp.process(json_data)
 
     global_messages: list[GlobalChatMessage] = chat_service.fetch_global_chat()
     assert len(global_messages) == 1
@@ -42,7 +44,8 @@ async def test_post_global_message(
 @pytest.mark.anyio
 async def test_post_directed_message(
         default_user: models.User,
-        chat_service: ChatService,
+        chat_service: ChatService, user_service: UserService,
+        redis_service: RedisUserService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
@@ -53,7 +56,7 @@ async def test_post_directed_message(
         chat_status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY)
     message_id = uuid.uuid4()
 
-    mp = ChatServerRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -64,7 +67,7 @@ async def test_post_directed_message(
             'text': 'hello'
         }
     })
-    mp.process(json_data)
+    await mp.process(json_data)
 
     chat: Chat = \
         chat_service.fetch_chat_by_members(recipient.id, default_user.id)
@@ -77,7 +80,8 @@ async def test_post_directed_message(
 @pytest.mark.anyio
 async def test_set_received_status(
         default_user: models.User,
-        chat_service: ChatService,
+        chat_service: ChatService, user_service: UserService,
+        redis_service: RedisUserService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
@@ -90,7 +94,7 @@ async def test_set_received_status(
     chat_service.post_message(
         message_id, default_user.id, recipient.id,
         timestamp=NOW, message='what', is_liked=False)
-    mp = ChatServerRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'payload': {
@@ -99,7 +103,7 @@ async def test_set_received_status(
             'status': 'received'
         }
     })
-    mp.process(json_data)
+    await mp.process(json_data)
 
     chat = chat_service.fetch_chat(chat_id)
     assert len(chat.messages) == 1
@@ -111,7 +115,8 @@ async def test_set_received_status(
 async def test_set_read_status(
 
         default_user: models.User,
-        chat_service: ChatService,
+        chat_service: ChatService, user_service: UserService,
+        redis_service: RedisUserService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
@@ -124,7 +129,7 @@ async def test_set_read_status(
     chat_service.post_message(
         message_id, default_user.id, recipient.id,
         timestamp=NOW, message='what', is_liked=False)
-    mp = ChatServerRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'payload': {
@@ -133,7 +138,7 @@ async def test_set_read_status(
             'status': 'read'
         }
     })
-    mp.process(json_data)
+    await mp.process(json_data)
 
     message: ChatMessage = chat_service.fetch_message(message_id)
     assert message.status == MessageStatus.READ
@@ -143,7 +148,8 @@ async def test_set_read_status(
 async def test_set_liked(
 
         default_user: models.User,
-        chat_service: ChatService,
+        chat_service: ChatService, user_service: UserService,
+        redis_service: RedisUserService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
@@ -156,7 +162,7 @@ async def test_set_liked(
     chat_service.post_message(
         message_id, default_user.id, recipient.id,
         timestamp=NOW, message='what', is_liked=False)
-    mp = ChatServerRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'payload': {
@@ -165,7 +171,7 @@ async def test_set_liked(
             'like': True
         }
     })
-    mp.process(json_data)
+    await mp.process(json_data)
 
     message: ChatMessage = chat_service.fetch_message(message_id)
     assert message.is_liked
@@ -174,7 +180,8 @@ async def test_set_liked(
 @pytest.mark.anyio
 async def test_set_disliked(
         default_user: models.User,
-        chat_service: ChatService,
+        chat_service: ChatService, user_service: UserService,
+        redis_service: RedisUserService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
@@ -187,7 +194,7 @@ async def test_set_disliked(
     chat_service.post_message(
         message_id, default_user.id, recipient.id,
         timestamp=NOW, message='what', is_liked=True)
-    mp = ChatServerRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'payload': {
@@ -196,7 +203,7 @@ async def test_set_disliked(
             'like': False
         }
     })
-    mp.process(json_data)
+    await mp.process(json_data)
 
     message: ChatMessage = chat_service.fetch_message(message_id)
     assert not message.is_liked
@@ -205,12 +212,13 @@ async def test_set_disliked(
 @pytest.mark.anyio
 async def test_create_chat_direct(
         default_user: models.User,
-        chat_service: ChatService,
+        chat_service: ChatService, user_service: UserService,
+        redis_service: RedisUserService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
-    mp = ChatServerRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
     json_data = BasePayload.validate({
 
         'sender_id': str(default_user.id),
@@ -228,7 +236,7 @@ async def test_create_chat_direct(
             }
         }
     })
-    mp.process(json_data)
+    await mp.process(json_data)
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     # direct chats are created 'requested'
@@ -243,12 +251,13 @@ async def test_create_chat_direct(
 @pytest.mark.anyio
 async def test_create_chat_text_lobby(
         default_user: models.User,
-        chat_service: ChatService,
+        chat_service: ChatService, user_service: UserService,
+        redis_service: RedisUserService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
-    mp = ChatServerRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -265,7 +274,7 @@ async def test_create_chat_text_lobby(
             } for _ in range(5)]
         }
     })
-    mp.process(json_data)
+    await mp.process(json_data)
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     # lobby chats are accepted from the beginning
@@ -280,12 +289,13 @@ async def test_create_chat_text_lobby(
 @pytest.mark.anyio
 async def test_create_chat_audio_lobby(
         default_user: models.User,
-        chat_service: ChatService,
+        chat_service: ChatService, user_service: UserService,
+        redis_service: RedisUserService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
-    mp = ChatServerRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -295,7 +305,7 @@ async def test_create_chat_audio_lobby(
             'chat_id': str(chat_id),
         }
     })
-    mp.process(json_data)
+    await mp.process(json_data)
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     # lobby chats are accepted from the beginning
@@ -309,12 +319,13 @@ async def test_create_chat_audio_lobby(
 @pytest.mark.anyio
 async def test_create_chat_video_lobby(
         default_user: models.User,
-        chat_service: ChatService,
+        chat_service: ChatService, user_service: UserService,
+        redis_service: RedisUserService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
-    mp = ChatServerRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -324,7 +335,7 @@ async def test_create_chat_video_lobby(
             'chat_id': str(chat_id),
         }
     })
-    mp.process(json_data)
+    await mp.process(json_data)
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     # lobby chats are accepted from the beginning
@@ -338,7 +349,8 @@ async def test_create_chat_video_lobby(
 @pytest.mark.anyio
 async def test_decline_chat(
         default_user: models.User,
-        chat_service: ChatService,
+        chat_service: ChatService, user_service: UserService,
+        redis_service: RedisUserService,
         session: Session,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
@@ -366,7 +378,7 @@ async def test_decline_chat(
         image_id='345345.png', sender=initiator)
     chat.messages.extend([msg1, msg2, msg3, msg4])
     session.commit()
-    mp = ChatServerRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -375,7 +387,7 @@ async def test_decline_chat(
             'chat_id': str(chat_id),
         }
     })
-    mp.process(json_data)
+    await mp.process(json_data)
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     assert not chat
@@ -384,7 +396,8 @@ async def test_decline_chat(
 @pytest.mark.anyio
 async def test_accept_chat(
         default_user: models.User,
-        chat_service: ChatService,
+        chat_service: ChatService, user_service: UserService,
+        redis_service: RedisUserService,
         session: Session,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
@@ -412,7 +425,7 @@ async def test_accept_chat(
         image_id='345345.png', sender=initiator)
     chat.messages.extend([msg1, msg2, msg3, msg4])
     session.commit()
-    mp = ChatServerRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -421,7 +434,7 @@ async def test_accept_chat(
             'chat_id': str(chat_id),
         }
     })
-    mp.process(json_data)
+    await mp.process(json_data)
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     assert chat.status == ChatStatus.ACCEPTED
@@ -430,7 +443,8 @@ async def test_accept_chat(
 @pytest.mark.anyio
 async def test_open_chat(
         default_user: models.User,
-        chat_service: ChatService,
+        chat_service: ChatService, user_service: UserService,
+        redis_service: RedisUserService,
         session: Session,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
@@ -458,7 +472,7 @@ async def test_open_chat(
         image_id='345345.png', sender=initiator)
     chat.messages.extend([msg1, msg2, msg3, msg4])
     session.commit()
-    mp = ChatServerRequestProcessor(chat_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -467,7 +481,7 @@ async def test_open_chat(
             'chat_id': str(chat_id),
         }
     })
-    mp.process(json_data)
+    await mp.process(json_data)
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     assert chat.status == ChatStatus.OPENED

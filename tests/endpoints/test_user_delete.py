@@ -184,7 +184,7 @@ async def test_user_delete_with_blacklist(
     mocker.patch('swipe.swipe_server.users.models.storage_client')
 
     other_user = randomizer.generate_random_user()
-    other_user.block_user(default_user)
+    user_service.update_blacklist(str(other_user.id), str(default_user.id))
     session.commit()
 
     auth_info_id: UUID = default_user.auth_info.id

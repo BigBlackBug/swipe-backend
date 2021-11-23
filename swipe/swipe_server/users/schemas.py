@@ -140,12 +140,12 @@ class PopularFilterBody(BaseModel):
     country: str
 
 
-class FilterBody(BaseModel):
+class OnlineFilterBody(BaseModel):
     limit: Optional[int] = 15
     gender: Optional[Gender] = None
     city: Optional[str] = None
-    online: Optional[bool] = None
     max_age_difference: Optional[int] = 5
+    ignore_users: list[str] = []
 
 
 class UserOutChatPreviewORM(BaseModel):

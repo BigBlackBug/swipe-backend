@@ -8,15 +8,16 @@ from swipe.settings import settings
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.services import RedisUserService
+from swipe.swipe_server.users.services import RedisUserService, UserService
 
 
 @pytest.mark.anyio
-async def test_user_fetch_offline_ignore(
+async def test_user_fetch_ignore(
         client: AsyncClient,
         default_user: User,
         randomizer: RandomEntityGenerator,
         session: Session,
+        redis_service: RedisUserService,
         default_user_auth_headers: dict[str, str]):
     default_user.date_of_birth = datetime.date.today().replace(year=2000)
 
@@ -24,18 +25,22 @@ async def test_user_fetch_offline_ignore(
     user_1 = randomizer.generate_random_user()
     user_1.date_of_birth = datetime.date.today().replace(year=2000)
     user_1.location.country = 'Russia'
+    await redis_service.connect_user(user_1.id)
 
     user_2 = randomizer.generate_random_user()
     user_2.date_of_birth = datetime.date.today().replace(year=2000)
     user_2.location.country = 'Russia'
+    await redis_service.connect_user(user_2.id)
 
     user_3 = randomizer.generate_random_user()
     user_3.date_of_birth = datetime.date.today().replace(year=2001)
     user_3.location.country = 'Russia'
+    await redis_service.connect_user(user_3.id)
 
     user_4 = randomizer.generate_random_user()
     user_4.date_of_birth = datetime.date.today().replace(year=2005)
     user_4.location.country = 'Russia'
+    await redis_service.connect_user(user_4.id)
     session.commit()
     # --------------------------------------------------------------------------
 
@@ -44,7 +49,6 @@ async def test_user_fetch_offline_ignore(
         f"{settings.API_V1_PREFIX}/users/fetch",
         headers=default_user_auth_headers,
         json={
-            'online': False,
             'limit': 10,
             'ignore_users': [str(user_4.id), ]
         }
@@ -58,11 +62,12 @@ async def test_user_fetch_offline_ignore(
 
 
 @pytest.mark.anyio
-async def test_user_fetch_offline_limit_sort_age(
+async def test_user_fetch_offline_limit(
         client: AsyncClient,
         default_user: User,
         randomizer: RandomEntityGenerator,
         session: Session,
+        redis_service: RedisUserService,
         default_user_auth_headers: dict[str, str]):
     default_user.date_of_birth = datetime.date.today().replace(year=2000)
 
@@ -70,14 +75,17 @@ async def test_user_fetch_offline_limit_sort_age(
     user_1 = randomizer.generate_random_user()
     user_1.date_of_birth = datetime.date.today().replace(year=2000)
     user_1.location.country = 'Russia'
+    await redis_service.connect_user(user_1.id)
 
     user_2 = randomizer.generate_random_user()
     user_2.date_of_birth = datetime.date.today().replace(year=2001)
     user_2.location.country = 'Russia'
+    await redis_service.connect_user(user_2.id)
 
     user_3 = randomizer.generate_random_user()
     user_3.date_of_birth = datetime.date.today().replace(year=2002)
     user_3.location.country = 'Russia'
+    await redis_service.connect_user(user_3.id)
 
     user_4 = randomizer.generate_random_user()
     user_4.date_of_birth = datetime.date.today().replace(year=2003)
@@ -90,18 +98,15 @@ async def test_user_fetch_offline_limit_sort_age(
         f"{settings.API_V1_PREFIX}/users/fetch",
         headers=default_user_auth_headers,
         json={
-            'online': False,
-            'limit': 3,
-            'sort': 'age_difference'
+            'limit': 2,
         }
     )
 
     assert response.status_code == 200
     resp_data = response.json()
-    assert len(resp_data) == 3
+    assert len(resp_data) == 2
     assert resp_data[0]['id'] == str(user_1.id)
     assert resp_data[1]['id'] == str(user_2.id)
-    assert resp_data[2]['id'] == str(user_3.id)
 
 
 @pytest.mark.anyio
@@ -131,7 +136,7 @@ async def test_user_fetch_online_gender(
     user_3.name = 'user3'
     user_3.date_of_birth = datetime.date.today().replace(year=2001)
     user_3.gender = Gender.MALE
-    await redis_service.refresh_online_status(user_3.id)
+    await redis_service.connect_user(user_3.id)
     user_3.location.country = 'Russia'
 
     user_4 = randomizer.generate_random_user()
@@ -153,7 +158,6 @@ async def test_user_fetch_online_gender(
         f"{settings.API_V1_PREFIX}/users/fetch",
         headers=default_user_auth_headers,
         json={
-            'online': True,
             'gender': 'male'
         }
     )
@@ -194,7 +198,7 @@ async def test_user_fetch_online_city(
     user_3.name = 'user3'
     user_3.date_of_birth = datetime.date.today().replace(year=2001)
     user_3.gender = Gender.MALE
-    await redis_service.refresh_online_status(user_3.id)
+    await redis_service.connect_user(user_3.id)
     user_3.set_location({
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
     })
@@ -202,7 +206,7 @@ async def test_user_fetch_online_city(
     user_4 = randomizer.generate_random_user()
     user_4.name = 'user4'
     user_4.date_of_birth = datetime.date.today().replace(year=2005)
-    await redis_service.refresh_online_status(user_4.id)
+    await redis_service.connect_user(user_4.id)
     user_4.gender = Gender.MALE
     user_4.set_location({
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
@@ -223,7 +227,6 @@ async def test_user_fetch_online_city(
         f"{settings.API_V1_PREFIX}/users/fetch",
         headers=default_user_auth_headers,
         json={
-            'online': True,
             'city': 'Saint Petersburg'
         }
     )
@@ -240,6 +243,8 @@ async def test_user_fetch_blacklist(
         default_user: User,
         randomizer: RandomEntityGenerator,
         session: Session,
+        user_service: UserService,
+        redis_service: RedisUserService,
         default_user_auth_headers: dict[str, str]):
     default_user.date_of_birth = datetime.date.today().replace(year=2000)
 
@@ -284,20 +289,25 @@ async def test_user_fetch_blacklist(
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
     })
 
-    default_user.block_user(user_1)
-    default_user.block_user(user_2)
-    default_user.block_user(user_3)
+    user_service.update_blacklist(str(default_user.id), str(user_1.id))
+    user_service.update_blacklist(str(default_user.id), str(user_2.id))
+    user_service.update_blacklist(str(default_user.id), str(user_3.id))
 
+    await redis_service.add_to_blacklist(str(default_user.id), str(user_1.id))
+    await redis_service.add_to_blacklist(str(default_user.id), str(user_2.id))
+    await redis_service.add_to_blacklist(str(default_user.id), str(user_3.id))
+
+    await redis_service.connect_user(user_1.id)
+    await redis_service.connect_user(user_3.id)
+    await redis_service.connect_user(user_4.id)
+    await redis_service.connect_user(user_5.id)
     session.commit()
     # --------------------------------------------------------------------------
 
     # offline
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch",
-        headers=default_user_auth_headers,
-        json={
-            'online': False
-        }
+        headers=default_user_auth_headers, json={}
     )
 
     assert response.status_code == 200

@@ -39,6 +39,37 @@ async def test_user_update_dob_zodiac(
 
 
 @pytest.mark.anyio
+async def test_user_update_location(
+        client: AsyncClient,
+        default_user: User,
+        user_service: UserService,
+        redis_service: RedisUserService,
+        session: Session,
+        default_user_auth_headers: dict[str, str]):
+    default_user.date_of_birth = datetime.date.today()
+    session.commit()
+    response: Response = await client.patch(
+        f"{settings.API_V1_PREFIX}/me",
+        headers=default_user_auth_headers,
+        json={
+            'location': {
+                'city': 'Hello',
+                'country': 'What Country',
+                'flag': 'f'
+            }
+        })
+    session.refresh(default_user)
+    assert default_user.location.city == 'Hello'
+    assert default_user.location.country == 'What Country'
+
+    # assert country is saved to cache
+    country_keys = await redis_service.redis.keys("country:*")
+    assert 'country:What Country' in country_keys
+    cities = await redis_service.redis.lrange('country:What Country', 0, -1)
+    assert 'Hello' in cities
+
+
+@pytest.mark.anyio
 async def test_user_update_photo_list(
         mocker: MockerFixture,
         client: AsyncClient,

@@ -13,20 +13,26 @@ from swipe.chat_server.schemas import BasePayload, MessagePayload, \
     GlobalMessagePayload, \
     MessageStatusPayload, MessageLikePayload, ChatMessagePayload, \
     AcceptChatPayload, OpenChatPayload, DeclineChatPayload, CreateChatPayload
+from swipe.settings import settings
 from swipe.swipe_server.chats.models import MessageStatus, ChatSource, \
     ChatStatus
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.users.enums import Gender
+from swipe.swipe_server.users.services import RedisUserService, UserService
 
 logger = logging.getLogger(__name__)
 
 
 class ChatServerRequestProcessor:
-    def __init__(self, chat_service: ChatService):
+    def __init__(self, chat_service: ChatService,
+                 user_service: UserService,
+                 redis_service: RedisUserService):
         self.chat_service = chat_service
+        self.user_service = user_service
+        self.redis_service = redis_service
 
-    def process(self, data: BasePayload):
+    async def process(self, data: BasePayload):
         payload = data.payload
         logger.info(f"Got payload with type '{payload.type_}' "
                     f"from {data.sender_id}, payload: {payload}")
@@ -102,8 +108,15 @@ class ChatServerRequestProcessor:
             self.chat_service.update_chat_status(
                 payload.chat_id, status=ChatStatus.OPENED)
         elif isinstance(payload, DeclineChatPayload):
-            # TODO add to blacklist
             self.chat_service.delete_chat(chat_id=payload.chat_id)
+            logger.info(
+                f"Chat {payload.chat_id} was declined, "
+                f"adding both {data.sender_id} and {data.recipient_id}"
+                f"to each others blacklist")
+            self.user_service.update_blacklist(
+                str(data.sender_id), str(data.recipient_id))
+            await self.redis_service.add_to_blacklist(
+                str(data.sender_id), str(data.recipient_id))
 
 
 class PayloadEncoder(json.JSONEncoder):

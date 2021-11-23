@@ -9,7 +9,6 @@ from sqlalchemy import select, insert
 from sqlalchemy.orm import Session, load_only
 
 import swipe.swipe_server.misc.dependencies as dependencies
-from swipe.settings import settings
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import IDList, User, blacklist_table
 
@@ -46,8 +45,7 @@ class MMUserService:
             options(load_only(User.date_of_birth, User.gender)).one_or_none()
 
     def update_blacklist(self, blocker_id: str, blocked_user_id: str):
-        if settings.ENABLE_MATCHMAKING_BLACKLIST:
-            self.db.execute(insert(blacklist_table).values(
-                blocked_user_id=blocked_user_id,
-                blocked_by_id=blocker_id))
-            self.db.commit()
+        self.db.execute(insert(blacklist_table).values(
+            blocked_user_id=blocked_user_id,
+            blocked_by_id=blocker_id))
+        self.db.commit()

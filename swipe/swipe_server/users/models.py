@@ -96,13 +96,6 @@ class User(ModelBase):
 
         self.location = location_in_db
 
-    def block_user(self, target_user: User):
-        if target_user in self.blacklist:
-            raise SwipeError(
-                f'{target_user.id} is already blocked by {self.id}')
-
-        self.blacklist.append(target_user)
-
     def delete_photos(self):
         logger.info(f"Deleting user {self.id} photos")
         for photo in self.photos:

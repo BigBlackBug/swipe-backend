@@ -263,10 +263,10 @@ class Matchmaker:
     def _process_decline_pairs(self, incoming_data: MMDataCache):
         for user_a_id, user_b_id in incoming_data.decline_pairs:
             logger.info(f"Processing {user_a_id}, {user_b_id}")
-            # TODO uncomment in production
-            # disconnect vertices
-            # self._connection_graph[user_a_id].disconnect(user_b_id)
-            # self._connection_graph[user_b_id].disconnect(user_a_id)
+            if settings.ENABLE_MATCHMAKING_BLACKLIST:
+                # disconnect vertices
+                self._connection_graph[user_a_id].disconnect(user_b_id)
+                self._connection_graph[user_b_id].disconnect(user_a_id)
 
             # enable edges
             self._connection_graph[user_a_id].matched = False
@@ -274,9 +274,6 @@ class Matchmaker:
 
             self._connection_graph[user_b_id].matched = False
             # self._connection_graph[user_b_id].waiting = True
-
-        # logger.info("Clearing decline list")
-        # incoming_data.decline_pairs[:] = []
 
     def _merge_graphs(self, incoming_data: MMDataCache):
         for incoming_user_id, incoming_vertex \
