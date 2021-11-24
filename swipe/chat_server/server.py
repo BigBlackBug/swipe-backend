@@ -94,7 +94,8 @@ async def websocket_endpoint(
             'avatar_url': user.data.avatar_url
         })
 
-    request_processor = ChatServerRequestProcessor(chat_service, redis_service)
+    request_processor = ChatServerRequestProcessor(
+        chat_service, user_service, redis_service)
     while True:
         try:
             raw_data: str = await websocket.receive_text()
@@ -124,8 +125,10 @@ async def websocket_endpoint(
 async def create_chat_from_matchmaking(
         payload: BasePayload = Body(...),
         chat_service: ChatService = Depends(),
+        user_service: UserService = Depends(),
         redis_service: RedisUserService = Depends()):
-    request_processor = ChatServerRequestProcessor(chat_service, redis_service)
+    request_processor = ChatServerRequestProcessor(
+        chat_service, user_service, redis_service)
     if not isinstance(payload.payload, CreateChatPayload):
         # TODO refactor
         raise SwipeError("Unsupported payload")
