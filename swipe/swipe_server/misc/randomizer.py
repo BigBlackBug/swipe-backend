@@ -11,12 +11,14 @@ from PIL import Image, ImageDraw, ImageFont
 from sqlalchemy import select
 
 from swipe.settings import constants
-from swipe.swipe_server.chats.models import Chat, ChatStatus, ChatMessage, MessageStatus, \
+from swipe.swipe_server.chats.models import Chat, ChatStatus, ChatMessage, \
+    MessageStatus, \
     GlobalChatMessage, ChatSource
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.misc.storage import storage_client
-from swipe.swipe_server.users.enums import AuthProvider, ZodiacSign, Gender, UserInterests, \
+from swipe.swipe_server.users.enums import AuthProvider, ZodiacSign, Gender, \
+    UserInterests, \
     RecurrenceRate, NotificationTypes
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.schemas import AuthenticationIn
@@ -59,9 +61,9 @@ class RandomEntityGenerator:
         new_user.swipes = random.randint(50, 150)
         new_user.set_location({
             'city': random.choice([
-                'Moscow', 'Saint Petersburg', 'Magadan', 'Surgut', 'Cherepovets'
+                'Москва', 'Санкт-Петербург', 'Магадан', 'Сургут', 'Череповец'
             ]),
-            'country': 'Russia',
+            'country': 'Россия',
             'flag': '🇷🇺'
         })
         self._user_service.db.commit()
@@ -154,9 +156,8 @@ class RandomEntityGenerator:
         draw = ImageDraw.Draw(img)
 
         font = ImageFont.truetype(str(
-            constants.BASE_DIR.joinpath('content',
-                                        'Herculanum.ttf').absolute()),
-            size=70)
+            constants.BASE_DIR.joinpath(
+                'content', 'Herculanum.ttf').absolute()), size=70)
         stroke_width = 2
 
         text_width, text_height = \
