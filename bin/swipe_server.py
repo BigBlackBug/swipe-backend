@@ -56,6 +56,7 @@ async def invalidate_caches():
     redis_service = RedisUserService(await dependencies.redis())
     logger.info("Invalidating online response cache")
     await redis_service.drop_online_response_cache_all()
+    # TODO just for tests, because chat server is also being restarted
     logger.info("Invalidating online user cache")
     await redis_service.invalidate_online_user_cache()
 

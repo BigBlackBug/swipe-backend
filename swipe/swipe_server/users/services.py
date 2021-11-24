@@ -465,19 +465,23 @@ class CacheService:
                           gender: Optional[Gender] = None):
         users = self.user_service.fetch_popular(
             country=country, city=city, gender=gender)
-        # user_objects = self.user_service.get_users(users)
+        logger.info(
+            f"Got popular users from db: {country}, {city}, {gender}: \n"
+            f"{users}")
         await self.redis_service.save_popular_users(
             country=country, city=city, gender=gender, users=users)
 
     async def populate_popular_cache(self):
-        logger.info("populating popular cache")
+        logger.info("Populating popular cache")
 
         locations = self.redis_service.fetch_locations()
         async for country, cities in locations:
+            logger.info(f"Processing '{country}' cache")
             await self._fill_cache(country, gender=Gender.MALE)
             await self._fill_cache(country, gender=Gender.FEMALE)
             await self._fill_cache(country)
 
+            logger.info(f"Processing '{country}', '{cities}' cache")
             for city in cities:
                 await self._fill_cache(country, city=city, gender=Gender.MALE)
                 await self._fill_cache(country, city=city, gender=Gender.FEMALE)

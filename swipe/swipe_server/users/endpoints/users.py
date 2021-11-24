@@ -35,14 +35,17 @@ async def fetch_list_of_users(
         user_service: UserService = Depends(),
         redis_service: RedisUserService = Depends(),
         current_user: User = Depends(security.get_current_user)):
+    logger.info(f"Fetching popular users with {filter_params}")
     # TODO maybe store whole users?
     popular_users: list[str] = \
         await redis_service.get_popular_users(filter_params)
 
+    logger.info(f"Got popular users for {filter_params}: {popular_users}")
     collected_users = user_service.get_users(
         current_user.id, user_ids=popular_users)
     collected_users = sorted(collected_users,
                              key=lambda user: user.rating, reverse=True)
+
     return [
         UserCardPreviewOut.patched_from_orm(user)
         for user in collected_users
@@ -82,10 +85,14 @@ async def fetch_list_of_users(
     if filter_params.invalidate_cache:
         ignored_user_ids: set[str] = set()
         await redis_service.drop_online_response_cache(str(current_user.id))
+        logger.info(f"User {current_user.id} request cache invalidated")
     else:
         # previously fetched users will be ignored
         ignored_user_ids: set[str] = \
             await redis_service.get_cached_online_response(user_cache)
+        logger.info(
+            f"User request cache, key:{user_cache.cache_key()}, "
+            f"{ignored_user_ids}")
 
     age_difference = settings.ONLINE_USER_DEFAULT_AGE_DIFF
 
