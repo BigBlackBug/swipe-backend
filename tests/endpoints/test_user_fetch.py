@@ -8,11 +8,12 @@ from swipe.settings import settings
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.services import RedisUserService, UserService
+from swipe.swipe_server.users.services import RedisUserService, UserService, \
+    UserRequestCacheSettings
 
 
 @pytest.mark.anyio
-async def test_user_fetch_ignore(
+async def test_user_fetch_basic(
         client: AsyncClient,
         default_user: User,
         randomizer: RandomEntityGenerator,
@@ -46,19 +47,17 @@ async def test_user_fetch_ignore(
 
     # ignore+offline+all genders+whole country
     response: Response = await client.post(
-        f"{settings.API_V1_PREFIX}/users/fetch",
+        f"{settings.API_V1_PREFIX}/users/fetch_online",
         headers=default_user_auth_headers,
         json={
-            'limit': 10,
-            'ignore_users': [str(user_4.id), ]
+            'limit': 10
         }
     )
 
     assert response.status_code == 200
     resp_data = response.json()
-    assert {user['id'] for user in resp_data} == {str(user_1.id),
-                                                  str(user_2.id),
-                                                  str(user_3.id)}
+    assert {user['id'] for user in resp_data} == \
+           {str(user_1.id), str(user_2.id), str(user_3.id), str(user_4.id)}
 
 
 @pytest.mark.anyio
@@ -95,7 +94,7 @@ async def test_user_fetch_offline_limit(
 
     # ignore+offline+all genders+whole country+small limit
     response: Response = await client.post(
-        f"{settings.API_V1_PREFIX}/users/fetch",
+        f"{settings.API_V1_PREFIX}/users/fetch_online",
         headers=default_user_auth_headers,
         json={
             'limit': 2,
@@ -155,7 +154,7 @@ async def test_user_fetch_online_gender(
 
     # online+gender
     response: Response = await client.post(
-        f"{settings.API_V1_PREFIX}/users/fetch",
+        f"{settings.API_V1_PREFIX}/users/fetch_online",
         headers=default_user_auth_headers,
         json={
             'gender': 'male'
@@ -168,7 +167,7 @@ async def test_user_fetch_online_gender(
 
 
 @pytest.mark.anyio
-async def test_user_fetch_online_city(
+async def test_user_fetch_online_city_check_cache(
         client: AsyncClient,
         default_user: User,
         randomizer: RandomEntityGenerator,
@@ -185,6 +184,7 @@ async def test_user_fetch_online_city(
     user_1.set_location({
         'country': 'Russia', 'city': 'Moscow', 'flag': 'F'
     })
+    session.add(user_1)
 
     user_2 = randomizer.generate_random_user()
     user_2.name = 'user2'
@@ -193,6 +193,7 @@ async def test_user_fetch_online_city(
     user_2.set_location({
         'country': 'Russia', 'city': 'Moscow', 'flag': 'F'
     })
+    session.add(user_2)
 
     user_3 = randomizer.generate_random_user()
     user_3.name = 'user3'
@@ -202,6 +203,7 @@ async def test_user_fetch_online_city(
     user_3.set_location({
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
     })
+    session.add(user_3)
 
     user_4 = randomizer.generate_random_user()
     user_4.name = 'user4'
@@ -211,30 +213,92 @@ async def test_user_fetch_online_city(
     user_4.set_location({
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
     })
+    session.add(user_4)
+
+    user_44 = randomizer.generate_random_user()
+    user_44.name = 'user44'
+    user_44.date_of_birth = datetime.date.today().replace(year=2005)
+    await redis_service.connect_user(user_44.id)
+    user_44.gender = Gender.ATTACK_HELICOPTER
+    user_44.set_location({
+        'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
+    })
+    session.add(user_44)
 
     user_5 = randomizer.generate_random_user()
     user_5.name = 'user5'
-    user_5.date_of_birth = datetime.date.today().replace(year=2002)
-    user_5.gender = Gender.ATTACK_HELICOPTER
+    user_5.date_of_birth = datetime.date.today().replace(year=2003)
+    user_5.gender = Gender.MALE
     user_5.set_location({
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
     })
+    session.add(user_5)
     session.commit()
     # --------------------------------------------------------------------------
 
-    # online+city
     response: Response = await client.post(
-        f"{settings.API_V1_PREFIX}/users/fetch",
+        f"{settings.API_V1_PREFIX}/users/fetch_online",
         headers=default_user_auth_headers,
         json={
             'city': 'Saint Petersburg'
         }
     )
-
     assert response.status_code == 200
     resp_data = response.json()
     assert {user['id'] for user in resp_data} == {str(user_3.id),
-                                                  str(user_4.id)}
+                                                  str(user_4.id), str(user_44.id)}
+
+    cached_response = await redis_service.get_cached_online_response(
+        UserRequestCacheSettings(user_id=str(default_user.id),
+                                 city_filter='Saint Petersburg'))
+    assert cached_response == {str(user_3.id), str(user_4.id), str(user_44.id)}
+
+    # -------------------refetching with a new user----------------------
+
+    await redis_service.connect_user(user_5.id)
+    response: Response = await client.post(
+        f"{settings.API_V1_PREFIX}/users/fetch_online",
+        headers=default_user_auth_headers,
+        json={
+            'city': 'Saint Petersburg'
+        }
+    )
+    assert response.status_code == 200
+    resp_data = response.json()
+    assert {user['id'] for user in resp_data} == {str(user_5.id)}
+
+    # cache now contains all four
+    cached_response = await redis_service.get_cached_online_response(
+        UserRequestCacheSettings(user_id=str(default_user.id),
+                                 city_filter='Saint Petersburg'))
+    assert cached_response == \
+           {str(user_3.id), str(user_4.id), str(user_44.id), str(user_5.id)}
+
+    # -------------------invalidating cache with new settings----------------
+    # user 2 went online
+    await redis_service.connect_user(user_2.id)
+    response: Response = await client.post(
+        f"{settings.API_V1_PREFIX}/users/fetch_online",
+        headers=default_user_auth_headers,
+        json={
+            'city': 'Moscow',
+            'invalidate_cache': True
+        }
+    )
+    assert response.status_code == 200
+    resp_data = response.json()
+    assert {user['id'] for user in resp_data} == {str(user_2.id)}
+
+    # old cache is dead
+    old_cached_response = await redis_service.get_cached_online_response(
+        UserRequestCacheSettings(user_id=str(default_user.id),
+                                 city_filter='Saint Petersburg'))
+    assert old_cached_response == set()
+    # new cache contains only moscow
+    cached_response = await redis_service.get_cached_online_response(
+        UserRequestCacheSettings(user_id=str(default_user.id),
+                                 city_filter='Moscow'))
+    assert cached_response == {str(user_2.id)}
 
 
 @pytest.mark.anyio
@@ -306,7 +370,7 @@ async def test_user_fetch_blacklist(
 
     # offline
     response: Response = await client.post(
-        f"{settings.API_V1_PREFIX}/users/fetch",
+        f"{settings.API_V1_PREFIX}/users/fetch_online",
         headers=default_user_auth_headers, json={}
     )
 

@@ -11,7 +11,7 @@ class Constants(BaseSettings):
     FREE_SWIPES_COOLDOWN_SEC = 10
 
     # TODO make it 20 mins
-    USER_CACHE_TTL_SECS = 5
+    USER_CACHE_TTL_SECS = 60
 
     FREE_SWIPES_REDIS_PREFIX = 'free_swipes_cooldown_'
 

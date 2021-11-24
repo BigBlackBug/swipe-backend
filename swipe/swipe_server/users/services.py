@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class UserRequestCacheSettings:
+class OnlineUserRequestCacheParams:
     age: int
     age_diff: int
     current_country: str
@@ -42,6 +42,17 @@ class UserRequestCacheSettings:
     def cache_key(self):
         return f'online:{self.age}:{self.age_diff}:' \
                f'{self.current_country}:' \
+               f'{self.gender_filter}:{self.city_filter}'
+
+
+@dataclass
+class UserRequestCacheSettings:
+    user_id: str
+    city_filter: str
+    gender_filter: Optional[str] = None
+
+    def cache_key(self):
+        return f'online_request:{self.user_id}:' \
                f'{self.gender_filter}:{self.city_filter}'
 
 
@@ -94,6 +105,8 @@ class RedisUserService:
         await self.redis.srem(self.ONLINE_USERS_SET, str(user_id))
         # remove blacklist cache
         await self.redis.delete(f'{self.BLACKLIST_KEY}:{user_id}')
+        # remove online request cache
+        await self.drop_online_response_cache(str(user_id))
 
     async def add_cities(self, country: str, cities: list[str]):
         await self.redis.lpush(f'country:{country}', *cities)
@@ -158,11 +171,31 @@ class RedisUserService:
         if settings.ENABLE_BLACKLIST:
             await self.redis.sadd(f'{self.BLACKLIST_KEY}:{user_id}', *blacklist)
 
-    async def find_user_ids(self, cache_settings: UserRequestCacheSettings) \
+    # --------------------------------------------
+    async def get_cached_online_response(
+            self, cache_settings: UserRequestCacheSettings) \
             -> set[str]:
         return await self.redis.smembers(cache_settings.cache_key())
 
-    async def store_user_ids(self, cache_settings: UserRequestCacheSettings,
+    async def save_cached_online_response(
+            self, cache_settings: UserRequestCacheSettings,
+            current_user_ids: set[str]):
+        await self.redis.sadd(cache_settings.cache_key(), *current_user_ids)
+
+    async def drop_online_response_cache(self, user_id: str):
+        for key in await self.redis.keys(f'online_request:{user_id}:*'):
+            await self.redis.delete(key)
+
+    # --------------------------------------------
+    async def find_user_ids(self,
+                            cache_settings: OnlineUserRequestCacheParams) \
+            -> Optional[set[str]]:
+        if not await self.redis.exists(cache_settings.cache_key()):
+            return None
+        return await self.redis.smembers(cache_settings.cache_key())
+
+    async def store_user_ids(self,
+                             cache_settings: OnlineUserRequestCacheParams,
                              current_user_ids: set[str]):
         if current_user_ids:
             await self.redis.delete(cache_settings.cache_key())

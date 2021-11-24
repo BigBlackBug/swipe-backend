@@ -14,7 +14,7 @@ from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.schemas import UserCardPreviewOut, \
     OnlineFilterBody, UserOut, PopularFilterBody
 from swipe.swipe_server.users.services import UserService, RedisUserService, \
-    UserRequestCacheSettings
+    OnlineUserRequestCacheParams, UserRequestCacheSettings
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ async def fetch_list_of_users(
 
 
 @router.post(
-    '/fetch',
+    '/fetch_online',
     name='Fetch online users according to the filter',
     responses={
         200: {'description': 'List of users according to filter'},
@@ -70,15 +70,33 @@ async def fetch_list_of_users(
     age = round(age_delta.years + age_delta.months / 12)
 
     collected_user_ids: set[str] = set()
-    ignored_user_ids = set(filter_params.ignore_users)
-    age_difference = 0
 
+    user_cache = UserRequestCacheSettings(
+        user_id=str(current_user.id),
+        gender_filter=filter_params.gender,
+        city_filter=filter_params.city
+    )
+    # the user's been away from the screen for too long or changed settings
+    # let's start from the beginning
+    if filter_params.invalidate_cache:
+        ignored_user_ids: set[str] = set()
+        await redis_service.drop_online_response_cache(str(current_user.id))
+    else:
+        # previously fetched users will be ignored
+        ignored_user_ids: set[str] = \
+            await redis_service.get_cached_online_response(user_cache)
+
+    age_difference = 1
+    max_age_difference = 5
     logger.info(f"Got filter params {filter_params}")
     # FEED filtered by same country by default)
     # premium filtered by gender
     # premium filtered by location(whole country/my city)
     while len(collected_user_ids) <= filter_params.limit:
-        current_cache_settings = UserRequestCacheSettings(
+        # saving caches for typical requests
+        # I'm 25, give me users from Russia within 2 years of my age
+        # this cache refers only to users in db as online-ness is checked later
+        current_cache_settings = OnlineUserRequestCacheParams(
             age=age,
             age_diff=age_difference,
             current_country=current_user.location.country,
@@ -87,7 +105,7 @@ async def fetch_list_of_users(
         )
         current_user_ids: set[str] = \
             await redis_service.find_user_ids(current_cache_settings)
-        if not current_user_ids:
+        if current_user_ids is None:
             logger.info(
                 f"Cache not found for {current_cache_settings.cache_key()}, "
                 f"saving")
@@ -99,12 +117,11 @@ async def fetch_list_of_users(
                 current_cache_settings, current_user_ids)
 
         for user in current_user_ids:
-            user = str(user)
             if user not in ignored_user_ids:
                 ignored_user_ids.add(user)
                 collected_user_ids.add(user)
 
-        if age_difference >= filter_params.max_age_difference:
+        if age_difference >= max_age_difference:
             break
 
         # increasing search boundaries
@@ -115,14 +132,22 @@ async def fetch_list_of_users(
     collected_user_ids = await redis_service.filter_online_users(
         collected_user_ids)
 
+    if not collected_user_ids:
+        return []
+
+    # adding currently returned users to cache
+    await redis_service.save_cached_online_response(
+        user_cache, collected_user_ids)
+
     collected_users = user_service.get_users(current_user.id,
                                              user_ids=collected_user_ids)
 
     collected_users = sorted(
         collected_users,
-        key=lambda user: \
-            abs(current_user.date_of_birth - user.date_of_birth).days
+        key=lambda user:
+        abs(current_user.date_of_birth - user.date_of_birth).days
     )
+
     return [
         UserCardPreviewOut.patched_from_orm(user)
         for user in collected_users[:filter_params.limit]

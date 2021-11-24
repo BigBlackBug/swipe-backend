@@ -6,8 +6,8 @@ from fastapi import Depends, Body, HTTPException, UploadFile, File, APIRouter
 from starlette import status
 from starlette.responses import Response
 
-from swipe.swipe_server.misc import security
 from swipe.swipe_server.chats.services import ChatService
+from swipe.swipe_server.misc import security
 from swipe.swipe_server.users import schemas
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.services import UserService, RedisUserService
@@ -46,6 +46,7 @@ async def patch_user(
     if user_body.location:
         await redis_service.add_cities(
             user_body.location.country, [user_body.location.city])
+        # todo save user to caches
     return user_object
 
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import datetime
-import enum
 from typing import Optional, Any
 from uuid import UUID
 
@@ -144,8 +143,8 @@ class OnlineFilterBody(BaseModel):
     limit: Optional[int] = 15
     gender: Optional[Gender] = None
     city: Optional[str] = None
-    max_age_difference: Optional[int] = 5
-    ignore_users: list[str] = []
+
+    invalidate_cache: bool = False
 
 
 class UserOutChatPreviewORM(BaseModel):

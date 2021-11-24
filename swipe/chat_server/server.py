@@ -100,7 +100,7 @@ async def websocket_endpoint(
             raw_data: str = await websocket.receive_text()
             logger.info(f"Received data {raw_data} from {user_id}")
         except WebSocketDisconnect as e:
-            logger.exception(f"{user_id} disconnected with code {e.code}")
+            logger.info(f"{user_id} disconnected with code {e.code}")
             await connection_manager.disconnect(user_id)
             await redis_service.disconnect_user(user_uuid)
             break
