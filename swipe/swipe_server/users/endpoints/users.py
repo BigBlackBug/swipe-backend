@@ -43,6 +43,7 @@ async def fetch_list_of_users(
     logger.info(f"Got popular users for {filter_params}: {popular_users}")
     collected_users = user_service.get_users(
         current_user.id, user_ids=popular_users)
+    # TODO  don't need to sort that?
     collected_users = sorted(collected_users,
                              key=lambda user: user.rating, reverse=True)
 

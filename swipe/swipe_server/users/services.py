@@ -118,13 +118,10 @@ class RedisUserService:
     async def get_popular_users(self, filter_params: PopularFilterBody) \
             -> list[str]:
         gender = filter_params.gender if filter_params.gender else 'ALL'
-        if filter_params.country:
-            key = f'popular:{gender}:country:{filter_params.country}'
-        elif filter_params.city:
-            key = f'popular:{gender}:city:{filter_params.city}'
-        else:
-            raise SwipeError("either city or country must be set")
+        key = f'popular:{gender}:country:{filter_params.country}:' \
+              f'city:{filter_params.city}'
 
+        logger.info(f"Getting popular for key {key}")
         return await self.redis.lrange(
             key, filter_params.offset,
             filter_params.offset + filter_params.limit - 1)
@@ -138,21 +135,17 @@ class RedisUserService:
 
     async def save_popular_users(self,
                                  users: list[str],
+                                 country: str,
                                  gender: Optional[Gender] = None,
-                                 country: Optional[str] = None,
                                  city: Optional[str] = None):
         if not users:
             return
         gender = gender if gender else 'ALL'
-        if country:
-            if not city:
-                key = f'popular:{gender}:country:{country}'
-                await self.redis.delete(key)
-                await self.redis.rpush(key, *users)
-            else:
-                key = f'popular:{gender}:city:{city}'
-                await self.redis.delete(key)
-                await self.redis.rpush(key, *users)
+        key = f'popular:{gender}:country:{country}:city:{city}'
+        logger.info(f"Deleting and saving popular cache for {key}")
+
+        await self.redis.delete(key)
+        await self.redis.rpush(key, *users)
 
     async def filter_blacklist(self, current_user_id: UUID,
                                user_ids: set[str]) -> set[str]:
@@ -432,7 +425,8 @@ class UserService:
         query = select(cast(User.id, String)).join(User.location). \
             where(Location.country == country). \
             where(gender_clause). \
-            where(city_clause).order_by(desc(User.rating)).limit(limit)
+            where(city_clause). \
+            order_by(desc(User.rating)).limit(limit)
         return self.db.execute(query).scalars().all()
 
     def update_blacklist(self, blocker_id: str, blocked_user_id: str):
@@ -466,8 +460,8 @@ class CacheService:
         users = self.user_service.fetch_popular(
             country=country, city=city, gender=gender)
         logger.info(
-            f"Got popular users from db: {country}, {city}, {gender}: \n"
-            f"{users}")
+            f"Got {len(users)} popular users from db for: "
+            f"{country}, {city}, {gender}")
         await self.redis_service.save_popular_users(
             country=country, city=city, gender=gender, users=users)
 
@@ -476,12 +470,13 @@ class CacheService:
 
         locations = self.redis_service.fetch_locations()
         async for country, cities in locations:
-            logger.info(f"Processing '{country}' cache")
+            logger.info(f"Processing country:'{country}' cache")
             await self._fill_cache(country, gender=Gender.MALE)
             await self._fill_cache(country, gender=Gender.FEMALE)
             await self._fill_cache(country)
 
-            logger.info(f"Processing '{country}', '{cities}' cache")
+            logger.info(f"Processing cities cache - '{country}', "
+                        f"'{cities}' cache")
             for city in cities:
                 await self._fill_cache(country, city=city, gender=Gender.MALE)
                 await self._fill_cache(country, city=city, gender=Gender.FEMALE)
