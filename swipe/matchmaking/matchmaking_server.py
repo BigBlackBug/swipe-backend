@@ -137,6 +137,10 @@ async def _process_disconnect(user_id: str):
                     sender_id=user_id,
                     recipient_id=match.user_id,
                     payload=decline).dict(by_alias=True))
+
+            logger.info(f"Reconnecting {match.user_id} to matchmaking")
+            matchmaking_data.reconnect(match.user_id)
+
         logger.info(f"Removing {user_id} from sent matches")
         matchmaking_data.remove_match(user_id)
 
