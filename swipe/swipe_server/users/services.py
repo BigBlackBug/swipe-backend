@@ -52,8 +52,9 @@ class UserRequestCacheSettings:
     gender_filter: Optional[str] = None
 
     def cache_key(self):
+        gender = self.gender_filter if self.gender_filter else 'ALL'
         return f'online_request:{self.user_id}:' \
-               f'{self.gender_filter}:{self.city_filter}'
+               f'{gender}:{self.city_filter}'
 
 
 class RedisUserService:
@@ -162,12 +163,14 @@ class RedisUserService:
     async def get_blacklist(self, user_id: UUID) -> set[str]:
         return await self.redis.smembers(f'{self.BLACKLIST_KEY}:{user_id}')
 
-    async def add_to_blacklist(self, current_user_id: str, user_id: str):
+    async def add_to_blacklist(self, blocker_id: str, blocked_by_id: str):
         if settings.ENABLE_BLACKLIST:
-            await self.redis.sadd(f'{self.BLACKLIST_KEY}:{current_user_id}',
-                                  user_id)
-            await self.redis.sadd(f'{self.BLACKLIST_KEY}:{user_id}',
-                                  current_user_id)
+            logger.info(f"adding both {blocker_id} and {blocked_by_id}"
+                        f"to each others blacklist cache")
+            await self.redis.sadd(f'{self.BLACKLIST_KEY}:{blocker_id}',
+                                  blocked_by_id)
+            await self.redis.sadd(f'{self.BLACKLIST_KEY}:{blocked_by_id}',
+                                  blocker_id)
 
     async def populate_blacklist(self, user_id: str, blacklist: set[str]):
         if settings.ENABLE_BLACKLIST:
@@ -439,6 +442,8 @@ class UserService:
 
     def update_blacklist(self, blocker_id: str, blocked_user_id: str):
         if settings.ENABLE_BLACKLIST:
+            logger.info(f"adding both {blocker_id} and {blocked_user_id}"
+                        f"to each others blacklist")
             try:
                 self.db.execute(insert(blacklist_table).values(
                     blocked_user_id=blocked_user_id,

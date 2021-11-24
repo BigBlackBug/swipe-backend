@@ -145,12 +145,11 @@ async def fetch_list_of_users(
         # increasing search boundaries
         age_difference += settings.ONLINE_USER_AGE_DIFF_STEP
 
-    logger.info(f"Saving user request cache for {user_cache.cache_key()}: "
-                f"{collected_user_ids}")
-
     if not collected_user_ids:
         return []
 
+    logger.info(f"Adding {collected_user_ids} to user request cache "
+                f"for {user_cache.cache_key()}")
     # adding currently returned users to cache
     await redis_service.save_cached_online_response(
         user_cache, collected_user_ids)
