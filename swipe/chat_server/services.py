@@ -83,22 +83,29 @@ class ChatServerRequestProcessor:
 
             # if a second user tries to accept a text lobby chat
             # before he receives an event, the method will raise SwipeError
-            self.chat_service.create_chat(
-                chat_id=payload.chat_id,
-                initiator_id=data.sender_id,
-                the_other_person_id=data.recipient_id,
-                chat_status=chat_status,
-                source=source)
-            data: ChatMessagePayload
-            for data in messages:
-                self.chat_service.post_message(
-                    message_id=data.message_id,
-                    sender_id=data.sender_id,
-                    recipient_id=data.recipient_id,
-                    message=data.text,
-                    image_id=data.image_id,
-                    timestamp=data.timestamp
-                )
+            try:
+                self.chat_service.create_chat(
+                    chat_id=payload.chat_id,
+                    initiator_id=data.sender_id,
+                    the_other_person_id=data.recipient_id,
+                    chat_status=chat_status,
+                    source=source)
+                data: ChatMessagePayload
+                for data in messages:
+                    self.chat_service.post_message(
+                        message_id=data.message_id,
+                        sender_id=data.sender_id,
+                        recipient_id=data.recipient_id,
+                        message=data.text,
+                        image_id=data.image_id,
+                        timestamp=data.timestamp
+                    )
+            except:
+                # TODO this should not be possible in the first place
+                self.chat_service.db.rollback()
+                logger.exception(
+                    f"Error creating chat between {payload.chat_id} "
+                    f"and {data.recipient_id}")
 
         elif isinstance(payload, AcceptChatPayload):
             self.chat_service.update_chat_status(
