@@ -43,9 +43,7 @@ class RandomEntityGenerator:
         new_user.name = names.get_full_name()[:30]
         new_user.bio = lorem.paragraph()[:200]
         new_user.height = random.randint(150, 195)
-        new_user.interests = list({
-            random.choice(list(UserInterests)) for _ in range(6)
-        })[:3]
+        new_user.interests = random.sample(list(UserInterests), 3)
         new_user.gender = random.choice(list(Gender))
         new_user.smoking = random.choice(list(RecurrenceRate))
         new_user.drinking = random.choice(list(RecurrenceRate))
