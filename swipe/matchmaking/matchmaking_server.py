@@ -61,6 +61,7 @@ connection_manager = WSConnectionManager()
 @app.websocket("/connect/{user_id}")
 async def matchmaker_endpoint(user_id: UUID, websocket: WebSocket,
                               user_service: MMUserService = Depends(),
+                              redis_service: RedisUserService = Depends(),
                               gender: Gender = Query(None)):
     if (user := user_service.get_matchmaking_preview(user_id)) is None:
         logger.info(f"User {user_id} not found")
@@ -91,7 +92,8 @@ async def matchmaker_endpoint(user_id: UUID, websocket: WebSocket,
 
         try:
             base_payload: MMBasePayload = MMBasePayload.validate(data)
-            await _process_payload(base_payload, user.data, user_service)
+            await _process_payload(
+                base_payload, user.data, user_service, redis_service)
 
             if base_payload.recipient_id:
                 await connection_manager.send(
@@ -145,7 +147,8 @@ async def _process_disconnect(user_id: str):
 
 
 async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData,
-                           user_service: MMUserService, redis_service: RedisUserService):
+                           user_service: MMUserService,
+                           redis_service: RedisUserService):
     data_payload = base_payload.payload
     sender_id = base_payload.sender_id
     recipient_id = base_payload.recipient_id

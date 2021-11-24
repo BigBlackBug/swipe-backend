@@ -13,7 +13,6 @@ from swipe.chat_server.schemas import BasePayload, MessagePayload, \
     GlobalMessagePayload, \
     MessageStatusPayload, MessageLikePayload, ChatMessagePayload, \
     AcceptChatPayload, OpenChatPayload, DeclineChatPayload, CreateChatPayload
-from swipe.settings import settings
 from swipe.swipe_server.chats.models import MessageStatus, ChatSource, \
     ChatStatus
 from swipe.swipe_server.chats.services import ChatService

@@ -9,7 +9,6 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, object_session
 
 from swipe.swipe_server.misc.database import ModelBase
-from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.enums import UserInterests, Gender, \
     AuthProvider, ZodiacSign, RecurrenceRate, NotificationTypes
