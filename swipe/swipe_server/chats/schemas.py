@@ -75,7 +75,7 @@ class ChatORMSchema(BaseModel):
         chat_dict = schema_obj.dict()
         if chat_dict['the_other_person_id'] == current_user_id:
             chat_dict['the_other_person_id'] = chat_dict['initiator_id']
-            del chat_dict['initiator_id']
+        del chat_dict['initiator_id']
         return chat_dict
 
     class Config:
@@ -87,7 +87,7 @@ class ChatORMSchema(BaseModel):
 class ChatOut(BaseModel):
     id: UUID
     the_other_person_id: Optional[UUID] = None
-    initiator_id: Optional[UUID] = None
+    # initiator_id: Optional[UUID] = None
     messages: list[ChatMessageORMSchema] = []
     source: ChatSource
     status: ChatStatus
