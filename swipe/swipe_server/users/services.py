@@ -201,7 +201,7 @@ class RedisUserService:
             await self.redis.delete(cache_settings.cache_key())
             await self.redis.sadd(cache_settings.cache_key(), *current_user_ids)
             await self.redis.expire(cache_settings.cache_key(),
-                                    time=constants.USER_CACHE_TTL_SECS)
+                                    time=settings.USER_CACHE_TTL_SECS)
 
 
 class UserService:
@@ -246,6 +246,7 @@ class UserService:
             where(Location.country == current_user.location.country). \
             where(city_clause). \
             where(gender_clause). \
+            where(User.id != current_user.id). \
             where(User.date_of_birth.between(min_age, max_age))
 
         return self.db.execute(query).scalars().all()
@@ -477,6 +478,6 @@ class CacheService:
     async def populate_country_cache(self):
         locations = self.user_service.fetch_locations()
 
-        logger.info("Populating location cache")
+        logger.info(f"Populating location cache with locations: {locations}")
         for country, cities in locations.items():
             await self.redis_service.add_cities(country, cities)

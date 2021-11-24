@@ -95,7 +95,9 @@ class MMSettings(BaseModel):
     gender_filter: Optional[Gender] = None
 
     def increase_age_diff(self):
-        self.age_diff = min(self.age_diff + 2, self.max_age_diff)
+        self.age_diff = \
+            min(self.age_diff + settings.MATCHMAKING_AGE_DIFF_STEP,
+                self.max_age_diff)
 
     def reset_weight(self):
         self.current_weight = 0

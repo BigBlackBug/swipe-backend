@@ -10,9 +10,6 @@ class Constants(BaseSettings):
     # TODO make it 30 mins
     FREE_SWIPES_COOLDOWN_SEC = 10
 
-    # TODO make it 20 mins
-    USER_CACHE_TTL_SECS = 60
-
     FREE_SWIPES_REDIS_PREFIX = 'free_swipes_cooldown_'
 
     BASE_DIR: Path = Path('.')
@@ -44,6 +41,14 @@ class Settings(BaseSettings):
     MATCHMAKING_ROUND_LENGTH_SECS = 5
     MATCHMAKING_DEFAULT_AGE_DIFF = 20
     MATCHMAKING_MAX_AGE_DIFF = 20
+    MATCHMAKING_AGE_DIFF_STEP = 5
+
+    ONLINE_USER_MAX_AGE_DIFF = 20
+    ONLINE_USER_DEFAULT_AGE_DIFF = 10
+    ONLINE_USER_AGE_DIFF_STEP = 5
+
+    # TODO make it 10 mins
+    USER_CACHE_TTL_SECS = 60
 
     REDIS_URL: str
 

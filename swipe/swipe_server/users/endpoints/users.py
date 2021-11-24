@@ -9,6 +9,7 @@ from starlette import status
 from starlette.responses import Response
 
 import swipe.swipe_server.misc.dependencies
+from swipe.settings import settings
 from swipe.swipe_server.misc import security
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.schemas import UserCardPreviewOut, \
@@ -86,8 +87,8 @@ async def fetch_list_of_users(
         ignored_user_ids: set[str] = \
             await redis_service.get_cached_online_response(user_cache)
 
-    age_difference = 1
-    max_age_difference = 5
+    age_difference = settings.ONLINE_USER_DEFAULT_AGE_DIFF
+
     logger.info(f"Got filter params {filter_params}")
     # FEED filtered by same country by default)
     # premium filtered by gender
@@ -108,11 +109,14 @@ async def fetch_list_of_users(
         if current_user_ids is None:
             logger.info(
                 f"Cache not found for {current_cache_settings.cache_key()}, "
-                f"saving")
+                f"querying database")
             current_user_ids = set(user_service.find_user_ids(
                 current_user, gender=filter_params.gender,
                 age_difference=age_difference,
                 city=filter_params.city))
+            logger.info(f"Got {collected_user_ids} "
+                        f"for settings {current_cache_settings.cache_key()}. "
+                        f"Saving cache")
             await redis_service.store_user_ids(
                 current_cache_settings, current_user_ids)
 
@@ -121,16 +125,19 @@ async def fetch_list_of_users(
                 ignored_user_ids.add(user)
                 collected_user_ids.add(user)
 
-        if age_difference >= max_age_difference:
+        if age_difference >= settings.ONLINE_USER_MAX_AGE_DIFF:
             break
 
         # increasing search boundaries
-        age_difference += 2
+        age_difference += settings.ONLINE_USER_AGE_DIFF_STEP
 
     collected_user_ids = await redis_service.filter_blacklist(
         current_user.id, collected_user_ids)
     collected_user_ids = await redis_service.filter_online_users(
         collected_user_ids)
+
+    logger.info(f"Saving user request cache for {user_cache.cache_key()}: "
+                f"{collected_user_ids}")
 
     if not collected_user_ids:
         return []
