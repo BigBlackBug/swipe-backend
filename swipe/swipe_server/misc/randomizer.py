@@ -59,9 +59,9 @@ class RandomEntityGenerator:
         new_user.swipes = random.randint(50, 150)
         new_user.set_location({
             'city': random.choice([
-                'Москва', 'Санкт-Петербург', 'Магадан', 'Сургут', 'Череповец'
+                'Moscow', 'Saint Petersburg', 'Magadan', 'Surgut', 'Cherepovets'
             ]),
-            'country': 'Россия',
+            'country': 'Russia',
             'flag': '🇷🇺'
         })
         self._user_service.db.commit()

@@ -36,13 +36,13 @@ class OnlineUserRequestCacheParams:
     age: int
     age_diff: int
     current_country: str
-    gender_filter: str
-    city_filter: str
+    gender_filter: Optional[str]
+    city_filter: Optional[str]
 
     def cache_key(self):
-        return f'online:{self.age}:{self.age_diff}:' \
-               f'{self.current_country}:' \
-               f'{self.gender_filter}:{self.city_filter}'
+        gender = self.gender_filter if self.gender_filter else 'ALL'
+        return f'online:{self.age}:{self.age_diff}:{gender}:' \
+               f'{self.current_country}:{self.city_filter}'
 
 
 @dataclass
@@ -90,10 +90,13 @@ class RedisUserService:
             f'{constants.FREE_SWIPES_REDIS_PREFIX}{user_object.id}')
         return int(reap_timestamp) if reap_timestamp else None
 
+    # ------------------------------------------------------------
     async def filter_online_users(self, user_ids: set[str]) -> set[str]:
-        online_users: set[str] = await self.redis.smembers(
-            self.ONLINE_USERS_SET)
+        online_users: set[str] = await self.get_online_users()
         return user_ids.intersection(online_users)
+
+    async def get_online_users(self) -> set[str]:
+        return await self.redis.smembers(self.ONLINE_USERS_SET)
 
     async def is_online(self, user_id: UUID) -> bool:
         return await self.redis.sismember(self.ONLINE_USERS_SET, str(user_id))
@@ -115,6 +118,14 @@ class RedisUserService:
     async def add_cities(self, country: str, cities: list[str]):
         await self.redis.lpush(f'country:{country}', *cities)
 
+    async def fetch_locations(self) \
+            -> AsyncGenerator[Tuple[str, list[str]], None]:
+        countries = await self.redis.keys("country:*")
+        for country_key in countries:
+            country = country_key.split(":")[1]
+            yield country, await self.redis.lrange(country_key, 0, -1)
+
+    # ------------------------------------------------
     async def get_popular_users(self, filter_params: PopularFilterBody) \
             -> list[str]:
         gender = filter_params.gender if filter_params.gender else 'ALL'
@@ -125,13 +136,6 @@ class RedisUserService:
         return await self.redis.lrange(
             key, filter_params.offset,
             filter_params.offset + filter_params.limit - 1)
-
-    async def fetch_locations(self) \
-            -> AsyncGenerator[Tuple[str, list[str]], None]:
-        countries = await self.redis.keys("country:*")
-        for country_key in countries:
-            country = country_key.split(":")[1]
-            yield country, await self.redis.lrange(country_key, 0, -1)
 
     async def save_popular_users(self,
                                  users: list[str],
@@ -147,6 +151,7 @@ class RedisUserService:
         await self.redis.delete(key)
         await self.redis.rpush(key, *users)
 
+    # -------------------------------------------------------
     async def filter_blacklist(self, current_user_id: UUID,
                                user_ids: set[str]) -> set[str]:
         if settings.ENABLE_BLACKLIST:
@@ -178,6 +183,9 @@ class RedisUserService:
             self, cache_settings: UserRequestCacheSettings,
             current_user_ids: set[str]):
         await self.redis.sadd(cache_settings.cache_key(), *current_user_ids)
+        # failsafe
+        await self.redis.expire(
+            cache_settings.cache_key(), settings.ONLINE_USER_RESPONSE_CACHE_TTL)
 
     async def drop_online_response_cache(self, user_id: str):
         for key in await self.redis.keys(f'online_request:{user_id}:*'):

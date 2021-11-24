@@ -99,7 +99,10 @@ class User(ModelBase):
         logger.info(f"Deleting user {self.id} photos")
         for photo in self.photos:
             storage_client.delete_image(photo)
-        storage_client.delete_image(self.avatar_id)
+
+        logger.info(f"Deleting user {self.id} avatar")
+        if self.avatar_id:
+            storage_client.delete_image(self.avatar_id)
 
     def __str__(self):
         return f'User {self.id}, name: {self.name}'

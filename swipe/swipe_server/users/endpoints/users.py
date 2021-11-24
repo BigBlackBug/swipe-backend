@@ -101,6 +101,8 @@ async def fetch_list_of_users(
     # FEED filtered by same country by default)
     # premium filtered by gender
     # premium filtered by location(whole country/my city)
+    blacklist = await redis_service.get_blacklist(current_user.id)
+    online = await redis_service.get_online_users()
     while len(collected_user_ids) <= filter_params.limit:
         # saving caches for typical requests
         # I'm 25, give me users from Russia within 2 years of my age
@@ -128,21 +130,20 @@ async def fetch_list_of_users(
             await redis_service.store_user_ids(
                 current_cache_settings, current_user_ids)
 
+        # and we're going through all these users, ugh
         for user in current_user_ids:
             if user not in ignored_user_ids:
                 ignored_user_ids.add(user)
                 collected_user_ids.add(user)
+
+        collected_user_ids = collected_user_ids.difference(blacklist)
+        collected_user_ids = collected_user_ids.intersection(online)
 
         if age_difference >= settings.ONLINE_USER_MAX_AGE_DIFF:
             break
 
         # increasing search boundaries
         age_difference += settings.ONLINE_USER_AGE_DIFF_STEP
-
-    collected_user_ids = await redis_service.filter_blacklist(
-        current_user.id, collected_user_ids)
-    collected_user_ids = await redis_service.filter_online_users(
-        collected_user_ids)
 
     logger.info(f"Saving user request cache for {user_cache.cache_key()}: "
                 f"{collected_user_ids}")

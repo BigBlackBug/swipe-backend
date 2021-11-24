@@ -115,10 +115,8 @@ class ChatServerRequestProcessor:
                 payload.chat_id, status=ChatStatus.OPENED)
         elif isinstance(payload, DeclineChatPayload):
             self.chat_service.delete_chat(chat_id=payload.chat_id)
-            logger.info(
-                f"Chat {payload.chat_id} was declined, "
-                f"adding both {data.sender_id} and {data.recipient_id}"
-                f"to each others blacklist")
+            logger.info(f"Chat {payload.chat_id} was declined")
+
             self.user_service.update_blacklist(
                 str(data.sender_id), str(data.recipient_id))
             await self.redis_service.add_to_blacklist(
