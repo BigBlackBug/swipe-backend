@@ -281,6 +281,13 @@ class Matchmaker:
             logger.info(
                 f"Processing {incoming_user_id} -> {incoming_vertex.edges}")
 
+            # TODO it's a workaround for users who have connected
+            # without disconnecting. It shouldn't be possible anyway
+            if incoming_user_id in self._connection_graph:
+                logger.error(f"HOWTHEFUCK is {incoming_user_id} in the graph???")
+                # self._connection_graph[incoming_user_id].matched = False
+                continue
+
             logger.info(f"Removing incoming edges of {incoming_user_id} "
                         f"that are not in the graph. current edges\n"
                         f"{incoming_vertex.edges}")
