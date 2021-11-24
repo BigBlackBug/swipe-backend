@@ -9,7 +9,7 @@ from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.services import RedisUserService, UserService, \
-    UserRequestCacheSettings
+    UserRequestCacheSettings, KeyType
 
 
 @pytest.mark.anyio
@@ -246,11 +246,13 @@ async def test_user_fetch_online_city_check_cache(
     assert response.status_code == 200
     resp_data = response.json()
     assert {user['id'] for user in resp_data} == {str(user_3.id),
-                                                  str(user_4.id), str(user_44.id)}
+                                                  str(user_4.id),
+                                                  str(user_44.id)}
 
     cached_response = await redis_service.get_cached_online_response(
         UserRequestCacheSettings(user_id=str(default_user.id),
-                                 city_filter='Saint Petersburg'))
+                                 city_filter='Saint Petersburg',
+                                 key_type=KeyType.ONLINE_REQUEST))
     assert cached_response == {str(user_3.id), str(user_4.id), str(user_44.id)}
 
     # -------------------refetching with a new user----------------------
@@ -270,7 +272,8 @@ async def test_user_fetch_online_city_check_cache(
     # cache now contains all four
     cached_response = await redis_service.get_cached_online_response(
         UserRequestCacheSettings(user_id=str(default_user.id),
-                                 city_filter='Saint Petersburg'))
+                                 city_filter='Saint Petersburg',
+                                 key_type=KeyType.ONLINE_REQUEST))
     assert cached_response == \
            {str(user_3.id), str(user_4.id), str(user_44.id), str(user_5.id)}
 
@@ -292,12 +295,14 @@ async def test_user_fetch_online_city_check_cache(
     # old cache is dead
     old_cached_response = await redis_service.get_cached_online_response(
         UserRequestCacheSettings(user_id=str(default_user.id),
-                                 city_filter='Saint Petersburg'))
+                                 city_filter='Saint Petersburg',
+                                 key_type=KeyType.ONLINE_REQUEST))
     assert old_cached_response == set()
     # new cache contains only moscow
     cached_response = await redis_service.get_cached_online_response(
         UserRequestCacheSettings(user_id=str(default_user.id),
-                                 city_filter='Moscow'))
+                                 city_filter='Moscow',
+                                 key_type=KeyType.ONLINE_REQUEST))
     assert cached_response == {str(user_2.id)}
 
 

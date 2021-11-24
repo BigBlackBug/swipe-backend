@@ -81,7 +81,8 @@ async def websocket_endpoint(
 
     await connection_manager.connect(user)
     await redis_service.connect_user(user_uuid)
-    blacklist:set[str] = user_service.fetch_blacklist(user_id)
+
+    blacklist: set[str] = user_service.fetch_blacklist(user_id)
     await redis_service.populate_blacklist(user_id, blacklist)
 
     logger.info(f"{user_id} connected from {websocket.client}, "

@@ -3,6 +3,7 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass
+from enum import Enum
 from typing import Optional, Union, Tuple, AsyncGenerator, Iterable
 from uuid import UUID
 
@@ -26,7 +27,7 @@ from swipe.swipe_server.users import schemas
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import IDList, User, AuthInfo, Location, \
     blacklist_table
-from swipe.swipe_server.users.schemas import PopularFilterBody
+from swipe.swipe_server.users.schemas import PopularFilterBody, OnlineFilterBody
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +37,8 @@ class OnlineUserRequestCacheParams:
     age: int
     age_diff: int
     current_country: str
-    gender_filter: Optional[str]
-    city_filter: Optional[str]
+    gender_filter: Optional[str] = None
+    city_filter: Optional[str] = None
 
     def cache_key(self):
         gender = self.gender_filter if self.gender_filter else 'ALL'
@@ -45,8 +46,14 @@ class OnlineUserRequestCacheParams:
                f'{self.current_country}:{self.city_filter}'
 
 
+class KeyType(Enum):
+    ONLINE_REQUEST = 'online_request'
+    CARDS_REQUEST = 'cards_request'
+
+
 @dataclass
 class UserRequestCacheSettings:
+    key_type: KeyType
     user_id: str
     city_filter: str
     gender_filter: Optional[str] = None
@@ -110,7 +117,11 @@ class RedisUserService:
         # remove blacklist cache
         await self.redis.delete(f'{self.BLACKLIST_KEY}:{user_id}')
         # remove online request cache
-        await self.drop_online_response_cache(str(user_id))
+        await self.drop_online_response_cache(
+            str(user_id), KeyType.ONLINE_REQUEST)
+        # remove online request cache
+        await self.drop_online_response_cache(
+            str(user_id), KeyType.CARDS_REQUEST)
 
     async def invalidate_online_user_cache(self):
         await self.redis.delete(self.ONLINE_USERS_SET)
@@ -185,17 +196,22 @@ class RedisUserService:
     async def save_cached_online_response(
             self, cache_settings: UserRequestCacheSettings,
             current_user_ids: set[str]):
+        if not current_user_ids:
+            return
+
         await self.redis.sadd(cache_settings.cache_key(), *current_user_ids)
         # failsafe
         await self.redis.expire(
             cache_settings.cache_key(), settings.ONLINE_USER_RESPONSE_CACHE_TTL)
 
-    async def drop_online_response_cache(self, user_id: str):
-        for key in await self.redis.keys(f'online_request:{user_id}:*'):
+    async def drop_online_response_cache(self, user_id: str, key_type: KeyType):
+        for key in await self.redis.keys(f'{key_type.value}:{user_id}:*'):
             await self.redis.delete(key)
 
     async def drop_online_response_cache_all(self):
-        for key in await self.redis.keys(f'online_request:*'):
+        for key in await self.redis.keys(f'{KeyType.ONLINE_REQUEST.value}:*'):
+            await self.redis.delete(key)
+        for key in await self.redis.keys(f'{KeyType.CARDS_REQUEST.value}:*'):
             await self.redis.delete(key)
 
     # --------------------------------------------
@@ -214,6 +230,48 @@ class RedisUserService:
             await self.redis.sadd(cache_settings.cache_key(), *current_user_ids)
             await self.redis.expire(cache_settings.cache_key(),
                                     time=settings.USER_CACHE_TTL_SECS)
+
+    async def add_new_user_to_online_caches(self, user: User):
+        gender = 'ALL' if user.gender == Gender.ATTACK_HELICOPTER \
+            else user.gender.value
+        age_delta = relativedelta(
+            datetime.date.today(), user.date_of_birth)
+        age = round(age_delta.years + age_delta.months / 12)
+        user_id = str(user.id)
+
+        for key in await self.redis.keys(
+                f"online:*:*:{gender}:{user.location.country}:"
+                f"{user.location.city}"):
+
+            cache_settings = OnlineUserRequestCacheParams(
+                age=int(key.split(':')[1]),
+                age_diff=int(key.split(':')[2]),
+                current_country=user.location.country,
+                gender_filter=gender,
+                city_filter=user.location.city
+            )
+            if cache_settings.age - cache_settings.age_diff <= \
+                    age <= cache_settings.age + cache_settings.age_diff:
+                logger.info(
+                    f"Adding {user_id} to cache "
+                    f"{cache_settings.cache_key()}")
+                await self.redis.sadd(cache_settings.cache_key(), user_id)
+
+        for key in await self.redis.keys(
+                f"online:*:*:{gender}:{user.location.country}:None"):
+            cache_settings = OnlineUserRequestCacheParams(
+                age=int(key.split(':')[1]),
+                age_diff=int(key.split(':')[2]),
+                current_country=user.location.country,
+                gender_filter=gender,
+                city_filter=None
+            )
+            if cache_settings.age - cache_settings.age_diff <= \
+                    age <= cache_settings.age + cache_settings.age_diff:
+                logger.info(
+                    f"Adding {user_id} to cache "
+                    f"{cache_settings.cache_key()}")
+                await self.redis.sadd(cache_settings.cache_key(), user_id)
 
 
 class UserService:
@@ -501,3 +559,106 @@ class CacheService:
         logger.info(f"Populating location cache with locations: {locations}")
         for country, cities in locations.items():
             await self.redis_service.add_cities(country, cities)
+
+
+class FetchService:
+    def __init__(self, user_service: UserService = Depends(),
+                 redis_service: RedisUserService = Depends()):
+        self.user_service = user_service
+        self.redis_service = redis_service
+
+    async def collect(self, current_user: User,
+                      filter_params: OnlineFilterBody,
+                      key_type: KeyType) -> set[str]:
+        user_cache = UserRequestCacheSettings(
+            key_type=key_type,
+            user_id=str(current_user.id),
+            gender_filter=filter_params.gender,
+            city_filter=filter_params.city
+        )
+        age_delta = relativedelta(datetime.date.today(),
+                                  current_user.date_of_birth)
+        age = round(age_delta.years + age_delta.months / 12)
+
+        collected_user_ids: set[str] = set()
+
+        # the user's been away from the screen for too long or changed settings
+        # let's start from the beginning
+        if filter_params.invalidate_cache:
+            ignored_user_ids: set[str] = set()
+            await self.redis_service.drop_online_response_cache(
+                str(current_user.id), key_type=user_cache.key_type)
+            logger.info(f"User {current_user.id} request cache invalidated")
+        else:
+            # previously fetched users will be ignored
+            ignored_user_ids: set[str] = \
+                await self.redis_service.get_cached_online_response(user_cache)
+            logger.info(
+                f"User request cache, key:{user_cache.cache_key()}, "
+                f"{ignored_user_ids}")
+
+        age_difference = settings.ONLINE_USER_DEFAULT_AGE_DIFF
+
+        logger.info(f"Got filter params {filter_params}")
+        # FEED filtered by same country by default)
+        # premium filtered by gender
+        # premium filtered by location(whole country/my city)
+        blacklist = await self.redis_service.get_blacklist(current_user.id)
+        online = await self.redis_service.get_online_users()
+        while len(collected_user_ids) <= filter_params.limit:
+            # saving caches for typical requests
+            # I'm 25, give me users from Russia within 2 years of my age
+            # this cache refers only to users in db as online-ness
+            # is checked later
+            current_cache_settings = OnlineUserRequestCacheParams(
+                age=age,
+                age_diff=age_difference,
+                current_country=current_user.location.country,
+                gender_filter=filter_params.gender,
+                city_filter=filter_params.city
+            )
+            current_user_ids: set[str] = \
+                await self.redis_service.find_user_ids(current_cache_settings)
+            if current_user_ids is None:
+                logger.info(
+                    f"Cache not found for "
+                    f"{current_cache_settings.cache_key()}, "
+                    f"querying database")
+
+                current_user_ids = set(self.user_service.find_user_ids(
+                    current_user, gender=filter_params.gender,
+                    age_difference=age_difference,
+                    city=filter_params.city))
+
+                logger.info(
+                    f"Got {collected_user_ids} "
+                    f"for settings {current_cache_settings.cache_key()}. "
+                    f"Saving cache")
+                await self.redis_service.store_user_ids(
+                    current_cache_settings, current_user_ids)
+
+            # removing
+            # and we're going through all these users, ugh
+            for user in current_user_ids:
+                # we need this filter because on each loop
+                # we are fetching same users
+                # TODO rework someday
+                if user not in ignored_user_ids:
+                    ignored_user_ids.add(user)
+                    collected_user_ids.add(user)
+
+            collected_user_ids = collected_user_ids.difference(blacklist)
+            collected_user_ids = collected_user_ids.intersection(online)
+
+            if age_difference >= settings.ONLINE_USER_MAX_AGE_DIFF:
+                break
+
+            # increasing search boundaries
+            age_difference += settings.ONLINE_USER_AGE_DIFF_STEP
+
+        logger.info(f"Adding {collected_user_ids} to user request cache "
+                    f"for {user_cache.cache_key()}")
+        # adding currently returned users to cache
+        await self.redis_service.save_cached_online_response(
+            user_cache, collected_user_ids)
+        return collected_user_ids

@@ -41,11 +41,15 @@ async def patch_user(
     # TODO This is bs, this field should not be in the docs
     # but the solutions are ugly AF
     # https://github.com/tiangolo/fastapi/issues/1357
-    user_object = user_service.update_user(current_user, user_body)
+    user_object: User = user_service.update_user(current_user, user_body)
 
     if user_body.location:
         await redis_service.add_cities(
             user_body.location.country, [user_body.location.city])
+        # TODO remove from previous caches if it's an update, and not
+        # creating of a new user
+        logger.info("Adding user to current online request caches")
+        await redis_service.add_new_user_to_online_caches(user_object)
         # todo save user to caches
     return user_object
 

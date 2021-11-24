@@ -1,19 +1,22 @@
 import datetime
 import io
+import uuid
 from unittest import mock
 from unittest.mock import MagicMock
 
 import dateutil.parser
 import pytest
 from PIL import Image
+from dateutil.relativedelta import relativedelta
 from httpx import AsyncClient, Response
 from pytest_mock import MockerFixture
 from sqlalchemy.orm import Session
 
 from swipe.settings import settings
-from swipe.swipe_server.users.enums import ZodiacSign
+from swipe.swipe_server.users.enums import ZodiacSign, Gender
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.services import UserService, RedisUserService
+from swipe.swipe_server.users.services import UserService, RedisUserService, \
+    OnlineUserRequestCacheParams
 
 
 @pytest.mark.anyio
@@ -46,8 +49,37 @@ async def test_user_update_location(
         redis_service: RedisUserService,
         session: Session,
         default_user_auth_headers: dict[str, str]):
-    default_user.date_of_birth = datetime.date.today()
+    default_user.gender = Gender.MALE
     session.commit()
+
+    await redis_service.connect_user(user_id=default_user.id)
+
+    age_delta = relativedelta(datetime.date.today(),
+                              default_user.date_of_birth)
+    age = round(age_delta.years + age_delta.months / 12)
+
+    # assuming some other users are in the cache for Hello
+    cached_user_id = str(uuid.uuid4())
+    cache_settings = OnlineUserRequestCacheParams(
+        age=age,
+        age_diff=4,
+        current_country='What Country',
+        gender_filter=default_user.gender,
+        city_filter='Hello'
+    )
+    # assuming some other users are in the cache for Hello
+    await redis_service.store_user_ids(cache_settings, {cached_user_id, })
+
+    cache_settings_country = OnlineUserRequestCacheParams(
+        age=age,
+        age_diff=4,
+        current_country='What Country',
+        gender_filter=default_user.gender,
+    )
+
+    await redis_service.store_user_ids(cache_settings_country,
+                                       {cached_user_id, })
+    # save to online user cache
     response: Response = await client.patch(
         f"{settings.API_V1_PREFIX}/me",
         headers=default_user_auth_headers,
@@ -67,6 +99,12 @@ async def test_user_update_location(
     assert 'country:What Country' in country_keys
     cities = await redis_service.redis.lrange('country:What Country', 0, -1)
     assert 'Hello' in cities
+
+    # user is added to current caches
+    assert await redis_service.find_user_ids(cache_settings) == {
+        str(default_user.id), cached_user_id}
+    assert await redis_service.find_user_ids(cache_settings_country) == {
+        str(default_user.id), cached_user_id}
 
 
 @pytest.mark.anyio
