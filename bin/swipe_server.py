@@ -52,6 +52,14 @@ async def populate_country_cache():
         await cache_service.populate_country_cache()
 
 
+async def invalidate_caches():
+    redis_service = RedisUserService(await dependencies.redis())
+    logger.info("Invalidating online response cache")
+    await redis_service.drop_online_response_cache_all()
+    logger.info("Invalidating online user cache")
+    await redis_service.invalidate_online_user_cache()
+
+
 @app.on_event("startup")
 @repeat_every(seconds=60 * 60, logger=logger)
 async def populate_popular_cache():
@@ -65,6 +73,8 @@ async def populate_popular_cache():
 
 if __name__ == '__main__':
     run_migrations()
+    # invalidate
+    asyncio.get_event_loop().run_until_complete(invalidate_caches())
     asyncio.get_event_loop().run_until_complete(populate_country_cache())
     logger.info(f'Starting app at port {settings.SWIPE_PORT}')
     uvicorn.run('bin.swipe_server:app', host='0.0.0.0',  # noqa

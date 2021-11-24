@@ -108,6 +108,10 @@ class RedisUserService:
         # remove online request cache
         await self.drop_online_response_cache(str(user_id))
 
+    async def invalidate_online_user_cache(self):
+        await self.redis.delete(self.ONLINE_USERS_SET)
+
+    # -----------------------------------------
     async def add_cities(self, country: str, cities: list[str]):
         await self.redis.lpush(f'country:{country}', *cities)
 
@@ -184,6 +188,10 @@ class RedisUserService:
 
     async def drop_online_response_cache(self, user_id: str):
         for key in await self.redis.keys(f'online_request:{user_id}:*'):
+            await self.redis.delete(key)
+
+    async def drop_online_response_cache_all(self):
+        for key in await self.redis.keys(f'online_request:*'):
             await self.redis.delete(key)
 
     # --------------------------------------------
