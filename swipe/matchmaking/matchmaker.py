@@ -252,7 +252,8 @@ class Matchmaker:
             logger.info(f"{user_id} disconnected during previous round, "
                         f"removing him from the old and new graphs")
             incoming_data.new_users.pop(user_id, None)
-            self._empty_candidates.remove(user_id)
+            if user_id in self._empty_candidates:
+                self._empty_candidates.remove(user_id)
 
             if user_id not in self._connection_graph:
                 # he might have connected during wait time and disconnected
