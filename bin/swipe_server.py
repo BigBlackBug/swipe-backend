@@ -1,7 +1,7 @@
-import asyncio
 import os
 import sys
 
+import uvicorn
 from fastapi_utils.tasks import repeat_every
 
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
@@ -12,7 +12,6 @@ import logging
 
 import alembic.command
 import alembic.config
-import uvicorn
 from swipe.swipe_server.users.services import RedisUserService, UserService, \
     CacheService
 from swipe.swipe_server.misc import dependencies
@@ -31,7 +30,11 @@ logger = logging.getLogger(__name__)
 app = swipe_app.init_app()
 
 
-def run_migrations():
+# prometheus = Instrumentator().instrument(app).expose(app)
+
+
+@app.on_event("startup")
+async def run_migrations():
     migrations_dir = str(constants.BASE_DIR.joinpath('migrations').absolute())
     alembic_cfg_dir = str(constants.BASE_DIR.joinpath('alembic.ini').absolute())
 
@@ -43,17 +46,19 @@ def run_migrations():
     alembic.command.upgrade(alembic_cfg, 'head')
 
 
+@app.on_event("startup")
 async def populate_country_cache():
     logger.info("Populating country cache")
     with dependencies.db_context() as db:
-        redis_service = RedisUserService(await dependencies.redis())
+        redis_service = RedisUserService(dependencies.redis())
         user_service = UserService(db)
         cache_service = CacheService(user_service, redis_service)
         await cache_service.populate_country_cache()
 
 
+@app.on_event("startup")
 async def invalidate_caches():
-    redis_service = RedisUserService(await dependencies.redis())
+    redis_service = RedisUserService(dependencies.redis())
     logger.info("Invalidating online response cache")
     await redis_service.drop_online_response_cache_all()
     # TODO just for tests, because chat server is also being restarted
@@ -66,18 +71,15 @@ async def invalidate_caches():
 async def populate_popular_cache():
     logger.info("Populating popular cache")
     with dependencies.db_context() as db:
-        redis_service = RedisUserService(await dependencies.redis())
+        redis_service = RedisUserService(dependencies.redis())
         user_service = UserService(db)
         cache_service = CacheService(user_service, redis_service)
         await cache_service.populate_popular_cache()
 
 
 if __name__ == '__main__':
-    run_migrations()
-    # invalidate
-    asyncio.get_event_loop().run_until_complete(invalidate_caches())
-    asyncio.get_event_loop().run_until_complete(populate_country_cache())
     logger.info(f'Starting app at port {settings.SWIPE_PORT}')
+
     uvicorn.run('bin.swipe_server:app', host='0.0.0.0',  # noqa
                 port=settings.SWIPE_PORT, workers=1,
                 reload=settings.ENABLE_WEB_SERVER_AUTORELOAD)

@@ -14,8 +14,8 @@ from httpx import AsyncClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
-from swipe import config
 import swipe.swipe_server.misc.dependencies
+from swipe import config
 from swipe.settings import settings
 from swipe.swipe_server import swipe_app
 from swipe.swipe_server.chats.services import ChatService
@@ -139,29 +139,6 @@ async def client(session, fake_redis, test_app) -> Generator:
     yield client
     del test_app.dependency_overrides[swipe.swipe_server.misc.dependencies.db]
     del test_app.dependency_overrides[
-        swipe.swipe_server.misc.dependencies.redis]
-    await client.aclose()
-
-
-@pytest.fixture
-async def mc_client(session, fake_redis, mc_test_app) -> Generator:
-    def test_database():
-        yield session
-
-    def patched_redis():
-        yield fake_redis
-
-    # database.db is a dependency used by the app
-    mc_test_app.dependency_overrides[
-        swipe.swipe_server.misc.dependencies.db] = test_database
-    mc_test_app.dependency_overrides[
-        swipe.swipe_server.misc.dependencies.redis] = patched_redis
-    # base_url is mandatory because starlette devs can be dumb sometimes
-    client = AsyncClient(app=mc_test_app, base_url='http://localhost')
-    yield client
-    del mc_test_app.dependency_overrides[
-        swipe.swipe_server.misc.dependencies.db]
-    del mc_test_app.dependency_overrides[
         swipe.swipe_server.misc.dependencies.redis]
     await client.aclose()
 

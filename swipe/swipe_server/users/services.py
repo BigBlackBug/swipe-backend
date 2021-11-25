@@ -129,7 +129,8 @@ class RedisUserService:
     # -----------------------------------------
     async def drop_country_cache(self):
         countries = await self.redis.keys("country:*")
-        await self.redis.delete(*countries)
+        if countries:
+            await self.redis.delete(*countries)
 
     async def add_cities(self, country: str, cities: list[str]):
         await self.redis.sadd(f'country:{country}', *cities)

@@ -31,8 +31,10 @@ def db_context() -> Session:
         session.close()
 
 
-async def redis() -> aioredis.Redis:
-    logging.info(f'Connecting to a redis@{settings.REDIS_URL}')
-    # TODO IDK if it's the right way to use redis connections since it's a pool
-    # TODO close connection
-    return aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+logging.info(f'Connecting to a redis@{settings.REDIS_URL}')
+redis_pool = aioredis.ConnectionPool.from_url(
+    settings.REDIS_URL, decode_responses=True)
+
+
+def redis() -> aioredis.Redis:
+    return aioredis.Redis(connection_pool=redis_pool)
