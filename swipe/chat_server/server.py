@@ -13,7 +13,7 @@ from uvicorn import Server, Config
 
 from swipe import error_handlers
 from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
-    MessagePayload, CreateChatPayload
+    MessagePayload, CreateChatPayload, BlacklistAddPayload
 from swipe.chat_server.services import ChatServerRequestProcessor, \
     WSConnectionManager, ConnectedUser, ChatUserData
 from swipe.settings import settings
@@ -144,6 +144,17 @@ async def create_chat_from_matchmaking(
     await connection_manager.send(str(payload.sender_id), out_payload)
 
     return Response()
+
+
+@app.post("/swipe/blacklist")
+async def send_blacklist_event(blocked_by_id: str = Body(..., embed=True),
+                               blocked_user_id: str = Body(..., embed=True)):
+    logger.info(f"Sending blocked event "
+                f"from {blocked_by_id} to {blocked_user_id}")
+    payload = BasePayload(
+        sender_id=UUID(hex=blocked_by_id),
+        payload=BlacklistAddPayload(blocked_by_id=blocked_by_id))
+    await connection_manager.send(blocked_user_id, payload.dict(by_alias=True))
 
 
 async def _send_payload(payload: BasePayload, user_service: UserService):

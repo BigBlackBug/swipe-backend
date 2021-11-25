@@ -75,6 +75,11 @@ class UserJoinPayloadOut(BaseModel):
     avatar_url: str
 
 
+class BlacklistAddPayload(BaseModel):
+    type_: str = Field('blacklist', alias='type', const=True)
+    blocked_by_id: str
+
+
 class BasePayload(BaseModel):
     sender_id: UUID
     recipient_id: Optional[UUID] = None
@@ -82,7 +87,7 @@ class BasePayload(BaseModel):
         MessagePayload, GlobalMessagePayload,
         MessageStatusPayload, MessageLikePayload,
         DeclineChatPayload, AcceptChatPayload, CreateChatPayload,
-        OpenChatPayload
+        OpenChatPayload, BlacklistAddPayload
     ]
 
     @classmethod

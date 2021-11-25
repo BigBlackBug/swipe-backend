@@ -119,7 +119,7 @@ class ChatServerRequestProcessor:
 
             self.user_service.update_blacklist(
                 str(data.sender_id), str(data.recipient_id))
-            await self.redis_service.add_to_blacklist(
+            await self.redis_service.add_to_blacklist_cache(
                 str(data.sender_id), str(data.recipient_id))
 
 

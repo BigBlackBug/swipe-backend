@@ -2,12 +2,14 @@ import datetime
 import logging
 from uuid import UUID
 
+import requests
 from fastapi import Depends, Body, APIRouter, HTTPException
 from sqlalchemy.orm import Session
 from starlette import status
 from starlette.responses import Response
 
 import swipe.swipe_server.misc.dependencies
+from swipe.settings import settings
 from swipe.swipe_server.misc import security
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.schemas import UserCardPreviewOut, \
@@ -64,12 +66,6 @@ async def fetch_list_of_online_users(
         fetch_service: FetchService = Depends(),
         user_service: UserService = Depends(),
         current_user: User = Depends(security.get_current_user)):
-    """
-    All fields are optional. Check default values.
-    Important point - ignore_users is supposed to be used
-    when fetching users for the popular list
-    """
-
     collected_user_ids = await fetch_service.collect(
         current_user, filter_params, key_type=KeyType.ONLINE_REQUEST)
 
@@ -104,11 +100,6 @@ async def fetch_list_of_user_cards(
         user_service: UserService = Depends(),
         fetch_service: FetchService = Depends(),
         current_user: User = Depends(security.get_current_user)):
-    """
-    All fields are optional. Check default values.
-    Important point - ignore_users is supposed to be used
-    when fetching users for the popular list
-    """
     collected_user_ids = await fetch_service.collect(
         current_user, filter_params, key_type=KeyType.CARDS_REQUEST)
 
@@ -155,11 +146,20 @@ async def block_user(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail='Not found')
 
-    user_service.update_blacklist(
-        str(current_user.id), str(target_user.id))
+    blocked_by_id = str(current_user.id)
+    blocked_user_id = str(user_id)
 
-    await redis_service.add_to_blacklist(
-        str(current_user.id), str(target_user.id))
+    user_service.update_blacklist(blocked_by_id, blocked_user_id)
+    await redis_service.add_to_blacklist_cache(blocked_by_id, blocked_user_id)
+
+    if settings.ENABLE_BLACKLIST:
+        # sending 'add to blacklist' event to blocked_user_id
+        url = f'{settings.CHAT_SERVER_HOST}/swipe/blacklist'
+        requests.post(url, json={
+            'blocked_by_id': blocked_by_id,
+            'blocked_user_id': blocked_user_id
+        })
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

@@ -9,7 +9,7 @@ from starlette.responses import Response
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc import security
 from swipe.swipe_server.users import schemas
-from swipe.swipe_server.users.models import User
+from swipe.swipe_server.users.models import User, Location
 from swipe.swipe_server.users.services import UserService, RedisUserService
 
 IMAGE_CONTENT_TYPE_REGEXP = 'image/(png|jpe?g)'
@@ -41,17 +41,20 @@ async def patch_user(
     # TODO This is bs, this field should not be in the docs
     # but the solutions are ugly AF
     # https://github.com/tiangolo/fastapi/issues/1357
-    user_object: User = user_service.update_user(current_user, user_body)
+    previous_location: Location = current_user.location
+    current_user: User = user_service.update_user(current_user, user_body)
 
     if user_body.location:
         await redis_service.add_cities(
             user_body.location.country, [user_body.location.city])
-        # TODO remove from previous caches if it's an update, and not
-        # creating of a new user
-        logger.info("Adding user to current online request caches")
-        await redis_service.add_new_user_to_online_caches(user_object)
-        # todo save user to caches
-    return user_object
+
+        logger.info("Removing user from old location request caches")
+        await redis_service.remove_from_request_caches(
+            current_user, previous_location)
+
+        logger.info("Adding user to current request caches")
+        await redis_service.add_user_to_request_caches(current_user)
+    return current_user
 
 
 @router.delete(

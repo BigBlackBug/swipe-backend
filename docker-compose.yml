@@ -19,6 +19,7 @@ services:
       - env/docker.env
     environment:
       - SWIPE_PORT=8000
+      - CHAT_SERVER_HOST=http://chat_server:80
     ports:
       - "8000:8000"
     entrypoint: python bin/swipe_server.py

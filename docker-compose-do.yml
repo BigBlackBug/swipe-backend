@@ -17,6 +17,7 @@ services:
       - swipe.env
     environment:
       - SWIPE_PORT=8000
+      - CHAT_SERVER_HOST=http://chat_server:80
     ports:
       - "80:8000"
     entrypoint: python bin/swipe_server.py

@@ -278,7 +278,7 @@ async def test_user_fetch_online_city_check_cache(
            {str(user_3.id), str(user_4.id), str(user_44.id), str(user_5.id)}
 
     # -------------------invalidating cache with new settings----------------
-    # user 2 went online
+    # settings changed, sending invalidate cache
     await redis_service.connect_user(user_2.id)
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch_online",
@@ -362,9 +362,9 @@ async def test_user_fetch_blacklist(
     user_service.update_blacklist(str(default_user.id), str(user_2.id))
     user_service.update_blacklist(str(default_user.id), str(user_3.id))
 
-    await redis_service.add_to_blacklist(str(default_user.id), str(user_1.id))
-    await redis_service.add_to_blacklist(str(default_user.id), str(user_2.id))
-    await redis_service.add_to_blacklist(str(default_user.id), str(user_3.id))
+    await redis_service.add_to_blacklist_cache(str(default_user.id), str(user_1.id))
+    await redis_service.add_to_blacklist_cache(str(default_user.id), str(user_2.id))
+    await redis_service.add_to_blacklist_cache(str(default_user.id), str(user_3.id))
 
     await redis_service.connect_user(user_1.id)
     await redis_service.connect_user(user_3.id)

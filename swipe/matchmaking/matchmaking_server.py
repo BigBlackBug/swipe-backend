@@ -174,7 +174,8 @@ async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData,
             # a decline means we add them to each others blacklist
             if settings.ENABLE_MATCHMAKING_BLACKLIST:
                 user_service.update_blacklist(sender_id, recipient_id)
-                await redis_service.add_to_blacklist(sender_id, recipient_id)
+                await redis_service.add_to_blacklist_cache(
+                    sender_id, recipient_id)
     elif isinstance(data_payload, MMLobbyPayload):
         if data_payload.action == MMLobbyAction.CONNECT:
             # user joined the lobby

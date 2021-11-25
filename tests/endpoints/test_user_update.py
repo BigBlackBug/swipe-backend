@@ -16,7 +16,7 @@ from swipe.settings import settings
 from swipe.swipe_server.users.enums import ZodiacSign, Gender
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.services import UserService, RedisUserService, \
-    OnlineUserRequestCacheParams
+    UserRequestCacheParams
 
 
 @pytest.mark.anyio
@@ -60,7 +60,7 @@ async def test_user_update_location(
 
     # assuming some other users are in the cache for Hello
     cached_user_id = str(uuid.uuid4())
-    cache_settings = OnlineUserRequestCacheParams(
+    cache_settings = UserRequestCacheParams(
         age=age,
         age_diff=4,
         current_country='What Country',
@@ -70,7 +70,7 @@ async def test_user_update_location(
     # assuming some other users are in the cache for Hello
     await redis_service.store_user_ids(cache_settings, {cached_user_id, })
 
-    cache_settings_country = OnlineUserRequestCacheParams(
+    cache_settings_country = UserRequestCacheParams(
         age=age,
         age_diff=4,
         current_country='What Country',
@@ -79,6 +79,17 @@ async def test_user_update_location(
 
     await redis_service.store_user_ids(cache_settings_country,
                                        {cached_user_id, })
+
+    # this dude is in cache of his previous location
+    old_location_cache_settings = UserRequestCacheParams(
+        age=age,
+        age_diff=4,
+        current_country=default_user.location.country,
+        gender_filter=default_user.gender,
+        city_filter=default_user.location.city
+    )
+    await redis_service.store_user_ids(old_location_cache_settings,
+                                       {str(default_user.id), })
     # save to online user cache
     response: Response = await client.patch(
         f"{settings.API_V1_PREFIX}/me",
@@ -105,6 +116,10 @@ async def test_user_update_location(
         str(default_user.id), cached_user_id}
     assert await redis_service.find_user_ids(cache_settings_country) == {
         str(default_user.id), cached_user_id}
+
+    # user is removed from old cache
+    assert await redis_service.find_user_ids(old_location_cache_settings) \
+           == set()
 
 
 @pytest.mark.anyio
