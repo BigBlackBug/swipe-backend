@@ -127,15 +127,19 @@ class RedisUserService:
         await self.redis.delete(self.ONLINE_USERS_SET)
 
     # -----------------------------------------
+    async def drop_country_cache(self):
+        countries = await self.redis.keys("country:*")
+        await self.redis.delete(*countries)
+
     async def add_cities(self, country: str, cities: list[str]):
-        await self.redis.lpush(f'country:{country}', *cities)
+        await self.redis.sadd(f'country:{country}', *cities)
 
     async def fetch_locations(self) \
             -> AsyncGenerator[Tuple[str, list[str]], None]:
         countries = await self.redis.keys("country:*")
         for country_key in countries:
             country = country_key.split(":")[1]
-            yield country, await self.redis.lrange(country_key, 0, -1)
+            yield country, await self.redis.smembers(country_key)
 
     # ------------------------------------------------
     async def get_popular_users(self, filter_params: PopularFilterBody) \
@@ -313,7 +317,6 @@ class RedisUserService:
                     f"Adding {user_id} to cache "
                     f"{cache_settings.cache_key()}")
                 await self.redis.sadd(cache_settings.cache_key(), user_id)
-
 
 class UserService:
     def __init__(self,
@@ -582,13 +585,13 @@ class CacheService:
 
         locations = self.redis_service.fetch_locations()
         async for country, cities in locations:
-            logger.info(f"Processing country:'{country}' cache")
+            logger.info(f"Processing country: '{country}'")
             await self._fill_cache(country, gender=Gender.MALE)
             await self._fill_cache(country, gender=Gender.FEMALE)
             await self._fill_cache(country)
 
             logger.info(f"Processing cities cache - '{country}', "
-                        f"'{cities}' cache")
+                        f"cities: '{cities}'")
             for city in cities:
                 await self._fill_cache(country, city=city, gender=Gender.MALE)
                 await self._fill_cache(country, city=city, gender=Gender.FEMALE)
@@ -597,8 +600,12 @@ class CacheService:
     async def populate_country_cache(self):
         locations = self.user_service.fetch_locations()
 
+        logger.info("Dropping country cache")
+        await self.redis_service.drop_country_cache()
+
         logger.info(f"Populating location cache with locations: {locations}")
         for country, cities in locations.items():
+            logger.info(f"Saving {cities} to {country}")
             await self.redis_service.add_cities(country, cities)
 
 
