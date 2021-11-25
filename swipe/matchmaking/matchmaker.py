@@ -2,7 +2,7 @@ import heapq
 import logging
 import time
 from dataclasses import dataclass
-from typing import Optional, Iterator
+from typing import Optional, Iterator, Tuple
 
 import requests
 
@@ -195,12 +195,24 @@ class Matchmaker:
 
     def find_match(self, user_id: str):
         current_vertex = self._connection_graph[user_id]
+
+        # some of the edges might be gone by now
+        logger.info(f"Filtering connections of {user_id}, \n"
+                    f"before: {current_vertex.edges.items()}")
+        potential_edges: list[Tuple[str, bool]] = list(filter(  # noqa
+            lambda item: item[0] in self._connection_graph,
+            current_vertex.edges.items()))
+        logger.info(f"Filtering connections of {user_id}, \n"
+                    f"after: {potential_edges}")
         # getting candidate with the most weight
-        potential_edges = sorted(
-            current_vertex.edges.items(),
+        # TODO might be a good idea to maintain a maxheap, instead of sorting
+        # on EACH iteration
+        potential_edges.sort(
             key=lambda item: self._connection_graph[
                 item[0]].mm_settings.current_weight,
             reverse=True)
+        current_vertex.edges = dict(potential_edges)
+
         logger.info(f"Edges of {user_id}: {potential_edges}")
         for potential_match_id, _ in potential_edges:
             logger.info(f"Checking {potential_match_id}")
@@ -240,6 +252,8 @@ class Matchmaker:
             logger.info(f"{user_id} disconnected during previous round, "
                         f"removing him from the old and new graphs")
             incoming_data.new_users.pop(user_id, None)
+            self._empty_candidates.remove(user_id)
+
             if user_id not in self._connection_graph:
                 # he might have connected during wait time and disconnected
                 continue
@@ -284,7 +298,8 @@ class Matchmaker:
             # TODO it's a workaround for users who have connected
             # without disconnecting. It shouldn't be possible anyway
             if incoming_user_id in self._connection_graph:
-                logger.error(f"HOWTHEFUCK is {incoming_user_id} in the graph???")
+                logger.error(
+                    f"HOW THE FUCK is {incoming_user_id} in the graph???")
                 # self._connection_graph[incoming_user_id].matched = False
                 continue
 
@@ -315,13 +330,14 @@ class Matchmaker:
                     f"{self._connection_graph.values()}")
 
     def _process_empty_candidates(self):
-        # online_users = set(self._connection_graph.keys())
         while self._empty_candidates:
             user_id: str = self._empty_candidates.pop()
-            # user could have been removed from the graph
-            # because he disconnected
             vertex = self._connection_graph.get(user_id, None)
             if not vertex:
+                # user could have been removed from the graph
+                # because he disconnected
+                # but this should not be possible, as I'm removing disconnected
+                # users from the empty candidates set before that
                 logger.info(f"{user_id} is not in the graph anymore, skipping")
                 continue
 
@@ -375,7 +391,7 @@ def start_matchmaker(round_length_secs: int = 5):
 
             for user_a, user_b \
                     in matchmaker.run_matchmaking_round(incoming_data):
-                logger.info(f"Sending match {user_a}-{user_b}")
+                logger.info(f"Sending match {user_a}, {user_b}")
                 requests.post(
                     f'{settings.MATCHMAKING_SERVER_HOST}/send_match',
                     json={
