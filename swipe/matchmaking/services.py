@@ -42,7 +42,8 @@ class MMUserService:
 
     def get_matchmaking_preview(self, user_id: UUID):
         return self.db.query(User).where(User.id == user_id). \
-            options(load_only(User.date_of_birth, User.gender)).one_or_none()
+            options(load_only(User.date_of_birth, User.gender, User.age))\
+            .one_or_none()
 
     def update_blacklist(self, blocker_id: str, blocked_user_id: str):
         self.db.execute(insert(blacklist_table).values(

@@ -1,10 +1,9 @@
 import asyncio
-import datetime
 import logging
 from uuid import UUID
 
+import aioredis
 import requests
-from dateutil.relativedelta import relativedelta
 from fastapi import FastAPI, Body, Query, Depends
 from fastapi import WebSocket
 from pydantic import BaseModel
@@ -20,9 +19,10 @@ from swipe.matchmaking.schemas import MMBasePayload, MMMatchPayload, \
     MMChatPayload, MMChatAction
 from swipe.matchmaking.services import MMUserService
 from swipe.settings import settings
+from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import IDList
-from swipe.swipe_server.users.services import RedisUserService
+from swipe.swipe_server.users.redis_services import RedisBlacklistService
 
 logger = logging.getLogger(__name__)
 
@@ -59,26 +59,27 @@ connection_manager = WSConnectionManager()
 
 
 @app.websocket("/connect/{user_id}")
-async def matchmaker_endpoint(user_id: UUID, websocket: WebSocket,
-                              user_service: MMUserService = Depends(),
-                              redis_service: RedisUserService = Depends(),
-                              gender: Gender = Query(None)):
+async def matchmaker_endpoint(
+        user_id: UUID, websocket: WebSocket,
+        user_service: MMUserService = Depends(),
+        redis: aioredis.Redis = Depends(
+            dependencies.redis),
+        gender: Gender = Query(None)):
     if (user := user_service.get_matchmaking_preview(user_id)) is None:
         logger.info(f"User {user_id} not found")
         await websocket.close(1003)
         return
 
-    age_delta = relativedelta(datetime.date.today(), user.date_of_birth)
-    age = round(age_delta.years + age_delta.months / 12)
+    redis_blacklist = RedisBlacklistService(redis)
 
-    logger.info(f"{user_id}, rounded age: {age} "
+    logger.info(f"{user_id}, rounded age: {user.age} "
                 f"connected with filter: {gender}")
 
     user_id = str(user_id)
-    user = ConnectedUser(user_id=user_id, connection=websocket,
-                         data=MMUserData(age=age, gender_filter=gender,
+    connected_user = ConnectedUser(user_id=user_id, connection=websocket,
+                         data=MMUserData(age=user.age, gender_filter=gender,
                                          gender=user.gender))
-    await connection_manager.connect(user)
+    await connection_manager.connect(connected_user)
 
     while True:
         try:
@@ -93,7 +94,7 @@ async def matchmaker_endpoint(user_id: UUID, websocket: WebSocket,
         try:
             base_payload: MMBasePayload = MMBasePayload.validate(data)
             await _process_payload(
-                base_payload, user.data, user_service, redis_service)
+                base_payload, connected_user, user_service, redis_blacklist)
 
             if base_payload.recipient_id:
                 await connection_manager.send(
@@ -150,9 +151,10 @@ async def _process_disconnect(user_id: str):
         matchmaking_data.remove_match(match.user_id)
 
 
-async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData,
-                           user_service: MMUserService,
-                           redis_service: RedisUserService):
+async def _process_payload(base_payload: MMBasePayload,
+                           connected_user: ConnectedUser,
+                           mm_user_service: MMUserService,
+                           redis_blacklist: RedisBlacklistService):
     data_payload = base_payload.payload
     sender_id = base_payload.sender_id
     recipient_id = base_payload.recipient_id
@@ -173,12 +175,13 @@ async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData,
 
             # a decline means we add them to each others blacklist
             if settings.ENABLE_MATCHMAKING_BLACKLIST:
-                user_service.update_blacklist(sender_id, recipient_id)
-                await redis_service.add_to_blacklist_cache(
+                mm_user_service.update_blacklist(sender_id, recipient_id)
+                await redis_blacklist.add_to_blacklist_cache(
                     sender_id, recipient_id)
     elif isinstance(data_payload, MMLobbyPayload):
         if data_payload.action == MMLobbyAction.CONNECT:
             # user joined the lobby
+            user_data = connected_user.data
             mm_settings = MMSettings(
                 age=user_data.age,
                 gender=user_data.gender,
@@ -188,7 +191,7 @@ async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData,
             logger.info(f"Current online users {matchmaking_data.online_users}")
 
             connections: IDList = \
-                user_service.find_user_ids(
+                mm_user_service.find_user_ids(
                     sender_id,
                     age=mm_settings.age,
                     online_users=matchmaking_data.online_users,

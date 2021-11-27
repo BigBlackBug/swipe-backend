@@ -233,11 +233,12 @@ async def test_fetch_existing_and_incoming_request(
         image_id='345345.png', sender=other_user)
     chat.messages.extend([msg1, msg2, msg3, msg4])
 
+    whatever_user = randomizer.generate_random_user()
     # chat wth no messages
     chat_no_messages = Chat(
         status=ChatStatus.ACCEPTED,
         source=ChatSource.VIDEO_LOBBY,
-        initiator=other_user,
+        initiator=whatever_user,
         the_other_person=default_user)
     session.add(chat_no_messages)
 
@@ -267,9 +268,10 @@ async def test_fetch_existing_and_incoming_request(
     )
     assert response.status_code == 200
     users = response.json()['users']
-    assert len(users) == 3
+    assert len(users) == 4
     assert set(users.keys()) == {
-        str(default_user.id), str(other_user.id), str(second_user.id)
+        str(default_user.id), str(other_user.id), str(second_user.id),
+        str(whatever_user.id)
     }
     assert users[str(default_user.id)]['name'] == default_user.name
     assert users[str(other_user.id)]['name'] == other_user.name

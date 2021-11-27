@@ -2,6 +2,7 @@ import datetime
 import uuid
 
 import pytest
+from fakeredis import aioredis
 from sqlalchemy.orm import Session
 
 from swipe.chat_server.schemas import BasePayload
@@ -12,7 +13,7 @@ from swipe.swipe_server.chats.models import GlobalChatMessage, Chat, \
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
-from swipe.swipe_server.users.services import UserService, RedisUserService
+from swipe.swipe_server.users.services import UserService
 
 NOW = datetime.datetime.now()
 
@@ -21,10 +22,10 @@ NOW = datetime.datetime.now()
 async def test_post_global_message(
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
-        redis_service: RedisUserService,
+        fake_redis: aioredis.FakeRedis,
         default_user_auth_headers: dict[str, str]):
     message_id = uuid.uuid4()
-    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, fake_redis)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'payload': {
@@ -45,7 +46,7 @@ async def test_post_global_message(
 async def test_post_directed_message(
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
-        redis_service: RedisUserService,
+        fake_redis: aioredis.FakeRedis,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
@@ -56,7 +57,7 @@ async def test_post_directed_message(
         chat_status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY)
     message_id = uuid.uuid4()
 
-    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, fake_redis)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -81,7 +82,7 @@ async def test_post_directed_message(
 async def test_set_received_status(
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
-        redis_service: RedisUserService,
+        fake_redis: aioredis.FakeRedis,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
@@ -94,7 +95,7 @@ async def test_set_received_status(
     chat_service.post_message(
         message_id, default_user.id, recipient.id,
         timestamp=NOW, message='what', is_liked=False)
-    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, fake_redis)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'payload': {
@@ -116,7 +117,7 @@ async def test_set_read_status(
 
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
-        redis_service: RedisUserService,
+        fake_redis: aioredis.FakeRedis,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
@@ -129,7 +130,7 @@ async def test_set_read_status(
     chat_service.post_message(
         message_id, default_user.id, recipient.id,
         timestamp=NOW, message='what', is_liked=False)
-    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, fake_redis)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'payload': {
@@ -149,7 +150,7 @@ async def test_set_liked(
 
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
-        redis_service: RedisUserService,
+        fake_redis: aioredis.FakeRedis,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
@@ -162,7 +163,7 @@ async def test_set_liked(
     chat_service.post_message(
         message_id, default_user.id, recipient.id,
         timestamp=NOW, message='what', is_liked=False)
-    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, fake_redis)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'payload': {
@@ -181,7 +182,7 @@ async def test_set_liked(
 async def test_set_disliked(
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
-        redis_service: RedisUserService,
+        fake_redis: aioredis.FakeRedis,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
@@ -194,7 +195,7 @@ async def test_set_disliked(
     chat_service.post_message(
         message_id, default_user.id, recipient.id,
         timestamp=NOW, message='what', is_liked=True)
-    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, fake_redis)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'payload': {
@@ -213,12 +214,12 @@ async def test_set_disliked(
 async def test_create_chat_direct(
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
-        redis_service: RedisUserService,
+        fake_redis: aioredis.FakeRedis,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
-    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, fake_redis)
     json_data = BasePayload.validate({
 
         'sender_id': str(default_user.id),
@@ -252,12 +253,12 @@ async def test_create_chat_direct(
 async def test_create_chat_text_lobby(
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
-        redis_service: RedisUserService,
+        fake_redis: aioredis.FakeRedis,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
-    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, fake_redis)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -290,12 +291,12 @@ async def test_create_chat_text_lobby(
 async def test_create_chat_audio_lobby(
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
-        redis_service: RedisUserService,
+        fake_redis: aioredis.FakeRedis,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
-    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, fake_redis)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -320,12 +321,12 @@ async def test_create_chat_audio_lobby(
 async def test_create_chat_video_lobby(
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
-        redis_service: RedisUserService,
+        fake_redis: aioredis.FakeRedis,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
-    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, fake_redis)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -350,7 +351,7 @@ async def test_create_chat_video_lobby(
 async def test_decline_chat(
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
-        redis_service: RedisUserService,
+        fake_redis: aioredis.FakeRedis,
         session: Session,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
@@ -378,7 +379,7 @@ async def test_decline_chat(
         image_id='345345.png', sender=initiator)
     chat.messages.extend([msg1, msg2, msg3, msg4])
     session.commit()
-    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, fake_redis)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -397,7 +398,7 @@ async def test_decline_chat(
 async def test_accept_chat(
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
-        redis_service: RedisUserService,
+        fake_redis: aioredis.FakeRedis,
         session: Session,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
@@ -425,7 +426,7 @@ async def test_accept_chat(
         image_id='345345.png', sender=initiator)
     chat.messages.extend([msg1, msg2, msg3, msg4])
     session.commit()
-    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, fake_redis)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),
@@ -444,7 +445,7 @@ async def test_accept_chat(
 async def test_open_chat(
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
-        redis_service: RedisUserService,
+        fake_redis: aioredis.FakeRedis,
         session: Session,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
@@ -472,7 +473,7 @@ async def test_open_chat(
         image_id='345345.png', sender=initiator)
     chat.messages.extend([msg1, msg2, msg3, msg4])
     session.commit()
-    mp = ChatServerRequestProcessor(chat_service, user_service, redis_service)
+    mp = ChatServerRequestProcessor(chat_service, user_service, fake_redis)
     json_data = BasePayload.validate({
         'sender_id': str(default_user.id),
         'recipient_id': str(recipient.id),

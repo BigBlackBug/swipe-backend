@@ -12,10 +12,11 @@ import swipe.swipe_server.misc.dependencies
 from swipe.settings import settings
 from swipe.swipe_server.misc import security
 from swipe.swipe_server.users.models import User
+from swipe.swipe_server.users.redis_services import RedisPopularService, \
+    RedisBlacklistService
 from swipe.swipe_server.users.schemas import UserCardPreviewOut, \
     OnlineFilterBody, UserOut, PopularFilterBody
-from swipe.swipe_server.users.services import UserService, RedisUserService, \
-    KeyType, FetchService
+from swipe.swipe_server.users.services import UserService, FetchService
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +34,16 @@ router = APIRouter()
 async def fetch_list_of_popular_users(
         filter_params: PopularFilterBody = Body(...),
         user_service: UserService = Depends(),
-        redis_service: RedisUserService = Depends(),
+        redis_popular: RedisPopularService = Depends(),
         current_user: User = Depends(security.get_current_user)):
+    """
+    If the size of the returned list is smaller than limit, it means
+    there are no more users and further requests make no sense
+    """
     logger.info(f"Fetching popular users with {filter_params}")
     # TODO maybe store whole users?
     popular_users: list[str] = \
-        await redis_service.get_popular_users(filter_params)
+        await redis_popular.get_popular_users(filter_params)
 
     logger.info(f"Got popular users for {filter_params}: {popular_users}")
     collected_users = user_service.get_users(
@@ -54,7 +59,7 @@ async def fetch_list_of_popular_users(
 
 
 @router.post(
-    '/fetch_online',
+    '/fetch',
     name='Fetch online users according to the filter',
     responses={
         200: {'description': 'List of users according to filter'},
@@ -66,42 +71,12 @@ async def fetch_list_of_online_users(
         fetch_service: FetchService = Depends(),
         user_service: UserService = Depends(),
         current_user: User = Depends(security.get_current_user)):
-    collected_user_ids = await fetch_service.collect(
-        current_user, filter_params, key_type=KeyType.ONLINE_REQUEST)
-
-    if not collected_user_ids:
-        return []
-
-    collected_users = user_service.get_users(
-        current_user.id, user_ids=collected_user_ids)
-
-    collected_users = sorted(
-        collected_users,
-        key=lambda user:
-        abs(current_user.date_of_birth - user.date_of_birth).days
-    )
-
-    return [
-        UserCardPreviewOut.patched_from_orm(user)
-        for user in collected_users[:filter_params.limit]
-    ]
-
-
-@router.post(
-    '/fetch_cards',
-    name='Fetch online user cards according to the filter',
-    responses={
-        200: {'description': 'List of users according to filter'},
-        400: {'description': 'Bad Request'},
-    },
-    response_model=list[UserCardPreviewOut])
-async def fetch_list_of_user_cards(
-        filter_params: OnlineFilterBody = Body(...),
-        user_service: UserService = Depends(),
-        fetch_service: FetchService = Depends(),
-        current_user: User = Depends(security.get_current_user)):
-    collected_user_ids = await fetch_service.collect(
-        current_user, filter_params, key_type=KeyType.CARDS_REQUEST)
+    """
+    If the size of the returned list is smaller than limit, it means
+    there are no more users and further requests make no sense
+    """
+    collected_user_ids = \
+        await fetch_service.collect(current_user, filter_params)
 
     if not collected_user_ids:
         return []
@@ -138,7 +113,7 @@ async def fetch_list_of_user_cards(
 async def block_user(
         user_id: UUID,
         user_service: UserService = Depends(),
-        redis_service: RedisUserService = Depends(),
+        redis_blacklist: RedisBlacklistService = Depends(),
         db: Session = Depends(swipe.swipe_server.misc.dependencies.db),
         current_user: User = Depends(security.get_current_user)):
     target_user = user_service.get_user(user_id)
@@ -150,7 +125,7 @@ async def block_user(
     blocked_user_id = str(user_id)
 
     user_service.update_blacklist(blocked_by_id, blocked_user_id)
-    await redis_service.add_to_blacklist_cache(blocked_by_id, blocked_user_id)
+    await redis_blacklist.add_to_blacklist_cache(blocked_by_id, blocked_user_id)
 
     if settings.ENABLE_BLACKLIST:
         # sending 'add to blacklist' event to blocked_user_id

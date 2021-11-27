@@ -1,5 +1,3 @@
-import uuid
-
 import pytest
 from httpx import Response, AsyncClient
 from pytest_mock import MockerFixture
@@ -8,7 +6,8 @@ from sqlalchemy.orm import Session
 from swipe.settings import settings
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
-from swipe.swipe_server.users.services import RedisUserService, UserService
+from swipe.swipe_server.users.redis_services import RedisBlacklistService
+from swipe.swipe_server.users.services import UserService
 
 
 @pytest.mark.anyio
@@ -16,9 +15,9 @@ async def test_add_to_blacklist(
         session: Session,
         randomizer: RandomEntityGenerator,
         client: AsyncClient,
-        redis_service: RedisUserService,
+        redis_blacklist: RedisBlacklistService,
         user_service: UserService,
-        mocker:MockerFixture,
+        mocker: MockerFixture,
         default_user: models.User,
         default_user_auth_headers: dict[str, str]):
     # --------------------------------------------------------------------------
@@ -73,7 +72,7 @@ async def test_add_to_blacklist(
         'blocked_user_id': str(user_3.id)
     })
     # --------------------------------------------------------
-    assert await redis_service.get_blacklist(default_user.id) == \
+    assert await redis_blacklist.get_blacklist(default_user.id) == \
            {str(user_1.id), str(user_2.id), str(user_3.id)}
     blacklist = user_service.fetch_blacklist(str(default_user.id))
     assert blacklist == {str(user_1.id), str(user_2.id), str(user_3.id)}

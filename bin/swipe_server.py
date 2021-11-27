@@ -12,8 +12,9 @@ import logging
 
 import alembic.command
 import alembic.config
-from swipe.swipe_server.users.services import RedisUserService, UserService, \
-    CacheService
+from swipe.swipe_server.users.redis_services import RedisOnlineUserService
+from swipe.swipe_server.users.services import PopularService, \
+    CountryCacheService
 from swipe.swipe_server.misc import dependencies
 from swipe.settings import settings, constants
 from swipe.swipe_server import swipe_app
@@ -50,20 +51,18 @@ async def run_migrations():
 async def populate_country_cache():
     logger.info("Populating country cache")
     with dependencies.db_context() as db:
-        redis_service = RedisUserService(dependencies.redis())
-        user_service = UserService(db)
-        cache_service = CacheService(user_service, redis_service)
+        cache_service = CountryCacheService(db, dependencies.redis())
         await cache_service.populate_country_cache()
 
 
 @app.on_event("startup")
 async def invalidate_caches():
-    redis_service = RedisUserService(dependencies.redis())
+    redis_online = RedisOnlineUserService(dependencies.redis())
     logger.info("Invalidating online response cache")
-    await redis_service.drop_online_response_cache_all()
+    await redis_online.drop_all_response_caches()
     # TODO just for tests, because chat server is also being restarted
     logger.info("Invalidating online user cache")
-    await redis_service.invalidate_online_user_cache()
+    await redis_online.invalidate_online_user_cache()
 
 
 @app.on_event("startup")
@@ -71,10 +70,8 @@ async def invalidate_caches():
 async def populate_popular_cache():
     logger.info("Populating popular cache")
     with dependencies.db_context() as db:
-        redis_service = RedisUserService(dependencies.redis())
-        user_service = UserService(db)
-        cache_service = CacheService(user_service, redis_service)
-        await cache_service.populate_popular_cache()
+        service = PopularService(db, dependencies.redis())
+        await service.populate_popular_cache()
 
 
 if __name__ == '__main__':

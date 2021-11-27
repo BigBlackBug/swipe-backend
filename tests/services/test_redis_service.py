@@ -1,20 +1,23 @@
+import aioredis
 import pytest
 from sqlalchemy.orm import Session
 
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
 from swipe.swipe_server.users.enums import Gender
+from swipe.swipe_server.users.redis_services import RedisPopularService
 from swipe.swipe_server.users.schemas import PopularFilterBody, UserUpdate, \
     LocationSchema
-from swipe.swipe_server.users.services import RedisUserService, UserService, \
-    CacheService
+from swipe.swipe_server.users.services import UserService, CountryCacheService, \
+    PopularService
 
 
 @pytest.mark.anyio
 async def test_redis_fetch_online_country(
         default_user: models.User,
-        redis_service: RedisUserService,
         user_service: UserService,
+        redis_popular:RedisPopularService,
+        fake_redis: aioredis.Redis,
         randomizer: RandomEntityGenerator,
         session: Session):
     user_service.update_user(default_user, UserUpdate(
@@ -68,20 +71,22 @@ async def test_redis_fetch_online_country(
     session.add(user_u_n_h)
     session.commit()
 
-    cache_service = CacheService(user_service, redis_service)
+    # populating caches
+    cache_service = CountryCacheService(session, fake_redis)
     await cache_service.populate_country_cache()
-    await cache_service.populate_popular_cache()
+    popular_service = PopularService(session, fake_redis)
+    await popular_service.populate_popular_cache()
 
-    result: list[str] = await redis_service.get_popular_users(
+    result: list[str] = await redis_popular.get_popular_users(
         PopularFilterBody(gender=Gender.MALE, country='Russia'))
     assert result == [str(user_r_s_m2.id), str(user_r_s_m.id), str(user_r_s_m3.id)]
 
-    result: list[str] = await redis_service.get_popular_users(
+    result: list[str] = await redis_popular.get_popular_users(
         PopularFilterBody(gender=Gender.FEMALE, city='New York', country='USA'))
     assert set(result) == {
         str(user_u_n_f.id)}
 
-    result: list[str] = await redis_service.get_popular_users(
+    result: list[str] = await redis_popular.get_popular_users(
         PopularFilterBody(country='USA'))
     assert set(result) == {
         str(user_u_n_f.id), str(user_u_n_h.id)}

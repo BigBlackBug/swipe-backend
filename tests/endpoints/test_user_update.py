@@ -7,7 +7,6 @@ from unittest.mock import MagicMock
 import dateutil.parser
 import pytest
 from PIL import Image
-from dateutil.relativedelta import relativedelta
 from httpx import AsyncClient, Response
 from pytest_mock import MockerFixture
 from sqlalchemy.orm import Session
@@ -15,8 +14,9 @@ from sqlalchemy.orm import Session
 from swipe.settings import settings
 from swipe.swipe_server.users.enums import ZodiacSign, Gender
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.services import UserService, RedisUserService, \
-    UserRequestCacheParams
+from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
+    OnlineUserCacheParams, RedisLocationService
+from swipe.swipe_server.users.services import UserService
 
 
 @pytest.mark.anyio
@@ -24,7 +24,6 @@ async def test_user_update_dob_zodiac(
         client: AsyncClient,
         default_user: User,
         user_service: UserService,
-        redis_service: RedisUserService,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     default_user.date_of_birth = datetime.date.today()
@@ -46,51 +45,36 @@ async def test_user_update_location(
         client: AsyncClient,
         default_user: User,
         user_service: UserService,
-        redis_service: RedisUserService,
         session: Session,
+        redis_online: RedisOnlineUserService,
+        redis_location: RedisLocationService,
         default_user_auth_headers: dict[str, str]):
     default_user.gender = Gender.MALE
     session.commit()
 
-    await redis_service.connect_user(user_id=default_user.id)
-
-    age_delta = relativedelta(datetime.date.today(),
-                              default_user.date_of_birth)
-    age = round(age_delta.years + age_delta.months / 12)
+    await redis_online.connect_user(default_user)
 
     # assuming some other users are in the cache for Hello
     cached_user_id = str(uuid.uuid4())
-    cache_settings = UserRequestCacheParams(
-        age=age,
-        age_diff=4,
-        current_country='What Country',
-        gender_filter=default_user.gender,
-        city_filter='Hello'
+    cache_settings_full = OnlineUserCacheParams(
+        age=default_user.age,
+        country='What Country',
+        city='Hello',
+        gender=default_user.gender
     )
-    # assuming some other users are in the cache for Hello
-    await redis_service.store_user_ids(cache_settings, {cached_user_id, })
+    for key in cache_settings_full.online_keys():
+        await redis_online.redis.sadd(key, cached_user_id)
 
-    cache_settings_country = UserRequestCacheParams(
-        age=age,
-        age_diff=4,
-        current_country='What Country',
-        gender_filter=default_user.gender,
+    # old dude is in cache of his previous location
+    old_location_cache_settings = OnlineUserCacheParams(
+        age=default_user.age,
+        country=default_user.location.country,
+        city=default_user.location.city,
+        gender=default_user.gender
     )
+    for key in old_location_cache_settings.online_keys():
+        await redis_online.redis.sadd(key, str(default_user.id))
 
-    await redis_service.store_user_ids(cache_settings_country,
-                                       {cached_user_id, })
-
-    # this dude is in cache of his previous location
-    old_location_cache_settings = UserRequestCacheParams(
-        age=age,
-        age_diff=4,
-        current_country=default_user.location.country,
-        gender_filter=default_user.gender,
-        city_filter=default_user.location.city
-    )
-    await redis_service.store_user_ids(old_location_cache_settings,
-                                       {str(default_user.id), })
-    # save to online user cache
     response: Response = await client.patch(
         f"{settings.API_V1_PREFIX}/me",
         headers=default_user_auth_headers,
@@ -106,19 +90,95 @@ async def test_user_update_location(
     assert default_user.location.country == 'What Country'
 
     # assert country is saved to cache
-    country_keys = await redis_service.redis.keys("country:*")
+    country_keys = await redis_location.redis.keys("country:*")
     assert 'country:What Country' in country_keys
-    cities = await redis_service.redis.smembers('country:What Country')
+    cities = await redis_location.redis.smembers('country:What Country')
     assert 'Hello' in cities
 
     # user is added to current caches
-    assert await redis_service.find_user_ids(cache_settings) == {
+    assert await redis_online.get_online_users(cache_settings_full) == {
         str(default_user.id), cached_user_id}
-    assert await redis_service.find_user_ids(cache_settings_country) == {
+    cache_settings_country = OnlineUserCacheParams(
+        age=default_user.age,
+        country='What Country',
+        gender=default_user.gender
+    )
+    assert await redis_online.get_online_users(cache_settings_country) == {
         str(default_user.id), cached_user_id}
 
     # user is removed from old cache
-    assert await redis_service.find_user_ids(old_location_cache_settings) \
+    assert await redis_online.get_online_users(old_location_cache_settings) \
+           == set()
+
+
+@pytest.mark.anyio
+async def test_user_update_location_heli(
+        client: AsyncClient,
+        default_user: User,
+        user_service: UserService,
+        session: Session,
+        redis_online: RedisOnlineUserService,
+        redis_location: RedisLocationService,
+        default_user_auth_headers: dict[str, str]):
+    default_user.gender = Gender.ATTACK_HELICOPTER
+    session.commit()
+
+    await redis_online.connect_user(default_user)
+
+    # assuming some other users are in the cache for Hello male and All
+    cached_user_id = str(uuid.uuid4())
+    cache_settings_full = OnlineUserCacheParams(
+        age=default_user.age,
+        country='What Country',
+        city='Hello',
+        gender=Gender.MALE
+    )
+    for key in cache_settings_full.online_keys():
+        await redis_online.redis.sadd(key, cached_user_id)
+
+    # old dude is in cache of his previous location as heli
+    old_location_cache_settings = OnlineUserCacheParams(
+        age=default_user.age,
+        country=default_user.location.country,
+        city=default_user.location.city,
+        gender=default_user.gender
+    )
+    for key in old_location_cache_settings.online_keys():
+        await redis_online.redis.sadd(key, str(default_user.id))
+
+    response: Response = await client.patch(
+        f"{settings.API_V1_PREFIX}/me",
+        headers=default_user_auth_headers,
+        json={
+            'location': {
+                'city': 'Hello',
+                'country': 'What Country',
+                'flag': 'f'
+            }
+        })
+    session.refresh(default_user)
+    assert default_user.location.city == 'Hello'
+    assert default_user.location.country == 'What Country'
+
+    # assert country is saved to cache
+    country_keys = await redis_location.redis.keys("country:*")
+    assert 'country:What Country' in country_keys
+    cities = await redis_location.redis.smembers('country:What Country')
+    assert 'Hello' in cities
+
+    # user is NOT added to male cache
+    assert await redis_online.get_online_users(cache_settings_full) == \
+           {cached_user_id, }
+    # but is added to country All cache
+    cache_settings_country = OnlineUserCacheParams(
+        age=default_user.age,
+        country='What Country'
+    )
+    assert await redis_online.get_online_users(cache_settings_country) == {
+        str(default_user.id), cached_user_id}
+
+    # user is removed from old cache
+    assert await redis_online.get_online_users(old_location_cache_settings) \
            == set()
 
 
@@ -128,7 +188,6 @@ async def test_user_update_photo_list(
         client: AsyncClient,
         default_user: User,
         user_service: UserService,
-        redis_service: RedisUserService,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     default_user.photos = ['photo_1.png', 'photo_2.png']
@@ -159,7 +218,6 @@ async def test_user_add_first_photo(
         client: AsyncClient,
         default_user: User,
         user_service: UserService,
-        redis_service: RedisUserService,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     default_user.photos = []
@@ -194,7 +252,6 @@ async def test_user_delete_photo(
         client: AsyncClient,
         default_user: User,
         user_service: UserService,
-        redis_service: RedisUserService,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     default_user.photos = ['photo_1.png', 'photo_2.png']

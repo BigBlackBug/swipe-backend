@@ -22,8 +22,10 @@ from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.database import ModelBase
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
+from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
+    RedisLocationService, RedisBlacklistService, RedisPopularService
 from swipe.swipe_server.users.schemas import AuthenticationIn
-from swipe.swipe_server.users.services import UserService, RedisUserService
+from swipe.swipe_server.users.services import UserService
 
 config.configure_logging()
 logger = logging.getLogger(__name__)
@@ -166,8 +168,22 @@ def user_service(session: Session) -> UserService:
 
 
 @pytest.fixture
-def redis_service(fake_redis: Redis) -> RedisUserService:
-    return RedisUserService(fake_redis)
+def redis_online(fake_redis: Redis) -> RedisOnlineUserService:
+    return RedisOnlineUserService(fake_redis)
+
+@pytest.fixture
+def redis_popular(fake_redis: Redis) -> RedisPopularService:
+    return RedisPopularService(fake_redis)
+
+
+@pytest.fixture
+def redis_location(fake_redis: Redis) -> RedisLocationService:
+    return RedisLocationService(fake_redis)
+
+
+@pytest.fixture
+def redis_blacklist(fake_redis: Redis) -> RedisBlacklistService:
+    return RedisBlacklistService(fake_redis)
 
 
 @pytest.fixture

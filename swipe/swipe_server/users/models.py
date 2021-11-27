@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import datetime
 import logging
 import uuid
 
+from dateutil.relativedelta import relativedelta
 from sqlalchemy import Column, String, Boolean, Integer, Enum, ARRAY, \
     ForeignKey, Date, UniqueConstraint, select, Table
 from sqlalchemy.dialects.postgresql import UUID
@@ -42,6 +44,7 @@ class User(ModelBase):
     gender = Column(Enum(Gender))
 
     date_of_birth = Column(Date)
+    age = Column(Integer)
     zodiac_sign = Column(Enum(ZodiacSign))
 
     smoking = Column(Enum(RecurrenceRate))
@@ -78,6 +81,12 @@ class User(ModelBase):
         back_populates="blacklist",
         primaryjoin=id == blacklist_table.c.blocked_user_id,  # noqa
         secondaryjoin=id == blacklist_table.c.blocked_by_id)  # noqa
+
+    def set_date_of_birth(self, date_of_birth: datetime.date):
+        age_delta = relativedelta(datetime.date.today(), date_of_birth)
+
+        self.date_of_birth = date_of_birth
+        self.age = age_delta.years
 
     def set_location(self, location: dict[str, str]):
         # location rows are unique with regards to city/country

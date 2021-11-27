@@ -8,7 +8,8 @@ from starlette.responses import Response
 from swipe.settings import constants
 from swipe.swipe_server.misc import security
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.services import UserService, RedisUserService
+from swipe.swipe_server.users.redis_services import RedisSwipeReapService
+from swipe.swipe_server.users.services import UserService
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +48,9 @@ async def add_swipes(
     })
 async def get_free_swipe_status(
         current_user: User = Depends(security.get_current_user),
-        redis_service: RedisUserService = Depends()):
+        redis_swipe: RedisSwipeReapService = Depends()):
     reap_timestamp = \
-        await redis_service.get_swipe_reap_timestamp(current_user) or -1
+        await redis_swipe.get_swipe_reap_timestamp(current_user) or -1
     return {
         'reap_timestamp': reap_timestamp
     }
@@ -78,9 +79,9 @@ async def get_free_swipe_status(
 async def get_free_swipes(
         current_user: User = Depends(security.get_current_user),
         user_service: UserService = Depends(UserService),
-        redis_service: RedisUserService = Depends()):
+        redis_swipe: RedisSwipeReapService = Depends()):
     reap_timestamp: int = \
-        await redis_service.get_swipe_reap_timestamp(current_user)
+        await redis_swipe.get_swipe_reap_timestamp(current_user)
 
     if reap_timestamp:
         raise HTTPException(
@@ -91,7 +92,7 @@ async def get_free_swipes(
     current_user = user_service.add_swipes(
         current_user, constants.FREE_SWIPES_PER_TIME_PERIOD)
     reap_timestamp = \
-        await redis_service.reset_swipe_reap_timestamp(current_user)
+        await redis_swipe.reset_swipe_reap_timestamp(current_user)
 
     return {
         'swipes': current_user.swipes,

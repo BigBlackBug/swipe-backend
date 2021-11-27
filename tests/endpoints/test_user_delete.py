@@ -15,7 +15,7 @@ from swipe.swipe_server.chats.models import ChatMessage, MessageStatus, Chat, \
     ChatSource, GlobalChatMessage
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users.models import AuthInfo, User
-from swipe.swipe_server.users.services import UserService, RedisUserService
+from swipe.swipe_server.users.services import UserService
 
 
 @pytest.mark.anyio
@@ -24,7 +24,6 @@ async def test_user_delete(
         client: AsyncClient,
         default_user: User,
         user_service: UserService,
-        redis_service: RedisUserService,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     mock_user_storage: MagicMock = \
@@ -55,7 +54,6 @@ async def test_user_delete_with_chats(
         client: AsyncClient,
         default_user: User,
         user_service: UserService,
-        redis_service: RedisUserService,
         randomizer: RandomEntityGenerator,
         session: Session,
         default_user_auth_headers: dict[str, str]):
@@ -122,7 +120,6 @@ async def test_user_delete_with_global(
         client: AsyncClient,
         default_user: User,
         user_service: UserService,
-        redis_service: RedisUserService,
         randomizer: RandomEntityGenerator,
         session: Session,
         default_user_auth_headers: dict[str, str]):

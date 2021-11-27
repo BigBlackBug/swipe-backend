@@ -73,6 +73,9 @@ class UserOut(UserBase):
     photos: list[str] = []
     photo_urls: Optional[list[str]] = []
 
+    avatar_id: Optional[str] = None
+    avatar_url: Optional[str] = None
+
     date_of_birth: Optional[datetime.date] = None
     zodiac_sign: Optional[ZodiacSign] = None
 
@@ -90,6 +93,10 @@ class UserOut(UserBase):
             # and include auth info
             patched_photos.append(storage_client.get_image_url(photo_id))
         schema_obj.photo_urls = patched_photos
+
+        if schema_obj.avatar_id:
+            schema_obj.avatar_url = \
+                storage_client.get_image_url(schema_obj.avatar_id)
         return schema_obj
 
     class Config:
@@ -140,11 +147,11 @@ class PopularFilterBody(BaseModel):
 
 
 class OnlineFilterBody(BaseModel):
+    country: str
+    session_id: str
     limit: Optional[int] = 15
     gender: Optional[Gender] = None
     city: Optional[str] = None
-
-    invalidate_cache: bool = False
 
 
 class UserOutChatPreviewORM(BaseModel):

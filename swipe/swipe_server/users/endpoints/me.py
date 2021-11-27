@@ -10,7 +10,9 @@ from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc import security
 from swipe.swipe_server.users import schemas
 from swipe.swipe_server.users.models import User, Location
-from swipe.swipe_server.users.services import UserService, RedisUserService
+from swipe.swipe_server.users.redis_services import RedisLocationService, \
+    RedisOnlineUserService
+from swipe.swipe_server.users.services import UserService
 
 IMAGE_CONTENT_TYPE_REGEXP = 'image/(png|jpe?g)'
 
@@ -36,7 +38,8 @@ async def fetch_user(current_user: User = Depends(security.get_current_user)):
 async def patch_user(
         user_body: schemas.UserUpdate = Body(...),
         user_service: UserService = Depends(),
-        redis_service: RedisUserService = Depends(),
+        redis_location: RedisLocationService = Depends(),
+        redis_online: RedisOnlineUserService = Depends(),
         current_user: User = Depends(security.get_current_user)):
     # TODO This is bs, this field should not be in the docs
     # but the solutions are ugly AF
@@ -45,15 +48,13 @@ async def patch_user(
     current_user: User = user_service.update_user(current_user, user_body)
 
     if user_body.location:
-        await redis_service.add_cities(
+        await redis_location.add_cities(
             user_body.location.country, [user_body.location.city])
 
-        logger.info("Removing user from old location request caches")
-        await redis_service.remove_from_request_caches(
+        logger.info("Removing user from old online request caches")
+        await redis_online.update_user_location(
             current_user, previous_location)
 
-        logger.info("Adding user to current request caches")
-        await redis_service.add_user_to_request_caches(current_user)
     return current_user
 
 
