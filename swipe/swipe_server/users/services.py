@@ -376,7 +376,7 @@ class PopularService:
             country=country, city=city, gender=gender)
         logger.info(
             f"Got {len(users)} popular users from db for: "
-            f"{country}, {city}, {gender}")
+            f"{country}, {city}, {gender or 'ALL'}")
         await self.redis_popular.save_popular_users(
             country=country, city=city, gender=gender, users=users)
 

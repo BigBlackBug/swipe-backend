@@ -25,8 +25,8 @@ class OnlineUserCacheParams:
     gender: Optional[Gender] = None
 
     def cache_key(self) -> str:
-        gender = self.gender if self.gender else 'ALL'
-        city = self.city if self.city else 'ALL'
+        gender = self.gender or 'ALL'
+        city = self.city or 'ALL'
         return f'online:{self.country}:{city}:{self.age}:{gender}'
 
     def online_keys(self):
@@ -119,7 +119,7 @@ class RedisPopularService:
 
     async def get_popular_users(self, filter_params: PopularFilterBody) \
             -> list[str]:
-        gender = filter_params.gender if filter_params.gender else 'ALL'
+        gender = filter_params.gender or 'ALL'
         key = f'popular:{gender}:country:{filter_params.country}:' \
               f'city:{filter_params.city}'
 
@@ -135,7 +135,7 @@ class RedisPopularService:
                                  city: Optional[str] = None):
         if not users:
             return
-        gender = gender if gender else 'ALL'
+        gender = gender or 'ALL'
         key = f'popular:{gender}:country:{country}:city:{city}'
         logger.info(f"Deleting and saving popular cache for {key}")
 
