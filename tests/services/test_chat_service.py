@@ -187,8 +187,8 @@ async def test_post_message_to_global(
 
     global_messages: list[GlobalChatMessage] = chat_service.fetch_global_chat()
     assert len(global_messages) == 2
-    assert global_messages[0].id == second_message_id
-    assert global_messages[1].id == first_message_id
+    assert global_messages[0].id == first_message_id
+    assert global_messages[1].id == second_message_id
 
 
 @pytest.mark.anyio
@@ -215,8 +215,8 @@ async def test_fetch_from_global_from_id(
     global_messages: list[GlobalChatMessage] = \
         chat_service.fetch_global_chat(first_message_id)
     assert len(global_messages) == 2
-    assert global_messages[0].id == third_message_id
-    assert global_messages[1].id == second_message_id
+    assert global_messages[0].id == second_message_id
+    assert global_messages[1].id == third_message_id
 
 
 @pytest.mark.anyio

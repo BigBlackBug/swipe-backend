@@ -51,12 +51,12 @@ async def test_fetch_global_chat(
     messages = response_data['messages']
     assert len(messages) == 4
 
-    assert messages[0]['id'] == str(msg4.id)
-    assert messages[1]['id'] == str(msg3.id)
-    assert messages[2]['id'] == str(msg2.id)
-    assert messages[3]['id'] == str(msg1.id)
+    assert messages[0]['id'] == str(msg1.id)
+    assert messages[1]['id'] == str(msg2.id)
+    assert messages[2]['id'] == str(msg3.id)
+    assert messages[3]['id'] == str(msg4.id)
 
-    assert messages[1]['message'] == msg3.message
+    assert messages[1]['message'] == msg2.message
 
     users: dict = response_data['users']
     assert len(users) == 3
@@ -99,7 +99,7 @@ async def test_fetch_global_chat_from_id(
     response: Response = await client.get(
         f"{settings.API_V1_PREFIX}/me/chats/global",
         params={
-            'last_message_id': str(msg1.id)
+            'last_message_id': str(msg2.id)
         },
         headers=default_user_auth_headers
     )
@@ -110,19 +110,18 @@ async def test_fetch_global_chat_from_id(
     assert 'messages' in response_data
 
     messages = response_data['messages']
-    assert len(messages) == 3
+    assert len(messages) == 2
 
-    assert messages[0]['id'] == str(msg4.id)
-    assert messages[1]['id'] == str(msg3.id)
-    assert messages[2]['id'] == str(msg2.id)
+    assert messages[0]['id'] == str(msg3.id)
+    assert messages[1]['id'] == str(msg4.id)
 
-    assert messages[1]['message'] == msg3.message
+    assert messages[1]['message'] == msg4.message
 
     users: dict = response_data['users']
-    assert len(users) == 3
+
+    assert len(users) == 2
     assert set(users.keys()) == {
-        str(default_user.id), str(other_user.id), str(another_user.id)
+        str(other_user.id), str(another_user.id)
     }
-    assert users[str(default_user.id)]['name'] == default_user.name
     assert users[str(another_user.id)]['name'] == another_user.name
     assert users[str(other_user.id)]['name'] == other_user.name

@@ -384,7 +384,7 @@ async def test_fetch_existing_chats_only_unread(
     assert messages[0]['id'] == str(msg6.id)
     assert messages[1]['id'] == str(msg7.id)
 
-    assert messages[1]['message'] == msg7.message
+    assert messages[0]['message'] == msg6.message
 
 
 @pytest.mark.anyio
@@ -467,4 +467,4 @@ async def test_fetch_single_chat_only_unread(
     resp_data = response.json()
     assert resp_data['the_other_person_id'] == str(initiator.id)
     assert len(resp_data['messages']) == 2
-    assert resp_data['messages'][0]['id'] == str(msg1.id)
+    assert resp_data['messages'][0]['id'] == str(msg3.id)

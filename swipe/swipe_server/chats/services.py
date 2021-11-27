@@ -29,7 +29,7 @@ class ChatService:
                 filter(ChatMessage.status != MessageStatus.READ). \
                 where(Chat.id == chat_id). \
                 options(contains_eager(Chat.messages)). \
-                order_by(desc(ChatMessage.timestamp)). \
+                order_by(ChatMessage.timestamp). \
                 populate_existing().one_or_none()
         else:
             return self.db.execute(
@@ -150,6 +150,7 @@ class ChatService:
                 join(Chat.messages). \
                 filter(ChatMessage.status != MessageStatus.READ). \
                 options(contains_eager(Chat.messages)). \
+                order_by(ChatMessage.timestamp). \
                 populate_existing().all()
         else:
             query = select(Chat). \
@@ -172,10 +173,10 @@ class ChatService:
             last_message = self.fetch_global_message(last_message_id)
             query = select(GlobalChatMessage). \
                 where(GlobalChatMessage.timestamp > last_message.timestamp). \
-                order_by(desc(GlobalChatMessage.timestamp))
+                order_by(GlobalChatMessage.timestamp)
         else:
             query = select(GlobalChatMessage). \
-                order_by(desc(GlobalChatMessage.timestamp))
+                order_by(GlobalChatMessage.timestamp)
         return self.db.execute(query).scalars().all()
 
     def set_like_status(self, message_id: UUID, status: bool = True):

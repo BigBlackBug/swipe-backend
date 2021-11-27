@@ -54,7 +54,7 @@ class Chat(ModelBase):
     status = Column(Enum(ChatStatus), nullable=False,
                     default=ChatStatus.REQUESTED)
     messages = relationship('ChatMessage',
-                            order_by='ChatMessage.timestamp',
+                            order_by='asc(ChatMessage.timestamp)',
                             collection_class=ordering_list('timestamp'),
                             # lazy='noload',
                             # we're using database cascades
