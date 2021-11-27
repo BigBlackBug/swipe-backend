@@ -108,7 +108,7 @@ async def test_user_update_location(
     # assert country is saved to cache
     country_keys = await redis_service.redis.keys("country:*")
     assert 'country:What Country' in country_keys
-    cities = await redis_service.redis.lrange('country:What Country', 0, -1)
+    cities = await redis_service.redis.smembers('country:What Country')
     assert 'Hello' in cities
 
     # user is added to current caches

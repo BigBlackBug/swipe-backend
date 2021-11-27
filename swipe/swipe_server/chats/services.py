@@ -150,7 +150,7 @@ class ChatService:
                 join(Chat.messages). \
                 filter(ChatMessage.status != MessageStatus.READ). \
                 options(contains_eager(Chat.messages)). \
-                populate_existing()
+                populate_existing().all()
         else:
             query = select(Chat). \
                 options(selectinload(Chat.messages)). \

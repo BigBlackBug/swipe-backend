@@ -7,7 +7,8 @@ from uuid import UUID
 from pydantic import BaseModel, validator
 from sqlalchemy.engine import Row
 
-from swipe.swipe_server.chats.models import MessageStatus, ChatMessage, Chat, ChatStatus, \
+from swipe.swipe_server.chats.models import MessageStatus, ChatMessage, Chat, \
+    ChatStatus, \
     ChatSource, GlobalChatMessage
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.models import User
@@ -87,7 +88,6 @@ class ChatORMSchema(BaseModel):
 class ChatOut(BaseModel):
     id: UUID
     the_other_person_id: Optional[UUID] = None
-    # initiator_id: Optional[UUID] = None
     messages: list[ChatMessageORMSchema] = []
     source: ChatSource
     status: ChatStatus
@@ -105,14 +105,29 @@ class MultipleChatsOut(BaseModel):
                     current_user_id: UUID) -> MultipleChatsOut:
         result = {'chats': [], 'requests': [], 'users': {}}
 
-        for chat in chats:
-            data = ChatORMSchema.parse_chat(chat, current_user_id)
+        # sort chats by last message date
+        def _date_sort_key(_chat: Chat):
+            if not _chat.messages:
+                return datetime.datetime.now()
+            else:
+                return _chat.messages[0].timestamp
 
-            if chat.status == ChatStatus.ACCEPTED:
+        chats.sort(key=_date_sort_key, reverse=True)
+
+        for chat in chats:
+            data: dict = ChatORMSchema.parse_chat(chat, current_user_id)
+
+            # outgoing are in the chats for everyone
+            if chat.initiator_id == current_user_id:
                 result['chats'].append(data)
             else:
-                # opened chats are still requested
-                result['requests'].append(data)
+                # incoming requests
+                if chat.status == ChatStatus.REQUESTED \
+                        or chat.status == ChatStatus.OPENED:
+                    result['requests'].append(data)
+                else:
+                    # incoming chats
+                    result['chats'].append(data)
 
         for user in users:
             user_dict: UserOutChatPreview \
