@@ -103,9 +103,9 @@ async def websocket_endpoint(
     await connection_manager.broadcast(
         user_id, {
             'type': 'join',
-            'user_id': user.user_id,
-            'name': user.data.name,
-            'avatar_url': user.data.avatar_url
+            'user_id': user_id,
+            'name': user_data.name,
+            'avatar_url': user_data.avatar_url
         })
 
     request_processor = ChatServerRequestProcessor(
