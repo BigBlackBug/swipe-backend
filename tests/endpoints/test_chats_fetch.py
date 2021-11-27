@@ -87,23 +87,23 @@ async def test_fetch_existing_chats(
 
     messages = chats[0]['messages']
     assert len(messages) == 3
-    assert messages[0]['id'] == str(msg7.id)
+    assert messages[0]['id'] == str(msg5.id)
     assert messages[1]['id'] == str(msg6.id)
-    assert messages[2]['id'] == str(msg5.id)
+    assert messages[2]['id'] == str(msg7.id)
 
     assert messages[1]['message'] == msg6.message
-    assert messages[0].get('image_url')
+    assert messages[2].get('image_url')
 
     # -----------------------------------------------------------
     messages = chats[1]['messages']
     assert len(messages) == 4
-    assert messages[0]['id'] == str(msg4.id)
-    assert messages[1]['id'] == str(msg3.id)
-    assert messages[2]['id'] == str(msg2.id)
-    assert messages[3]['id'] == str(msg1.id)
+    assert messages[0]['id'] == str(msg1.id)
+    assert messages[1]['id'] == str(msg2.id)
+    assert messages[2]['id'] == str(msg3.id)
+    assert messages[3]['id'] == str(msg4.id)
 
-    assert messages[1]['message'] == msg3.message
-    assert messages[0].get('image_url')
+    assert messages[1]['message'] == msg2.message
+    assert messages[3].get('image_url')
 
 
 @pytest.mark.anyio
@@ -182,24 +182,24 @@ async def test_fetch_existing_and_outgoing_request(
 
     messages = chats[0]['messages']
     assert len(messages) == 3
-    assert messages[0]['id'] == str(msg7.id)
+    assert messages[0]['id'] == str(msg5.id)
     assert messages[1]['id'] == str(msg6.id)
-    assert messages[2]['id'] == str(msg5.id)
+    assert messages[2]['id'] == str(msg7.id)
 
     assert messages[1]['message'] == msg6.message
-    assert messages[0].get('image_url')
+    assert messages[2].get('image_url')
 
     # chat is second
     assert chats[1]['id'] == str(chat.id)
     messages = chats[1]['messages']
     assert len(messages) == 4
-    assert messages[0]['id'] == str(msg4.id)
-    assert messages[1]['id'] == str(msg3.id)
-    assert messages[2]['id'] == str(msg2.id)
-    assert messages[3]['id'] == str(msg1.id)
+    assert messages[0]['id'] == str(msg1.id)
+    assert messages[1]['id'] == str(msg2.id)
+    assert messages[2]['id'] == str(msg3.id)
+    assert messages[3]['id'] == str(msg4.id)
 
-    assert messages[1]['message'] == msg3.message
-    assert messages[0].get('image_url')
+    assert messages[1]['message'] == msg2.message
+    assert messages[3].get('image_url')
 
     assert len(response.json()['requests']) == 0
 
@@ -288,13 +288,13 @@ async def test_fetch_existing_and_incoming_request(
 
     messages = chats[1]['messages']
     assert len(messages) == 4
-    assert messages[0]['id'] == str(msg4.id)
-    assert messages[1]['id'] == str(msg3.id)
-    assert messages[2]['id'] == str(msg2.id)
-    assert messages[3]['id'] == str(msg1.id)
+    assert messages[0]['id'] == str(msg1.id)
+    assert messages[1]['id'] == str(msg2.id)
+    assert messages[2]['id'] == str(msg3.id)
+    assert messages[3]['id'] == str(msg4.id)
 
-    assert messages[1]['message'] == msg3.message
-    assert messages[0].get('image_url')
+    assert messages[1]['message'] == msg2.message
+    assert messages[3].get('image_url')
 
     chat_requests = response.json()['requests']
     assert len(chat_requests) == 1
@@ -302,12 +302,12 @@ async def test_fetch_existing_and_incoming_request(
     messages = chat_requests[0]['messages']
 
     assert len(messages) == 3
-    assert messages[0]['id'] == str(msg7.id)
+    assert messages[0]['id'] == str(msg5.id)
     assert messages[1]['id'] == str(msg6.id)
-    assert messages[2]['id'] == str(msg5.id)
+    assert messages[2]['id'] == str(msg7.id)
 
     assert messages[1]['message'] == msg6.message
-    assert messages[0].get('image_url')
+    assert messages[2].get('image_url')
 
 
 @pytest.mark.anyio
@@ -381,10 +381,10 @@ async def test_fetch_existing_chats_only_unread(
     assert chat_response[0]['id'] == str(newer_chat.id)
     messages = chat_response[0]['messages']
     assert len(messages) == 2
-    assert messages[0]['id'] == str(msg7.id)
-    assert messages[1]['id'] == str(msg6.id)
+    assert messages[0]['id'] == str(msg6.id)
+    assert messages[1]['id'] == str(msg7.id)
 
-    assert messages[1]['message'] == msg6.message
+    assert messages[1]['message'] == msg7.message
 
 
 @pytest.mark.anyio
@@ -424,7 +424,7 @@ async def test_fetch_single_chat(
     resp_data = response.json()
     assert resp_data['the_other_person_id'] == str(initiator.id)
     assert len(resp_data['messages']) == 4
-    assert resp_data['messages'][3]['id'] == str(msg1.id)
+    assert resp_data['messages'][3]['id'] == str(msg4.id)
 
 
 @pytest.mark.anyio
@@ -467,4 +467,4 @@ async def test_fetch_single_chat_only_unread(
     resp_data = response.json()
     assert resp_data['the_other_person_id'] == str(initiator.id)
     assert len(resp_data['messages']) == 2
-    assert resp_data['messages'][0]['id'] == str(msg4.id)
+    assert resp_data['messages'][0]['id'] == str(msg1.id)
