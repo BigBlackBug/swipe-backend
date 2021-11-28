@@ -8,7 +8,7 @@ from starlette.responses import Response
 from swipe.settings import constants
 from swipe.swipe_server.misc import security
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.redis_services import RedisSwipeReapService
+from swipe.swipe_server.users.redis_services import RedisSwipeReaperService
 from swipe.swipe_server.users.services import UserService
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ async def add_swipes(
     })
 async def get_free_swipe_status(
         current_user: User = Depends(security.get_current_user),
-        redis_swipe: RedisSwipeReapService = Depends()):
+        redis_swipe: RedisSwipeReaperService = Depends()):
     reap_timestamp = \
         await redis_swipe.get_swipe_reap_timestamp(current_user) or -1
     return {
@@ -79,7 +79,7 @@ async def get_free_swipe_status(
 async def get_free_swipes(
         current_user: User = Depends(security.get_current_user),
         user_service: UserService = Depends(UserService),
-        redis_swipe: RedisSwipeReapService = Depends()):
+        redis_swipe: RedisSwipeReaperService = Depends()):
     reap_timestamp: int = \
         await redis_swipe.get_swipe_reap_timestamp(current_user)
 

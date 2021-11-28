@@ -10,9 +10,8 @@ class Constants(BaseSettings):
     # TODO make it 30 mins
     FREE_SWIPES_COOLDOWN_SEC = 10
 
-    FREE_SWIPES_REDIS_PREFIX = 'free_swipes_cooldown_'
-
     CALL_FEEDBACK_RATING_DIFF = 5
+
     BASE_DIR: Path = Path('.')
 
 

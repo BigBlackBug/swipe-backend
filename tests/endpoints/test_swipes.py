@@ -4,8 +4,9 @@ import pytest
 from aioredis import Redis
 from httpx import AsyncClient, Response
 
-from swipe.settings import constants, settings
+from swipe.settings import settings
 from swipe.swipe_server.users import models
+from swipe.swipe_server.users.redis_services import RedisSwipeReaperService
 
 
 @pytest.mark.anyio
@@ -28,14 +29,15 @@ async def test_free_swipes_can_be_reaped(
 async def test_free_swipes_can_not_be_reaped(
         client: AsyncClient, fake_redis: Redis,
         default_user: models.User,
+        redis_swipes: RedisSwipeReaperService,
         default_user_auth_headers: dict[str, str]):
     """
     Test must succeed when the reap time is ahead of current time
     """
     time_in_the_future = datetime.datetime.now() + datetime.timedelta(hours=1)
-    reap_key = f'{constants.FREE_SWIPES_REDIS_PREFIX}{default_user.id}'
-    await fake_redis.set(reap_key, int(time_in_the_future.timestamp()))
-
+    time_in_the_future = int(time_in_the_future.timestamp())
+    await redis_swipes.reset_swipe_reap_timestamp(
+        default_user, time_in_the_future)
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/me/swipes/reap",
         headers=default_user_auth_headers

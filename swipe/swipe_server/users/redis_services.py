@@ -61,13 +61,16 @@ class FetchUserCacheKey:
         return f'{FETCH_REQUEST_KEY}:{self.user_id}:*'
 
 
-class RedisSwipeReapService:
+class RedisSwipeReaperService:
+    FREE_SWIPES_REDIS_PREFIX = 'free_swipes_cooldown_'
+
     def __init__(self,
                  redis: Redis = Depends(dependencies.redis)):
         self.redis = redis
 
     async def reset_swipe_reap_timestamp(
-            self, user_object: User) -> int:
+            self, user_object: User,
+            reap_timestamp: Optional[int] = None) -> int:
         """
         Sets the timestamp for when the free swipes can be reaped
         for the specified user
@@ -75,9 +78,11 @@ class RedisSwipeReapService:
         :param user_object:
         :return: new timestamp
         """
-        reap_timestamp = int(time.time() + constants.FREE_SWIPES_COOLDOWN_SEC)
+        if not reap_timestamp:
+            reap_timestamp = \
+                int(time.time() + constants.FREE_SWIPES_COOLDOWN_SEC)
         await self.redis.setex(
-            f'{constants.FREE_SWIPES_REDIS_PREFIX}{user_object.id}',
+            f'{self.FREE_SWIPES_REDIS_PREFIX}{user_object.id}',
             time=constants.FREE_SWIPES_COOLDOWN_SEC,
             value=reap_timestamp)
         return reap_timestamp
@@ -88,7 +93,7 @@ class RedisSwipeReapService:
         Returns the timestamp for when the free swipes can be reaped
         """
         reap_timestamp = await self.redis.get(
-            f'{constants.FREE_SWIPES_REDIS_PREFIX}{user_object.id}')
+            f'{self.FREE_SWIPES_REDIS_PREFIX}{user_object.id}')
         return int(reap_timestamp) if reap_timestamp else None
 
 
