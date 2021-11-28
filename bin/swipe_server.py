@@ -48,14 +48,6 @@ async def run_migrations():
 
 
 @app.on_event("startup")
-async def populate_country_cache():
-    logger.info("Populating country cache")
-    with dependencies.db_context() as db:
-        cache_service = CountryCacheService(db, dependencies.redis())
-        await cache_service.populate_country_cache()
-
-
-@app.on_event("startup")
 async def invalidate_caches():
     redis_online = RedisOnlineUserService(dependencies.redis())
     logger.info("Invalidating online response cache")
@@ -63,6 +55,14 @@ async def invalidate_caches():
     # TODO just for tests, because chat server is also being restarted
     logger.info("Invalidating online user cache")
     await redis_online.invalidate_online_user_cache()
+
+
+@app.on_event("startup")
+async def populate_country_cache():
+    logger.info("Populating country cache")
+    with dependencies.db_context() as db:
+        cache_service = CountryCacheService(db, dependencies.redis())
+        await cache_service.populate_country_cache()
 
 
 @app.on_event("startup")
