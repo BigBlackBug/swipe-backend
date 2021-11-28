@@ -1,5 +1,4 @@
 import logging
-import logging
 import time
 import uuid
 from dataclasses import dataclass
@@ -12,12 +11,12 @@ from dateutil.relativedelta import relativedelta
 from fastapi import Depends
 from jose import jwt
 from jose.constants import ALGORITHMS
-from sqlalchemy import select, delete, func, desc, String, cast, insert
+from sqlalchemy import select, delete, func, desc, String, cast, insert, update
 from sqlalchemy.engine import Row
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, Bundle
 
-from swipe.settings import settings
+from swipe.settings import settings, constants
 from swipe.swipe_server import utils
 from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.misc.errors import SwipeError
@@ -29,7 +28,7 @@ from swipe.swipe_server.users.models import IDList, User, AuthInfo, Location, \
 from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
     RedisBlacklistService, OnlineUserCacheParams, \
     FetchUserCacheKey, RedisPopularService, RedisLocationService
-from swipe.swipe_server.users.schemas import OnlineFilterBody
+from swipe.swipe_server.users.schemas import OnlineFilterBody, CallFeedback
 from swipe.swipe_server.utils import enable_blacklist
 
 logger = logging.getLogger(__name__)
@@ -272,6 +271,19 @@ class UserService:
         return set(self.db.execute(
             blocked_me.union(blocked_by_me)
         ).scalars())
+
+    def add_call_feedback(self, target_user: User, feedback: CallFeedback):
+        rating_diff = constants.CALL_FEEDBACK_RATING_DIFF
+        if feedback == CallFeedback.THUMBS_DOWN:
+            new_rating = max(0, target_user.rating - rating_diff)
+        else:
+            new_rating = target_user.rating + rating_diff
+
+        self.db.execute(update(User).where(User.id == target_user.id).values(
+            rating=new_rating
+        ))
+        self.db.commit()
+
 
 @dataclass
 class UserPool:

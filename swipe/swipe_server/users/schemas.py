@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+from enum import Enum
 from typing import Optional, Any
 from uuid import UUID
 
@@ -11,6 +12,11 @@ from swipe.swipe_server.misc.storage import storage_client
 from .enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
     RecurrenceRate, NotificationTypes
 from .models import User
+
+
+class CallFeedback(str, Enum):
+    THUMBS_UP = 'thumbs_up'
+    THUMBS_DOWN = 'thumbs_down'
 
 
 class LocationSchema(BaseModel):

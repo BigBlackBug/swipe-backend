@@ -12,6 +12,7 @@ class Constants(BaseSettings):
 
     FREE_SWIPES_REDIS_PREFIX = 'free_swipes_cooldown_'
 
+    CALL_FEEDBACK_RATING_DIFF = 5
     BASE_DIR: Path = Path('.')
 
 
@@ -47,9 +48,6 @@ class Settings(BaseSettings):
     ONLINE_USER_DEFAULT_AGE_DIFF = 10
     ONLINE_USER_AGE_DIFF_STEP = 5
     ONLINE_USER_RESPONSE_CACHE_TTL = 60 * 60
-
-    # TODO make it 10 mins
-    USER_CACHE_TTL_SECS = 60
 
     REDIS_URL: str
 
