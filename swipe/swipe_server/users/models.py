@@ -6,7 +6,7 @@ import uuid
 
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import Column, String, Boolean, Integer, Enum, ARRAY, \
-    ForeignKey, Date, UniqueConstraint, select, Table
+    ForeignKey, Date, UniqueConstraint, select, Table, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, object_session
 
@@ -23,6 +23,9 @@ IDList = list[UUID]
 blacklist_table = Table(
     "blacklist",
     ModelBase.metadata,
+    Column('block_date', DateTime, nullable=False,
+           default=datetime.datetime.utcnow().replace(microsecond=0)),
+    Column('comment', String(200), default='Fuck him'),
     Column("blocked_by_id", UUID(as_uuid=True),
            ForeignKey("users.id", ondelete='CASCADE'), primary_key=True),
     Column("blocked_user_id", UUID(as_uuid=True),
@@ -37,6 +40,9 @@ class User(ModelBase):
 
     # can not be updated
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    registration_date = Column(
+        DateTime, nullable=False,
+        default=datetime.datetime.utcnow().replace(microsecond=0))
     name = Column(String(30), nullable=False, default='')
 
     bio = Column(String(200), nullable=False, default='')
