@@ -2,9 +2,9 @@ import os
 import sys
 
 import uvicorn
-from fastapi_utils.tasks import repeat_every
 
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
+
 from swipe import config
 
 config.configure_logging()
@@ -12,6 +12,7 @@ import logging
 
 import alembic.command
 import alembic.config
+from fastapi_utils.tasks import repeat_every
 from swipe.swipe_server.users.redis_services import RedisOnlineUserService
 from swipe.swipe_server.users.services import PopularUserService, \
     CountryCacheService
