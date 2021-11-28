@@ -6,17 +6,30 @@ def configure_logging():
     logging.config.dictConfig(LOGGING_CONFIG)
 
 
+class PackagePathFilter(logging.Filter):
+    def filter(self, record):
+        pathname = record.pathname
+        if '/swipe/' in pathname:
+            index = pathname.index('/swipe/')
+            record.pathname = 'app->' + pathname[index + len('/swipe/'):]
+        elif '/site-packages/' in pathname:
+            index = pathname.index('/site-packages/')
+            record.pathname = \
+                'lib->' + pathname[index + len('/site-packages/'):]
+        return record
+
+
 LOGGING_CONFIG: dict = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
         "default": {
-            "format": "[%(asctime)s %(levelname)s|%(processName)s] | "
-                      "%(name)s | %(module)s@%(lineno)d | %(message)s"
+            "format": "[%(asctime)s] [%(levelname)s] [%(processName)s] | "
+                      "%(pathname)s@%(lineno)d | %(message)s"
         },
         "access": {
             "()": "uvicorn.logging.AccessFormatter",
-            "fmt": '[%(asctime)s %(levelname)s|%(processName)s] %(name)s | '
+            "fmt": '[%(asctime)s] [%(levelname)s] [%(processName)s] %(name)s | '
                    '%(client_addr)s - "%(request_line)s" %(status_code)s',
         },
     },
@@ -25,6 +38,7 @@ LOGGING_CONFIG: dict = {
             "formatter": "default",
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stdout",
+            "filters": ['special', ]
         },
         "access": {
             "formatter": "access",
@@ -32,30 +46,41 @@ LOGGING_CONFIG: dict = {
             "stream": "ext://sys.stderr",
         },
     },
+    'filters': {
+        'special': {
+            '()': 'swipe.config.PackagePathFilter'
+        }
+    },
     "loggers": {
         "uvicorn": {
-            "handlers": ["default"],
-            "propagate": False
+            "handlers": ["default", ],
+            "propagate": False,
+            "filters": ['special', ]
         },
         'alembic': {
-            'handlers': ['default'],
-            'propagate': False
+            'handlers': ['default', ],
+            'propagate': False,
+            "filters": ['special', ]
+        },
+        "sqlalchemy": {
+            "handlers": ["default", ],
+            "propagate": False,
+            "filters": ['special', ]
+        },
+        "websockets": {
+            "handlers": ["default", ],
+            "propagate": False,
+            "filters": ['special', ]
         },
         # "uvicorn.error": {"handlers": ["default"], "level": "INFO"},
         "uvicorn.access": {
-            "handlers": ["access"],
+            "handlers": ["access", ],
             "propagate": False
         },
-        "sqlalchemy": {
-            "handlers": ["default"],
-            "propagate": False,
-        },
-        "websockets": {
-            "handlers": ["default"],
-            "propagate": False,
-        },
+
         "root": {
-            "handlers": ["default"], "level": "INFO",
+            "handlers": ["default", ],
+            "level": "INFO",
         },
     },
 }

@@ -404,7 +404,7 @@ class PopularUserService:
             country=country, city=city, gender=gender)
         logger.info(
             f"Got {len(users)} popular users from db for: "
-            f"{country}, {city}, {gender or 'ALL'}")
+            f"{country}, city:{city}, {gender or 'ALL'}")
         await self.redis_popular.save_popular_users(
             country=country, city=city, gender=gender, users=users)
 
@@ -413,12 +413,12 @@ class PopularUserService:
         locations = self.redis_locations.fetch_locations()
 
         async for country, cities in locations:
-            logger.info(f"Processing country: '{country}'")
+            logger.info(f"Populating cache for country: '{country}'")
             await self._fill_cache(country, gender=Gender.MALE)
             await self._fill_cache(country, gender=Gender.FEMALE)
             await self._fill_cache(country)
 
-            logger.info(f"Processing cities cache - '{country}', "
+            logger.info(f"Populating cities cache for '{country}', "
                         f"cities: '{cities}'")
             for city in cities:
                 await self._fill_cache(country, city=city,
