@@ -28,7 +28,8 @@ from swipe.swipe_server.users.models import IDList, User, AuthInfo, Location, \
 from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
     RedisBlacklistService, OnlineUserCacheParams, \
     FetchUserCacheKey, RedisPopularService, RedisLocationService
-from swipe.swipe_server.users.schemas import OnlineFilterBody, CallFeedback
+from swipe.swipe_server.users.schemas import OnlineFilterBody, CallFeedback, \
+    RatingUpdateReason
 from swipe.swipe_server.utils import enable_blacklist
 
 logger = logging.getLogger(__name__)
@@ -288,6 +289,24 @@ class UserService:
 
         target_user.swipes -= number_of_swipes
         self.db.commit()
+
+    def add_rating(self, user: User, reason: RatingUpdateReason):
+        # TODO move to enum
+        if reason == RatingUpdateReason.AD_WATCHED:
+            rating_diff = constants.RATING_UPDATE_AD_WATCHED
+        elif reason == RatingUpdateReason.FRIEND_REFERRED:
+            rating_diff = constants.RATING_UPDATE_FRIEND_REFERRED
+        elif reason == RatingUpdateReason.APP_REVIEWED:
+            rating_diff = constants.RATING_UPDATE_APP_REVIEWED
+        elif reason == RatingUpdateReason.PREMIUM_ACTIVATED:
+            rating_diff = constants.RATING_UPDATE_PREMIUM_ACTIVATED
+        else:
+            rating_diff = 0
+
+        user.rating += rating_diff
+        self.db.commit()
+
+        return user.rating
 
 
 @dataclass

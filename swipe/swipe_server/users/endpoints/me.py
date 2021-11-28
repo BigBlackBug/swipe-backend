@@ -12,6 +12,7 @@ from swipe.swipe_server.users import schemas
 from swipe.swipe_server.users.models import User, Location
 from swipe.swipe_server.users.redis_services import RedisLocationService, \
     RedisOnlineUserService, RedisBlacklistService
+from swipe.swipe_server.users.schemas import RatingUpdateReason
 from swipe.swipe_server.users.services import UserService
 
 IMAGE_CONTENT_TYPE_REGEXP = 'image/(png|jpe?g)'
@@ -28,6 +29,30 @@ router = APIRouter()
 async def fetch_user(current_user: User = Depends(security.get_current_user)):
     user_out: schemas.UserOut = schemas.UserOut.patched_from_orm(current_user)
     return user_out
+
+
+@router.post(
+    '/rating', name="Add rating", responses={
+        200: {
+            "description": "Rating updated",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "rating": 100500
+                    }
+                }
+            },
+        },
+    })
+async def add_rating(
+        reason: RatingUpdateReason = Body(..., embed=True),
+        user_service: UserService = Depends(),
+        current_user: User = Depends(security.get_current_user)):
+    new_rating: int = user_service.add_rating(current_user, reason)
+
+    return {
+        'rating': new_rating
+    }
 
 
 @router.patch(

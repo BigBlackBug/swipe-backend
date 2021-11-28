@@ -19,6 +19,13 @@ class CallFeedback(str, Enum):
     THUMBS_DOWN = 'thumbs_down'
 
 
+class RatingUpdateReason(str, Enum):
+    FRIEND_REFERRED = 'friend_referred'
+    AD_WATCHED = 'ad_watched'
+    APP_REVIEWED = 'app_reviewed'
+    PREMIUM_ACTIVATED = 'premium_activated'
+
+
 class LocationSchema(BaseModel):
     city: str
     country: str
