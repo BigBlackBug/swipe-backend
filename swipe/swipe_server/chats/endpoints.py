@@ -41,29 +41,12 @@ async def fetch_global_chat(
     return GlobalChatOut.parse_chats(chats, users)
 
 
-@router.delete(
-    '/images',
-    name='Deletes chat images',
-    responses={
-        204: {
-            "description": "Images successfully deleted",
-        },
-    },
-    status_code=status.HTTP_204_NO_CONTENT)
-async def delete_chat_image(
-        image_ids: list[str] = Body(..., embed=True),
-        current_user: User = Depends(security.get_current_user)):
-    for image_id in image_ids:
-        storage_client.delete_chat_image(image_id)
-
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
 @router.get(
     '/{chat_id}',
     name='Fetch a single chat',
     response_model_exclude_none=True,
-    response_model=ChatOut)
+    response_model=ChatOut,
+    deprecated=True)
 async def fetch_chat(
         chat_id: UUID,
         only_unread: bool = False,
