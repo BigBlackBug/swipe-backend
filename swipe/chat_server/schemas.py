@@ -9,6 +9,13 @@ from pydantic import BaseModel, Field
 from swipe.swipe_server.chats.models import MessageStatus, ChatSource
 
 
+class UserJoinPayload(BaseModel):
+    type_: str = Field('join', alias='type', const=True)
+    user_id: str
+    name: str
+    avatar_url: str
+
+
 class ChatMessagePayload(BaseModel):
     message_id: UUID
     sender_id: UUID

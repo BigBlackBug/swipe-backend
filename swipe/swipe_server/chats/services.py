@@ -4,12 +4,13 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import Depends
-from sqlalchemy import select, update, desc, delete
+from sqlalchemy import select, update, delete
 from sqlalchemy.orm import Session, selectinload, contains_eager
 
-import swipe.swipe_server.misc.dependencies
-from swipe.swipe_server.chats.models import Chat, ChatStatus, ChatMessage, MessageStatus, \
+from swipe.swipe_server.chats.models import Chat, ChatStatus, ChatMessage, \
+    MessageStatus, \
     GlobalChatMessage, ChatSource
+from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.users.models import User
 
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class ChatService:
     def __init__(self,
-                 db: Session = Depends(swipe.swipe_server.misc.dependencies.db)):
+                 db: Session = Depends(dependencies.db)):
         self.db = db
 
     def fetch_chat(self, chat_id: UUID, only_unread: bool = False) \

@@ -15,7 +15,8 @@ from swipe.swipe_server.chats.models import ChatMessage, MessageStatus, Chat, \
     ChatSource, GlobalChatMessage
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users.models import AuthInfo, User
-from swipe.swipe_server.users.services import UserService
+from swipe.swipe_server.users.redis_services import RedisBlacklistService
+from swipe.swipe_server.users.services import UserService, BlacklistService
 
 
 @pytest.mark.anyio
@@ -175,13 +176,16 @@ async def test_user_delete_with_blacklist(
         client: AsyncClient,
         default_user: User,
         user_service: UserService,
+        blacklist_service: BlacklistService,
+        redis_blacklist: RedisBlacklistService,
         randomizer: RandomEntityGenerator,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     mocker.patch('swipe.swipe_server.users.models.storage_client')
 
     other_user = randomizer.generate_random_user()
-    user_service.update_blacklist(str(other_user.id), str(default_user.id))
+    await blacklist_service.update_blacklist(
+        str(other_user.id), str(default_user.id))
     session.commit()
 
     auth_info_id: UUID = default_user.auth_info.id
@@ -196,3 +200,6 @@ async def test_user_delete_with_blacklist(
 
     session.refresh(other_user)
     assert len(other_user.blacklist) == 0
+
+    # user is gone and so is his blacklist cache
+    assert await redis_blacklist.get_blacklist(default_user.id) == set()

@@ -9,7 +9,7 @@ from swipe.swipe_server.users.redis_services import RedisPopularService
 from swipe.swipe_server.users.schemas import PopularFilterBody, UserUpdate, \
     LocationSchema
 from swipe.swipe_server.users.services import UserService, CountryCacheService, \
-    PopularService
+    PopularUserService
 
 
 @pytest.mark.anyio
@@ -74,7 +74,7 @@ async def test_redis_fetch_online_country(
     # populating caches
     cache_service = CountryCacheService(session, fake_redis)
     await cache_service.populate_country_cache()
-    popular_service = PopularService(session, fake_redis)
+    popular_service = PopularUserService(session, fake_redis)
     await popular_service.populate_popular_cache()
 
     result: list[str] = await redis_popular.get_popular_users(

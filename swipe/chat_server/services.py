@@ -8,6 +8,7 @@ from typing import Optional
 from uuid import UUID
 
 import aioredis
+from sqlalchemy.orm import Session
 from starlette.websockets import WebSocket
 
 from swipe.chat_server.schemas import BasePayload, MessagePayload, \
@@ -19,19 +20,16 @@ from swipe.swipe_server.chats.models import MessageStatus, ChatSource, \
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.users.enums import Gender
-from swipe.swipe_server.users.redis_services import RedisBlacklistService
-from swipe.swipe_server.users.services import UserService
+from swipe.swipe_server.users.services import UserService, BlacklistService
 
 logger = logging.getLogger(__name__)
 
 
 class ChatServerRequestProcessor:
-    def __init__(self, chat_service: ChatService,
-                 user_service: UserService,
-                 redis: aioredis.Redis):
-        self.chat_service = chat_service
-        self.user_service = user_service
-        self.redis_blacklist = RedisBlacklistService(redis)
+    def __init__(self, db: Session, redis: aioredis.Redis):
+        self.chat_service = ChatService(db)
+        self.user_service = UserService(db)
+        self.blacklist_service = BlacklistService(db, redis)
 
     async def process(self, data: BasePayload):
         payload = data.payload
@@ -119,9 +117,7 @@ class ChatServerRequestProcessor:
             self.chat_service.delete_chat(chat_id=payload.chat_id)
             logger.info(f"Chat {payload.chat_id} was declined")
 
-            self.user_service.update_blacklist(
-                str(data.sender_id), str(data.recipient_id))
-            await self.redis_blacklist.add_to_blacklist_cache(
+            await self.blacklist_service.update_blacklist(
                 str(data.sender_id), str(data.recipient_id))
 
 

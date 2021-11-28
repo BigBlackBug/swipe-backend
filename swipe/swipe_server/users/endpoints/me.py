@@ -11,7 +11,7 @@ from swipe.swipe_server.misc import security
 from swipe.swipe_server.users import schemas
 from swipe.swipe_server.users.models import User, Location
 from swipe.swipe_server.users.redis_services import RedisLocationService, \
-    RedisOnlineUserService
+    RedisOnlineUserService, RedisBlacklistService
 from swipe.swipe_server.users.services import UserService
 
 IMAGE_CONTENT_TYPE_REGEXP = 'image/(png|jpe?g)'
@@ -64,6 +64,7 @@ async def patch_user(
 async def delete_user(
         user_service: UserService = Depends(),
         chat_service: ChatService = Depends(),
+        redis_blacklist: RedisBlacklistService = Depends(),
         current_user: User = Depends(security.get_current_user)):
     # TODO send event to all chat members to remove them from view
     chat_ids: list[UUID] = chat_service.fetch_chat_ids(current_user.id)
@@ -71,6 +72,8 @@ async def delete_user(
         chat_service.delete_chat(chat_id)
 
     user_service.delete_user(current_user)
+
+    await redis_blacklist.drop_blacklist_cache(str(current_user.id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

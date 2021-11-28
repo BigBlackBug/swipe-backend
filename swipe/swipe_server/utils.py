@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import functools
 import io
+from typing import Type
 
 from PIL import Image
 
+from swipe.settings import settings
 from swipe.swipe_server.misc.errors import SwipeError
 
 AVATAR_SIZE = (60, 60)
@@ -26,3 +29,21 @@ def compress_image(image_source: bytes) -> bytes:
     output_bytes = io.BytesIO()
     cropped.save(output_bytes, format='PNG')
     return output_bytes.getvalue()
+
+
+def enable_blacklist(
+        enable: bool = settings.ENABLE_BLACKLIST,
+        return_value_class: Type = None):
+    def _decorator(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            if enable:
+                return func(self, *args, **kwargs)
+            elif return_value_class:
+                return return_value_class()
+            else:
+                return None
+
+        return wrapper
+
+    return _decorator

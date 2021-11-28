@@ -13,7 +13,7 @@ import logging
 import alembic.command
 import alembic.config
 from swipe.swipe_server.users.redis_services import RedisOnlineUserService
-from swipe.swipe_server.users.services import PopularService, \
+from swipe.swipe_server.users.services import PopularUserService, \
     CountryCacheService
 from swipe.swipe_server.misc import dependencies
 from swipe.settings import settings, constants
@@ -70,7 +70,7 @@ async def invalidate_caches():
 async def populate_popular_cache():
     logger.info("Populating popular cache")
     with dependencies.db_context() as db:
-        service = PopularService(db, dependencies.redis())
+        service = PopularUserService(db, dependencies.redis())
         await service.populate_popular_cache()
 
 

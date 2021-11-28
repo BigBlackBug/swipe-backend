@@ -12,7 +12,7 @@ from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
     RedisBlacklistService
 from swipe.swipe_server.users.services import UserService, \
-    FetchUserCacheKey
+    FetchUserCacheKey, BlacklistService
 
 
 @pytest.mark.anyio
@@ -351,6 +351,7 @@ async def test_user_fetch_with_blacklist(
         randomizer: RandomEntityGenerator,
         session: Session,
         user_service: UserService,
+        blacklist_service: BlacklistService,
         redis_online: RedisOnlineUserService,
         redis_blacklist: RedisBlacklistService,
         default_user_auth_headers: dict[str, str]):
@@ -398,16 +399,9 @@ async def test_user_fetch_with_blacklist(
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
     })
 
-    user_service.update_blacklist(str(default_user.id), str(user_1.id))
-    user_service.update_blacklist(str(default_user.id), str(user_2.id))
-    user_service.update_blacklist(str(default_user.id), str(user_3.id))
-
-    await redis_blacklist.add_to_blacklist_cache(
-        str(default_user.id), str(user_1.id))
-    await redis_blacklist.add_to_blacklist_cache(
-        str(default_user.id), str(user_2.id))
-    await redis_blacklist.add_to_blacklist_cache(
-        str(default_user.id), str(user_3.id))
+    await blacklist_service.update_blacklist(str(default_user.id), str(user_1.id))
+    await blacklist_service.update_blacklist(str(default_user.id), str(user_2.id))
+    await blacklist_service.update_blacklist(str(default_user.id), str(user_3.id))
 
     await redis_online.connect_user(user_1)
     await redis_online.connect_user(user_3)
@@ -416,7 +410,6 @@ async def test_user_fetch_with_blacklist(
     session.commit()
     # --------------------------------------------------------------------------
 
-    # offline
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch",
         headers=default_user_auth_headers, json={

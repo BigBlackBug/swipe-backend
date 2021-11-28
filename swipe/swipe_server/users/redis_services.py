@@ -13,6 +13,7 @@ from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import User, Location
 from swipe.swipe_server.users.schemas import PopularFilterBody
+from swipe.swipe_server.utils import enable_blacklist
 
 logger = logging.getLogger(__name__)
 
@@ -150,35 +151,27 @@ class RedisBlacklistService:
                  redis: Redis = Depends(dependencies.redis)):
         self.redis = redis
 
-    async def filter_blacklist(self, current_user_id: UUID,
-                               user_ids: set[str]) -> set[str]:
-        if settings.ENABLE_BLACKLIST:
-            blacklist: set[str] = await self.get_blacklist(current_user_id)
-            return user_ids.difference(blacklist)
-        return user_ids
-
+    @enable_blacklist(return_value_class=set)
     async def get_blacklist(self, user_id: UUID) -> set[str]:
-        if settings.ENABLE_BLACKLIST:
-            return await self.redis.smembers(f'{self.BLACKLIST_KEY}:{user_id}')
-        return set()
+        return await self.redis.smembers(f'{self.BLACKLIST_KEY}:{user_id}')
 
+    @enable_blacklist()
     async def add_to_blacklist_cache(
             self, blocked_user_id: str, blocked_by_id: str):
-        if settings.ENABLE_BLACKLIST:
-            logger.info(f"Adding both {blocked_user_id} and {blocked_by_id}"
-                        f"to each others blacklist cache")
-            await self.redis.sadd(f'{self.BLACKLIST_KEY}:{blocked_user_id}',
-                                  blocked_by_id)
-            await self.redis.sadd(f'{self.BLACKLIST_KEY}:{blocked_by_id}',
-                                  blocked_user_id)
+        logger.info(f"Adding both {blocked_user_id} and {blocked_by_id}"
+                    f"to each others blacklist cache")
+        await self.redis.sadd(f'{self.BLACKLIST_KEY}:{blocked_user_id}',
+                              blocked_by_id)
+        await self.redis.sadd(f'{self.BLACKLIST_KEY}:{blocked_by_id}',
+                              blocked_user_id)
 
+    @enable_blacklist()
     async def populate_blacklist(self, user_id: str, blacklist: set[str]):
-        if settings.ENABLE_BLACKLIST:
-            await self.redis.sadd(f'{self.BLACKLIST_KEY}:{user_id}', *blacklist)
+        await self.redis.sadd(f'{self.BLACKLIST_KEY}:{user_id}', *blacklist)
 
-    async def drop(self, user_id: str):
-        if settings.ENABLE_BLACKLIST:
-            await self.redis.delete(f'{self.BLACKLIST_KEY}:{user_id}')
+    @enable_blacklist()
+    async def drop_blacklist_cache(self, user_id: str):
+        await self.redis.delete(f'{self.BLACKLIST_KEY}:{user_id}')
 
 
 class RedisOnlineUserService:

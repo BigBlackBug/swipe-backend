@@ -44,9 +44,3 @@ class MMUserService:
         return self.db.query(User).where(User.id == user_id). \
             options(load_only(User.date_of_birth, User.gender, User.age))\
             .one_or_none()
-
-    def update_blacklist(self, blocker_id: str, blocked_user_id: str):
-        self.db.execute(insert(blacklist_table).values(
-            blocked_user_id=blocked_user_id,
-            blocked_by_id=blocker_id))
-        self.db.commit()

@@ -30,6 +30,7 @@ from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
     RedisBlacklistService, OnlineUserCacheParams, \
     FetchUserCacheKey, RedisPopularService, RedisLocationService
 from swipe.swipe_server.users.schemas import OnlineFilterBody
+from swipe.swipe_server.utils import enable_blacklist
 
 logger = logging.getLogger(__name__)
 
@@ -259,35 +260,26 @@ class UserService:
             order_by(desc(User.rating)).limit(limit)
         return self.db.execute(query).scalars().all()
 
-    def update_blacklist(self, blocked_by_id: str, blocked_user_id: str):
-        if settings.ENABLE_BLACKLIST:
-            logger.info(f"Adding both {blocked_by_id} and {blocked_user_id}"
-                        f"to each others blacklist")
-            try:
-                self.db.execute(insert(blacklist_table).values(
-                    blocked_user_id=blocked_user_id,
-                    blocked_by_id=blocked_by_id))
-                self.db.commit()
-            except IntegrityError:
-                raise SwipeError(f"{blocked_user_id} is "
-                                 f"already blocked by {blocked_by_id}")
-
+    @enable_blacklist(return_value_class=set)
     def fetch_blacklist(self, user_id: str) -> set[str]:
-        if settings.ENABLE_BLACKLIST:
-            return set(self.db.execute(
-                select(cast(blacklist_table.columns.blocked_user_id, String))
-                    .where(blacklist_table.columns.blocked_by_id == user_id)
-            ).scalars())
-        return set()
+        blocked_by_me = select(
+            cast(blacklist_table.columns.blocked_user_id, String)) \
+            .where(blacklist_table.columns.blocked_by_id == user_id)
 
+        blocked_me = select(
+            cast(blacklist_table.columns.blocked_by_id, String)) \
+            .where(blacklist_table.columns.blocked_user_id == user_id)
+        return set(self.db.execute(
+            blocked_me.union(blocked_by_me)
+        ).scalars())
 
 @dataclass
-class Holder:
+class UserPool:
     online_users: list[str]
     head: int = 0
 
 
-class FetchService:
+class FetchUserService:
     def __init__(self, user_service: UserService = Depends(),
                  redis_online: RedisOnlineUserService = Depends(),
                  redis_blacklist: RedisBlacklistService = Depends()):
@@ -335,10 +327,10 @@ class FetchService:
                 if current_age not in online_users_pool:
                     user_cache = \
                         await self.redis_online.get_online_users(cache_params)
-                    online_users_pool[current_age] = Holder(list(user_cache))
+                    online_users_pool[current_age] = UserPool(list(user_cache))
 
             for current_age in age_range:
-                current_pool: Holder = online_users_pool[current_age]
+                current_pool: UserPool = online_users_pool[current_age]
                 # getting one user per age pool
                 if current_pool.head < len(current_pool.online_users):
                     candidate = current_pool.online_users[current_pool.head]
@@ -364,7 +356,7 @@ class FetchService:
         return result
 
 
-class PopularService:
+class PopularUserService:
     def __init__(self, db: Session, redis: aioredis.Redis):
         self.user_service = UserService(db)
         self.redis_popular = RedisPopularService(redis)
@@ -417,3 +409,26 @@ class CountryCacheService:
         for country, cities in locations.items():
             logger.info(f"Saving {cities} to {country}")
             await self.redis_locations.add_cities(country, cities)
+
+
+class BlacklistService:
+    def __init__(self, db: Session = Depends(dependencies.db),
+                 redis: aioredis.Redis = Depends(dependencies.redis)):
+        self.db = db
+        self.redis_blacklist = RedisBlacklistService(redis)
+
+    @enable_blacklist()
+    async def update_blacklist(self, blocked_by_id: str, blocked_user_id: str):
+        logger.info(f"Adding both {blocked_by_id} and {blocked_user_id}"
+                    f"to each others blacklist")
+        try:
+            self.db.execute(insert(blacklist_table).values(
+                blocked_user_id=blocked_user_id,
+                blocked_by_id=blocked_by_id))
+            self.db.commit()
+        except IntegrityError:
+            raise SwipeError(f"{blocked_user_id} is "
+                             f"already blocked by {blocked_by_id}")
+
+        await self.redis_blacklist.add_to_blacklist_cache(
+            blocked_by_id, blocked_user_id)

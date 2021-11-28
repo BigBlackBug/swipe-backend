@@ -8,13 +8,14 @@ from fastapi import FastAPI, Depends, Body
 from fastapi import WebSocket
 from firebase_admin import messaging as firebase
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 from starlette.responses import Response
 from starlette.websockets import WebSocketDisconnect
 from uvicorn import Server, Config
 
 from swipe import error_handlers
 from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
-    MessagePayload, CreateChatPayload, BlacklistAddPayload
+    MessagePayload, CreateChatPayload, BlacklistAddPayload, UserJoinPayload
 from swipe.chat_server.services import ChatServerRequestProcessor, \
     WSConnectionManager, ConnectedUser, ChatUserData
 from swipe.settings import settings
@@ -25,7 +26,7 @@ from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
     RedisBlacklistService
 from swipe.swipe_server.users.schemas import UserOut
-from swipe.swipe_server.users.services import UserService
+from swipe.swipe_server.users.services import UserService, BlacklistService
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ async def websocket_endpoint(
         user_id: str,
         websocket: WebSocket,
         user_service: UserService = Depends(),
-        chat_service: ChatService = Depends(),
+        db: Session = Depends(dependencies.db),
         redis: aioredis.Redis = Depends(dependencies.redis)):
     try:
         user_uuid = UUID(hex=user_id)
@@ -82,7 +83,6 @@ async def websocket_endpoint(
 
     redis_online = RedisOnlineUserService(redis)
     redis_blacklist = RedisBlacklistService(redis)
-
     await redis_online.connect_user(user)
 
     # TODO we don't need all fields here
@@ -101,15 +101,13 @@ async def websocket_endpoint(
     logger.info(f"{user_id} connected from {websocket.client}, "
                 f"sending join event")
     await connection_manager.broadcast(
-        user_id, {
-            'type': 'join',
-            'user_id': user_id,
-            'name': user_data.name,
-            'avatar_url': user_data.avatar_url
-        })
+        user_id, UserJoinPayload(
+            user_id=user_id,
+            name=user_data.name,
+            avatar_url=user_data.avatar_url
+        ).dict(by_alias=True))
 
-    request_processor = ChatServerRequestProcessor(
-        chat_service, user_service, redis)
+    request_processor = ChatServerRequestProcessor(db, redis)
     while True:
         try:
             raw_data: str = await websocket.receive_text()
@@ -119,7 +117,7 @@ async def websocket_endpoint(
             await connection_manager.disconnect(user_id)
             await redis_online.disconnect_user(user)
             await redis_online.drop_all_response_caches(user_id)
-            await redis_blacklist.drop(user_id)
+            await redis_blacklist.drop_blacklist_cache(user_id)
 
             break
 
@@ -141,11 +139,9 @@ async def websocket_endpoint(
 @app.post("/matchmaking/create_chat")
 async def create_chat_from_matchmaking(
         payload: BasePayload = Body(...),
-        chat_service: ChatService = Depends(),
-        user_service: UserService = Depends(),
+        db: Session = Depends(dependencies.db),
         redis: aioredis.Redis = Depends(dependencies.redis)):
-    request_processor = ChatServerRequestProcessor(
-        chat_service, user_service, redis)
+    request_processor = ChatServerRequestProcessor(db, redis)
     if not isinstance(payload.payload, CreateChatPayload):
         # TODO refactor
         raise SwipeError("Unsupported payload")

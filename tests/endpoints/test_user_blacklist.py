@@ -7,7 +7,7 @@ from swipe.settings import settings
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
 from swipe.swipe_server.users.redis_services import RedisBlacklistService
-from swipe.swipe_server.users.services import UserService
+from swipe.swipe_server.users.services import UserService, BlacklistService
 
 
 @pytest.mark.anyio
@@ -16,6 +16,7 @@ async def test_add_to_blacklist(
         randomizer: RandomEntityGenerator,
         client: AsyncClient,
         redis_blacklist: RedisBlacklistService,
+        blacklist_service: BlacklistService,
         user_service: UserService,
         mocker: MockerFixture,
         default_user: models.User,
@@ -24,6 +25,7 @@ async def test_add_to_blacklist(
     user_1 = randomizer.generate_random_user()
     user_2 = randomizer.generate_random_user()
     user_3 = randomizer.generate_random_user()
+    user_4 = randomizer.generate_random_user()
     session.commit()
 
     requests_mock = \
@@ -71,10 +73,13 @@ async def test_add_to_blacklist(
         'blocked_by_id': str(default_user.id),
         'blocked_user_id': str(user_3.id)
     })
+
     # --------------------------------------------------------
+
     assert await redis_blacklist.get_blacklist(default_user.id) == \
            {str(user_1.id), str(user_2.id), str(user_3.id)}
     blacklist = user_service.fetch_blacklist(str(default_user.id))
+
     assert blacklist == {str(user_1.id), str(user_2.id), str(user_3.id)}
     # 409 on repeated block
     response: Response = await client.post(

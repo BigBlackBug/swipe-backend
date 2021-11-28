@@ -1,22 +1,35 @@
-import datetime
 import logging
 from uuid import UUID
 
 import requests
 from fastapi import Depends, Body, APIRouter, HTTPException
-from sqlalchemy.orm import Session
 from starlette import status
 from starlette.responses import Response
 
-import swipe.swipe_server.misc.dependencies
 from swipe.settings import settings
 from swipe.swipe_server.misc import security
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.redis_services import RedisPopularService, \
-    RedisBlacklistService
+from swipe.swipe_server.users.redis_services import RedisPopularService
 from swipe.swipe_server.users.schemas import UserCardPreviewOut, \
     OnlineFilterBody, UserOut, PopularFilterBody
-from swipe.swipe_server.users.services import UserService, FetchService
+from swipe.swipe_server.users.services import UserService, FetchUserService, \
+    BlacklistService
+import logging
+from uuid import UUID
+
+import requests
+from fastapi import Depends, Body, APIRouter, HTTPException
+from starlette import status
+from starlette.responses import Response
+
+from swipe.settings import settings
+from swipe.swipe_server.misc import security
+from swipe.swipe_server.users.models import User
+from swipe.swipe_server.users.redis_services import RedisPopularService
+from swipe.swipe_server.users.schemas import UserCardPreviewOut, \
+    OnlineFilterBody, UserOut, PopularFilterBody
+from swipe.swipe_server.users.services import UserService, FetchUserService, \
+    BlacklistService
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +81,7 @@ async def fetch_list_of_popular_users(
     response_model=list[UserCardPreviewOut])
 async def fetch_list_of_online_users(
         filter_params: OnlineFilterBody = Body(...),
-        fetch_service: FetchService = Depends(),
+        fetch_service: FetchUserService = Depends(),
         user_service: UserService = Depends(),
         current_user: User = Depends(security.get_current_user)):
     """
@@ -113,8 +126,7 @@ async def fetch_list_of_online_users(
 async def block_user(
         user_id: UUID,
         user_service: UserService = Depends(),
-        redis_blacklist: RedisBlacklistService = Depends(),
-        db: Session = Depends(swipe.swipe_server.misc.dependencies.db),
+        blacklist_service: BlacklistService = Depends(),
         current_user: User = Depends(security.get_current_user)):
     target_user = user_service.get_user(user_id)
     if not target_user:
@@ -124,9 +136,7 @@ async def block_user(
     blocked_by_id = str(current_user.id)
     blocked_user_id = str(user_id)
 
-    user_service.update_blacklist(blocked_by_id, blocked_user_id)
-    await redis_blacklist.add_to_blacklist_cache(blocked_by_id, blocked_user_id)
-
+    await blacklist_service.update_blacklist(blocked_by_id, blocked_user_id)
     if settings.ENABLE_BLACKLIST:
         # sending 'add to blacklist' event to blocked_user_id
         url = f'{settings.CHAT_SERVER_HOST}/swipe/blacklist'
