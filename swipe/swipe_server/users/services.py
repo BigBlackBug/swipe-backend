@@ -11,7 +11,7 @@ from dateutil.relativedelta import relativedelta
 from fastapi import Depends
 from jose import jwt
 from jose.constants import ALGORITHMS
-from sqlalchemy import select, delete, func, desc, String, cast, insert, update
+from sqlalchemy import select, delete, func, desc, String, cast, insert
 from sqlalchemy.engine import Row
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, Bundle
@@ -279,9 +279,14 @@ class UserService:
         else:
             new_rating = target_user.rating + rating_diff
 
-        self.db.execute(update(User).where(User.id == target_user.id).values(
-            rating=new_rating
-        ))
+        target_user.rating = new_rating
+        self.db.commit()
+
+    def use_swipes(self, target_user: User, number_of_swipes: int = 1):
+        if target_user.swipes < 1:
+            raise SwipeError(f"{target_user.id} has 0 swipes left")
+
+        target_user.swipes -= number_of_swipes
         self.db.commit()
 
 
@@ -430,7 +435,9 @@ class BlacklistService:
         self.redis_blacklist = RedisBlacklistService(redis)
 
     @enable_blacklist()
-    async def update_blacklist(self, blocked_by_id: str, blocked_user_id: str):
+    async def update_blacklist(
+            self, blocked_by_id: str, blocked_user_id: str,
+            send_blacklist_event: bool = False):
         logger.info(f"Adding both {blocked_by_id} and {blocked_user_id}"
                     f"to each others blacklist")
         try:
@@ -444,3 +451,11 @@ class BlacklistService:
 
         await self.redis_blacklist.add_to_blacklist_cache(
             blocked_by_id, blocked_user_id)
+
+        if send_blacklist_event:
+            # sending 'add to blacklist' event to blocked_user_id
+            url = f'{settings.CHAT_SERVER_HOST}/swipe/blacklist'
+            requests.post(url, json={
+                'blocked_by_id': blocked_by_id,
+                'blocked_user_id': blocked_user_id
+            })

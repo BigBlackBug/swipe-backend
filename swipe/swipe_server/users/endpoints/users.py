@@ -1,12 +1,10 @@
 import logging
 from uuid import UUID
 
-import requests
 from fastapi import Depends, Body, APIRouter, HTTPException
 from starlette import status
 from starlette.responses import Response
 
-from swipe.settings import settings
 from swipe.swipe_server.misc import security
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.redis_services import RedisPopularService
@@ -120,14 +118,8 @@ async def block_user(
     blocked_by_id = str(current_user.id)
     blocked_user_id = str(user_id)
 
-    await blacklist_service.update_blacklist(blocked_by_id, blocked_user_id)
-    if settings.ENABLE_BLACKLIST:
-        # sending 'add to blacklist' event to blocked_user_id
-        url = f'{settings.CHAT_SERVER_HOST}/swipe/blacklist'
-        requests.post(url, json={
-            'blocked_by_id': blocked_by_id,
-            'blocked_user_id': blocked_user_id
-        })
+    await blacklist_service.update_blacklist(
+        blocked_by_id, blocked_user_id, send_blacklist_event=True)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -151,6 +143,37 @@ async def call_feedback(
                             detail='Not found')
 
     user_service.add_call_feedback(target_user, feedback)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    '/{user_id}/swipe_left',
+    name='Leave a feedback for a call with user',
+    responses={
+        204: {
+            'description': 'OK',
+        },
+        409: {
+            'description': 'User does not have enough swipes'
+        }
+    })
+async def decline_card_offer(
+        user_id: UUID,
+        user_service: UserService = Depends(),
+        blacklist_service: BlacklistService = Depends(),
+        current_user: User = Depends(security.get_current_user)):
+    target_user = user_service.get_user(user_id)
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail='Not found')
+
+    user_service.use_swipes(target_user)
+    blocked_by_id = str(current_user.id)
+    blocked_user_id = str(user_id)
+
+    await blacklist_service.update_blacklist(
+        blocked_by_id, blocked_user_id, send_blacklist_event=True)
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

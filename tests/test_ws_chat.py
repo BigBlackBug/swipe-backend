@@ -3,16 +3,19 @@ import uuid
 
 import pytest
 from fakeredis import aioredis
+from pytest_mock import MockerFixture
 from sqlalchemy.orm import Session
 
 from swipe.chat_server.schemas import BasePayload
 from swipe.chat_server.services import ChatServerRequestProcessor
+from swipe.settings import settings
 from swipe.swipe_server.chats.models import GlobalChatMessage, Chat, \
     ChatMessage, \
     MessageStatus, ChatStatus, ChatSource
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
+from swipe.swipe_server.users.redis_services import RedisBlacklistService
 from swipe.swipe_server.users.services import UserService
 
 NOW = datetime.datetime.now()
@@ -353,7 +356,11 @@ async def test_decline_chat(
         chat_service: ChatService, user_service: UserService,
         fake_redis: aioredis.FakeRedis, session: Session,
         randomizer: RandomEntityGenerator,
+        mocker: MockerFixture,
+        redis_blacklist: RedisBlacklistService,
         default_user_auth_headers: dict[str, str]):
+    requests_mock = \
+        mocker.patch('swipe.swipe_server.users.services.requests')
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
     initiator = randomizer.generate_random_user()
@@ -391,6 +398,23 @@ async def test_decline_chat(
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     assert not chat
+
+    session.refresh(default_user)
+    session.refresh(recipient)
+
+    assert len(default_user.blacklist) == 1
+    assert recipient in default_user.blacklist
+    assert default_user in recipient.blocked_by
+
+    assert await redis_blacklist.get_blacklist(default_user.id) == \
+           {str(recipient.id)}
+    assert await redis_blacklist.get_blacklist(recipient.id) == \
+           {str(default_user.id)}
+    url = f'{settings.CHAT_SERVER_HOST}/swipe/blacklist'
+    requests_mock.post.assert_called_with(url, json={
+        'blocked_by_id': str(default_user.id),
+        'blocked_user_id': str(recipient.id)
+    })
 
 
 @pytest.mark.anyio

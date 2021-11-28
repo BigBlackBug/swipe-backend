@@ -29,7 +29,7 @@ async def test_add_to_blacklist(
     session.commit()
 
     requests_mock = \
-        mocker.patch('swipe.swipe_server.users.endpoints.users.requests')
+        mocker.patch('swipe.swipe_server.users.services.requests')
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/{user_1.id}/block",
         headers=default_user_auth_headers
