@@ -8,7 +8,7 @@ def configure_logging():
 
 LOGGING_CONFIG: dict = {
     "version": 1,
-    "disable_existing_loggers": False,
+    "disable_existing_loggers": True,
     "formatters": {
         "default": {
             "format": "[%(asctime)s %(levelname)s|%(processName)s] | "
@@ -33,29 +33,14 @@ LOGGING_CONFIG: dict = {
         },
     },
     "loggers": {
-        "uvicorn": {
-            "handlers": ["default"],
-            "propagate": False
-        },
-        'alembic': {
-            'handlers': ['default'],
-            'propagate': False
-        },
-        # "uvicorn.error": {"handlers": ["default"], "level": "INFO"},
         "uvicorn.access": {
             "handlers": ["access"],
             "propagate": False
         },
-        "sqlalchemy": {
-            "handlers": ["default"],
-            "propagate": False,
-        },
-        "websockets": {
-            "handlers": ["default"],
-            "propagate": False,
-        },
         "root": {
-            "handlers": ["default"], "level": "INFO",
+            "handlers": ["default"],
+            "level": "INFO",
+            "propagate": False
         },
     },
 }

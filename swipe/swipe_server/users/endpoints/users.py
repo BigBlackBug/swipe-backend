@@ -126,7 +126,7 @@ async def block_user(
 
 @router.post(
     '/{user_id}/call_feedback',
-    name='Leave a feedback for a call with user',
+    name='Leave feedback for a call with user',
     responses={
         204: {
             'description': 'OK',
@@ -148,7 +148,7 @@ async def call_feedback(
 
 @router.post(
     '/{user_id}/swipe_left',
-    name='Leave a feedback for a call with user',
+    name='Decline user card',
     responses={
         204: {
             'description': 'OK',

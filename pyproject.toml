@@ -43,14 +43,15 @@ timeout = 3000
 
 [tool.coverage.run]
 source = [
-    'swipe', 'janus'
+    'swipe'
 ]
 branch = true
 omit = [
     '*/models.py',
     '*/enums.py',
     'swipe/dependencies.py',
-    'swipe/storage.py'
+    'swipe/storage.py',
+    'swipe/matchmaking/*'
 ]
 
 [tool.coverage.report]
