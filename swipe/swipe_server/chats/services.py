@@ -4,7 +4,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import Depends
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, union_all
 from sqlalchemy.orm import Session, selectinload, contains_eager
 
 from swipe.swipe_server.chats.models import Chat, ChatStatus, ChatMessage, \
@@ -43,14 +43,16 @@ class ChatService:
         """
         :return: Chat between provided users or None
         """
-        # TODO a shitty query, but I don't know how todo union intersections
-        # in sqlalchemy
-        return self.db.execute(select(Chat).where(
+        a_to_b = select(Chat).where(
             ((Chat.initiator_id == user_a_id) &
-             (Chat.the_other_person_id == user_b_id)) |
-            ((Chat.initiator_id == user_b_id) & (
-                    Chat.the_other_person_id == user_a_id))
-        )).scalar_one_or_none()
+             (Chat.the_other_person_id == user_b_id))
+        )
+        b_to_a = select(Chat).where(
+            ((Chat.initiator_id == user_b_id) &
+             (Chat.the_other_person_id == user_a_id))
+        )
+        query = select(Chat).from_statement(union_all(a_to_b, b_to_a))
+        return self.db.execute(query).scalar_one_or_none()
 
     def post_message(
             self, message_id: UUID,
@@ -132,7 +134,6 @@ class ChatService:
                     f"starting from {message_id}")
         message: ChatMessage = self.fetch_message(message_id)
 
-        # TODO update only received or all?
         self.db.execute(
             update(ChatMessage).where(
                 (ChatMessage.timestamp <= message.timestamp) &

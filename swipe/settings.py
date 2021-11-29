@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseSettings, PostgresDsn
+from pydantic import BaseSettings, PostgresDsn, RedisDsn
 
 
 class Constants(BaseSettings):
@@ -26,6 +26,9 @@ class Settings(BaseSettings):
 
     SWIPE_PORT: Optional[int] = None
     DATABASE_URL: Optional[PostgresDsn] = None
+    REDIS_URL: Optional[RedisDsn] = None
+
+    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
 
     STORAGE_ACCESS_KEY: str
     STORAGE_SECRET_KEY: str
@@ -52,10 +55,6 @@ class Settings(BaseSettings):
     ONLINE_USER_DEFAULT_AGE_DIFF = 10
     ONLINE_USER_AGE_DIFF_STEP = 5
     ONLINE_USER_RESPONSE_CACHE_TTL = 60 * 60
-
-    REDIS_URL: str
-
-    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
 
     SENTRY_SWIPE_SERVER_URL: Optional[str] = None
     SENTRY_MATCHMAKER_URL: Optional[str] = None

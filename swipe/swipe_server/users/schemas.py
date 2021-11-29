@@ -70,8 +70,6 @@ class UserCardPreviewOut(BaseModel):
         schema_obj = cls.from_orm(obj)
         patched_photos = []
         for photo_id in schema_obj.photos:
-            # TODO add a url shortener cuz these urls are freaking looong
-            # and include auth info
             patched_photos.append(storage_client.get_image_url(photo_id))
         schema_obj.photo_urls = patched_photos
         return schema_obj
@@ -99,11 +97,8 @@ class UserOut(UserBase):
     @classmethod
     def patched_from_orm(cls: UserOut, obj: Any) -> UserOut:
         schema_obj = cls.from_orm(obj)
-        # TODO make it a dependency or smth
         patched_photos = []
         for photo_id in schema_obj.photos:
-            # TODO add a url shortener cuz these urls are freaking looong
-            # and include auth info
             patched_photos.append(storage_client.get_image_url(photo_id))
         schema_obj.photo_urls = patched_photos
 

@@ -21,7 +21,7 @@ from swipe.matchmaking.services import MMUserService
 from swipe.settings import settings
 from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.users.enums import Gender
-from swipe.swipe_server.users.models import IDList
+from swipe.swipe_server.users.models import IDList, User
 from swipe.swipe_server.users.services import BlacklistService
 
 logger = logging.getLogger(__name__)
@@ -64,6 +64,8 @@ async def matchmaker_endpoint(
         user_service: MMUserService = Depends(),
         redis: aioredis.Redis = Depends(dependencies.redis),
         gender: Gender = Query(None)):
+    user: User
+    # loading only age and gender
     if (user := user_service.get_matchmaking_preview(user_id)) is None:
         logger.info(f"User {user_id} not found")
         await websocket.close(1003)

@@ -149,7 +149,7 @@ class MMUserData:
 
 class ConnectedUser:
     def __init__(self, user_id: str, connection: WebSocket,
-                 data: ChatUserData | MMUserData):
+                 data: Optional[ChatUserData | MMUserData] = None):
         self.connection = connection
         self.user_id = user_id
         self.data = data

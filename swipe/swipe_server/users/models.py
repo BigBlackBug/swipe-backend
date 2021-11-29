@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 IDList = list[UUID]
 
-# TODO add a shit ton of indices
 blacklist_table = Table(
     "blacklist",
     ModelBase.metadata,

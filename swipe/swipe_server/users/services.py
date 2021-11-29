@@ -14,7 +14,7 @@ from jose.constants import ALGORITHMS
 from sqlalchemy import select, delete, func, desc, String, cast, insert
 from sqlalchemy.engine import Row
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, Bundle
+from sqlalchemy.orm import Session, Bundle, Load, joinedload
 
 from swipe.settings import settings, constants
 from swipe.swipe_server import utils
@@ -86,15 +86,18 @@ class UserService:
             select(User).where(User.id == user_id)) \
             .scalar_one_or_none()
 
-    def get_users(self, current_user_id: UUID,
-                  user_ids: Optional[
+    def get_user_card_previews(self, current_user_id: UUID,
+                               user_ids: Optional[
                       Union[Iterable[UUID], Iterable[str]]] = None) \
             -> list[User]:
-        # TODO use load_only for card preview
         clause = True if user_ids is None else User.id.in_(user_ids)
-        return self.db.execute(select(User).where(clause)
-                               .where(User.id != current_user_id)). \
-            scalars().all()
+        query = self.db.query(User).where(User.id != current_user_id).\
+            where(clause).options(
+            Load(User).load_only("id", "name", "date_of_birth",
+                                 "rating", "photos"),
+            joinedload(User.location)
+        )
+        return query.all()
 
     def get_user_chat_preview(
             self, user_ids: Optional[IDList] = None,
@@ -114,10 +117,12 @@ class UserService:
         return self.db.execute(
             select(User.id, User.name, User.avatar_id).where(clause)).all()
 
-    def get_global_chat_preview_one(self, user_id: UUID) -> Optional[Row]:
-        return self.db.execute(
-            select(User.id, User.name, User.avatar_id).
-                where(User.id == user_id)).one_or_none()
+    def get_user_login_preview_one(self, user_id: UUID) -> Optional[User]:
+        query = self.db.query(User).where(User.id == user_id).options(
+            Load(User).load_only("id", "name", "age", "gender", "avatar_id"),
+            joinedload(User.location)
+        )
+        return query.one_or_none()
 
     def update_user(
             self,

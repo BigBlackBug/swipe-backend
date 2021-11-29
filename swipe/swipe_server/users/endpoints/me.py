@@ -66,9 +66,6 @@ async def patch_user(
         redis_location: RedisLocationService = Depends(),
         redis_online: RedisOnlineUserService = Depends(),
         current_user: User = Depends(security.get_current_user)):
-    # TODO This is bs, this field should not be in the docs
-    # but the solutions are ugly AF
-    # https://github.com/tiangolo/fastapi/issues/1357
     previous_location: Location = current_user.location
     current_user: User = user_service.update_user(current_user, user_body)
 
@@ -91,7 +88,8 @@ async def delete_user(
         chat_service: ChatService = Depends(),
         redis_blacklist: RedisBlacklistService = Depends(),
         current_user: User = Depends(security.get_current_user)):
-    # TODO send event to all chat members to remove them from view
+    # TODO send event to all chat members
+    # to remove them from global message list and chats
     chat_ids: list[UUID] = chat_service.fetch_chat_ids(current_user.id)
     for chat_id in chat_ids:
         chat_service.delete_chat(chat_id)

@@ -45,6 +45,9 @@ LOGGING_CONFIG: dict = {
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stderr",
         },
+        "null": {
+            "class": "logging.NullHandler"
+        },
     },
     'filters': {
         'special': {
@@ -62,10 +65,10 @@ LOGGING_CONFIG: dict = {
             'propagate': False,
             "filters": ['special', ]
         },
-        "sqlalchemy": {
-            "handlers": ["default", ],
+        # using stock logger for sqlalchemy
+        "sqlalchemy.engine": {
+            "handlers": ["null", ],
             "propagate": False,
-            "filters": ['special', ]
         },
         "websockets": {
             "handlers": ["default", ],

@@ -17,14 +17,14 @@ from swipe import error_handlers
 from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
     MessagePayload, CreateChatPayload, BlacklistAddPayload, UserJoinPayload
 from swipe.chat_server.services import ChatServerRequestProcessor, \
-    WSConnectionManager, ConnectedUser, ChatUserData
+    WSConnectionManager, ConnectedUser
 from swipe.settings import settings
 from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.misc.errors import SwipeError
+from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
     RedisBlacklistService
-from swipe.swipe_server.users.schemas import UserOut
 from swipe.swipe_server.users.services import UserService, FirebaseService
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,8 @@ async def websocket_endpoint(
         return
 
     user: User
-    if (user := user_service.get_user(user_uuid)) is None:
+    # loading only required fields
+    if (user := user_service.get_user_login_preview_one(user_uuid)) is None:
         logger.info(f"User {user_id} not found")
         await websocket.close(1003)
         return
@@ -88,11 +89,7 @@ async def websocket_endpoint(
     redis_blacklist = RedisBlacklistService(redis)
     await redis_online.connect_user(user)
 
-    # TODO we don't need all fields here
-    user_data = UserOut.patched_from_orm(user)
-    connected_user = ConnectedUser(
-        user_id=user_id, connection=websocket,
-        data=ChatUserData(name=user_data.name, avatar_url=user_data.avatar_url))
+    connected_user = ConnectedUser(user_id=user_id, connection=websocket)
 
     await connection_manager.connect(connected_user)
 
@@ -106,8 +103,8 @@ async def websocket_endpoint(
     await connection_manager.broadcast(
         user_id, UserJoinPayload(
             user_id=user_id,
-            name=user_data.name,
-            avatar_url=user_data.avatar_url
+            name=user.name,
+            avatar_url=storage_client.get_image_url(user.avatar_id)
         ).dict(by_alias=True))
 
     request_processor = ChatServerRequestProcessor(db, redis)
@@ -209,6 +206,7 @@ def start_server():
     app.add_exception_handler(Exception, error_handlers.global_error_handler)
     server_config = Config(app=app, host='0.0.0.0',
                            port=settings.CHAT_SERVER_PORT,
+                           reload=settings.ENABLE_WEB_SERVER_AUTORELOAD,
                            workers=1, loop='asyncio')
     server = Server(server_config)
     loop.run_until_complete(server.serve())
