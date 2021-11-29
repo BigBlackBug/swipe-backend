@@ -6,7 +6,7 @@ import uuid
 
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import Column, String, Boolean, Integer, Enum, ARRAY, \
-    ForeignKey, Date, UniqueConstraint, select, Table, DateTime
+    ForeignKey, Date, UniqueConstraint, select, Table, DateTime, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, object_session
 
@@ -31,6 +31,10 @@ blacklist_table = Table(
     Column("blocked_user_id", UUID(as_uuid=True),
            ForeignKey("users.id", ondelete='CASCADE'), primary_key=True),
 )
+
+# we're searching the table by these fields separately
+Index("idx_blacklist_blocked_by", blacklist_table.c.blocked_by_id)
+Index("idx_blacklist_blocked_user", blacklist_table.c.blocked_user_id)
 
 
 class User(ModelBase):
@@ -123,6 +127,13 @@ class User(ModelBase):
         return f'User {self.id}, name: {self.name}'
 
 
+Index('idx_user_gender', User.gender)
+Index('idx_user_date_of_birth', User.date_of_birth)
+
+# for ordering in popular query
+Index('idx_user_rating', User.rating)
+
+
 class Location(ModelBase):
     __table_args__ = (
         UniqueConstraint('city', 'country', name='_location'),
@@ -133,6 +144,10 @@ class Location(ModelBase):
     city = Column(String, nullable=False)
     country = Column(String, nullable=False)
     flag = Column(String, nullable=False)
+
+
+Index('idx_location_city', Location.city)
+Index('idx_location_country', Location.country)
 
 
 class AuthInfo(ModelBase):
@@ -147,3 +162,7 @@ class AuthInfo(ModelBase):
     user = relationship('User', back_populates='auth_info')
     user_id = Column(UUID(as_uuid=True),
                      ForeignKey('users.id', ondelete="CASCADE"))
+
+
+Index('idx_auth_provider_provider', AuthInfo.auth_provider)
+Index('idx_auth_provider_provider_user_id', AuthInfo.provider_user_id)

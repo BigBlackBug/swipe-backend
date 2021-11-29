@@ -6,7 +6,7 @@ import logging
 import uuid
 
 from sqlalchemy import Column, String, Enum, ForeignKey, DateTime, \
-    UniqueConstraint, Boolean
+    UniqueConstraint, Boolean, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.orderinglist import ordering_list
 from sqlalchemy.orm import relationship
@@ -72,6 +72,10 @@ class Chat(ModelBase):
                                     uselist=False)
 
 
+Index('chat_initiator_id', Chat.initiator_id)
+Index('chat_the_other_person_id', Chat.the_other_person_id)
+
+
 class ChatMessage(ModelBase):
     __tablename__ = 'chat_messages'
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -98,6 +102,11 @@ class ChatMessage(ModelBase):
             storage_client.delete_chat_image(self.image_id)
 
 
+Index('chat_message_sender_id', ChatMessage.sender_id)
+# for order by clauses
+Index('chat_message_timestamp', ChatMessage.timestamp)
+
+
 class GlobalChatMessage(ModelBase):
     __tablename__ = 'global_chat_messages'
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -109,3 +118,6 @@ class GlobalChatMessage(ModelBase):
     sender_id = Column(UUID(as_uuid=True),
                        ForeignKey('users.id', ondelete='CASCADE'))
     sender = relationship('User', uselist=False)
+
+
+Index('global_chat_message_timestamp', GlobalChatMessage.timestamp)
