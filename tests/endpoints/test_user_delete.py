@@ -3,6 +3,7 @@ import uuid
 from unittest.mock import MagicMock, call
 from uuid import UUID
 
+import aioredis
 import pytest
 from httpx import AsyncClient
 from pytest_mock import MockerFixture
@@ -14,9 +15,12 @@ from swipe.swipe_server.chats.models import ChatMessage, MessageStatus, Chat, \
     ChatStatus, \
     ChatSource, GlobalChatMessage
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
+from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import AuthInfo, User
-from swipe.swipe_server.users.redis_services import RedisBlacklistService
-from swipe.swipe_server.users.services import UserService, BlacklistService
+from swipe.swipe_server.users.redis_services import RedisBlacklistService, \
+    RedisOnlineUserService, RedisPopularService, OnlineUserCacheParams
+from swipe.swipe_server.users.services import UserService, BlacklistService, \
+    PopularUserService
 
 
 @pytest.mark.anyio
@@ -24,29 +28,79 @@ async def test_user_delete(
         mocker: MockerFixture,
         client: AsyncClient,
         default_user: User,
+        randomizer: RandomEntityGenerator,
         user_service: UserService,
         session: Session,
+        fake_redis: aioredis.Redis,
+        redis_online: RedisOnlineUserService,
+        redis_blacklist: RedisBlacklistService,
+        redis_popular: RedisPopularService,
         default_user_auth_headers: dict[str, str]):
+    default_user.gender = Gender.MALE
+
+    popular_service = PopularUserService(session, fake_redis)
+    user_1 = randomizer.generate_random_user()
     mock_user_storage: MagicMock = \
         mocker.patch('swipe.swipe_server.users.models.storage_client')
 
     auth_info_id: UUID = default_user.auth_info.id
     photos: list[str] = default_user.photos
 
+    user_id = str(default_user.id)
+    await redis_online.add_to_online_cache(default_user)
+    await popular_service.populate_popular_cache()
+    await redis_blacklist.add_to_blacklist_cache(
+        blocked_user_id=str(user_1.id), blocked_by_id=user_id)
+
+    delete_image_calls = []
+    for photo in photos:
+        delete_image_calls.append(call(photo))
+    delete_image_calls.append(call(default_user.avatar_id))
+
+    # -----------------------------------------------------
     await client.delete(
         f"{settings.API_V1_PREFIX}/me",
         headers=default_user_auth_headers)
-    calls = []
-    for photo in photos:
-        calls.append(call(photo))
-    calls.append(call(default_user.avatar_id))
+
     mock_user_storage.delete_image.assert_has_calls(
-        calls, any_order=True)
+        delete_image_calls, any_order=True)
 
     assert not user_service.get_user(default_user.id)
     assert not session.execute(
         select(AuthInfo).where(AuthInfo.id == auth_info_id)). \
         scalars().one_or_none()
+
+    assert not await redis_online.is_online(user_id)
+
+    all_settings = OnlineUserCacheParams(
+        age=default_user.age,
+        country=default_user.location.country,
+        city=default_user.location.city,
+        gender=default_user.gender
+    )
+    assert user_id not in await redis_online.get_online_users(all_settings)
+
+    all_settings = OnlineUserCacheParams(
+        age=default_user.age,
+        country=default_user.location.country,
+        gender=default_user.gender
+    )
+    assert user_id not in await redis_online.get_online_users(all_settings)
+
+    all_settings = OnlineUserCacheParams(
+        age=default_user.age,
+        country=default_user.location.country,
+        city=default_user.location.city,
+    )
+    assert user_id not in await redis_online.get_online_users(all_settings)
+
+    all_settings = OnlineUserCacheParams(
+        age=default_user.age,
+        country=default_user.location.country,
+    )
+    assert user_id not in await redis_online.get_online_users(all_settings)
+
+    assert await redis_blacklist.get_blacklist(user_id) == set()
 
 
 @pytest.mark.anyio
@@ -202,4 +256,4 @@ async def test_user_delete_with_blacklist(
     assert len(other_user.blacklist) == 0
 
     # user is gone and so is his blacklist cache
-    assert await redis_blacklist.get_blacklist(default_user.id) == set()
+    assert await redis_blacklist.get_blacklist(str(default_user.id)) == set()

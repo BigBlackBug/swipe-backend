@@ -32,25 +32,25 @@ async def test_user_fetch_basic(
     user_1.location.country = 'Russia'
     user_1.set_date_of_birth(
         datetime.date.today().replace(year=2000))
-    await redis_online.connect_user(user_1)
+    await redis_online.add_to_online_cache(user_1)
 
     user_2 = randomizer.generate_random_user()
     user_2.location.country = 'Russia'
     user_2.set_date_of_birth(
         datetime.date.today().replace(year=2000))
-    await redis_online.connect_user(user_2)
+    await redis_online.add_to_online_cache(user_2)
 
     user_3 = randomizer.generate_random_user()
     user_3.location.country = 'Russia'
     user_3.set_date_of_birth(
         datetime.date.today().replace(year=2001))
-    await redis_online.connect_user(user_3)
+    await redis_online.add_to_online_cache(user_3)
 
     user_4 = randomizer.generate_random_user()
     user_4.location.country = 'Russia'
     user_4.set_date_of_birth(
         datetime.date.today().replace(year=2005))
-    await redis_online.connect_user(user_4)
+    await redis_online.add_to_online_cache(user_4)
     session.commit()
     # --------------------------------------------------------------------------
 
@@ -88,17 +88,17 @@ async def test_user_fetch_small_limit(
     user_1.location.country = 'Russia'
     user_1.set_date_of_birth(
         datetime.date.today().replace(year=2000))
-    await redis_online.connect_user(user_1)
+    await redis_online.add_to_online_cache(user_1)
 
     user_2 = randomizer.generate_random_user()
     user_2.set_date_of_birth(datetime.date.today().replace(year=2001))
     user_2.location.country = 'Russia'
-    await redis_online.connect_user(user_2)
+    await redis_online.add_to_online_cache(user_2)
 
     user_3 = randomizer.generate_random_user()
     user_3.set_date_of_birth(datetime.date.today().replace(year=2002))
     user_3.location.country = 'Russia'
-    await redis_online.connect_user(user_3)
+    await redis_online.add_to_online_cache(user_3)
 
     user_4 = randomizer.generate_random_user()
     user_4.set_date_of_birth(datetime.date.today().replace(year=2003))
@@ -156,7 +156,7 @@ async def test_user_fetch_gender(
     user_3.set_date_of_birth(
         datetime.date.today().replace(year=2001))
     user_3.gender = Gender.MALE
-    await redis_online.connect_user(user_3)
+    await redis_online.add_to_online_cache(user_3)
     user_3.location.country = 'Russia'
 
     user_4 = randomizer.generate_random_user()
@@ -232,7 +232,7 @@ async def test_user_fetch_online_city_cached_requests(
     user_3.set_location({
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
     })
-    await redis_online.connect_user(user_3)
+    await redis_online.add_to_online_cache(user_3)
     session.add(user_3)
 
     user_4 = randomizer.generate_random_user()
@@ -243,7 +243,7 @@ async def test_user_fetch_online_city_cached_requests(
     user_4.set_location({
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
     })
-    await redis_online.connect_user(user_4)
+    await redis_online.add_to_online_cache(user_4)
     session.add(user_4)
 
     user_44 = randomizer.generate_random_user()
@@ -254,7 +254,7 @@ async def test_user_fetch_online_city_cached_requests(
     user_44.set_location({
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
     })
-    await redis_online.connect_user(user_44)
+    await redis_online.add_to_online_cache(user_44)
     session.add(user_44)
 
     user_5 = randomizer.generate_random_user()
@@ -292,7 +292,7 @@ async def test_user_fetch_online_city_cached_requests(
 
     # -------------------fetching with a new user----------------------
 
-    await redis_online.connect_user(user_5)
+    await redis_online.add_to_online_cache(user_5)
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch",
         headers=default_user_auth_headers,
@@ -317,7 +317,7 @@ async def test_user_fetch_online_city_cached_requests(
     # -------------------invalidating cache with new settings----------------
     # settings changed, sending invalidate cache
     new_session_id = str(uuid.uuid4())
-    await redis_online.connect_user(user_2)
+    await redis_online.add_to_online_cache(user_2)
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch",
         headers=default_user_auth_headers,
@@ -403,10 +403,10 @@ async def test_user_fetch_with_blacklist(
     await blacklist_service.update_blacklist(str(default_user.id), str(user_2.id))
     await blacklist_service.update_blacklist(str(default_user.id), str(user_3.id))
 
-    await redis_online.connect_user(user_1)
-    await redis_online.connect_user(user_3)
-    await redis_online.connect_user(user_4)
-    await redis_online.connect_user(user_5)
+    await redis_online.add_to_online_cache(user_1)
+    await redis_online.add_to_online_cache(user_3)
+    await redis_online.add_to_online_cache(user_4)
+    await redis_online.add_to_online_cache(user_5)
     session.commit()
     # --------------------------------------------------------------------------
 

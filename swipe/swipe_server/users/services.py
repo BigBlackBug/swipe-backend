@@ -328,9 +328,10 @@ class FetchUserService:
 
     async def collect(self, current_user: User,
                       filter_params: OnlineFilterBody) -> set[str]:
+        user_id = str(current_user.id)
         request_cache_settings = FetchUserCacheKey(
             session_id=filter_params.session_id,
-            user_id=str(current_user.id),
+            user_id=user_id,
         )
 
         await self.redis_online.drop_obsolete_caches(request_cache_settings)
@@ -345,7 +346,7 @@ class FetchUserService:
         # premium filtered by gender
         # premium filtered by location(whole country/my city)
         blacklist: set[str] = \
-            await self.redis_blacklist.get_blacklist(current_user.id)
+            await self.redis_blacklist.get_blacklist(user_id)
         # Russia, SPB, 25+-2,3,4, ALL
 
         # age->(index,user_list)
@@ -407,7 +408,7 @@ class PopularUserService:
             country=country, city=city, gender=gender)
         logger.info(
             f"Got {len(users)} popular users from db for: "
-            f"{country}, city:{city}, {gender or 'ALL'}")
+            f"{country}, city:{city or 'ALL'}, {gender or 'ALL'}")
         await self.redis_popular.save_popular_users(
             country=country, city=city, gender=gender, users=users)
 

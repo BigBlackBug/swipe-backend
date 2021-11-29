@@ -11,7 +11,7 @@ from swipe.swipe_server.misc import security
 from swipe.swipe_server.users import schemas
 from swipe.swipe_server.users.models import User, Location
 from swipe.swipe_server.users.redis_services import RedisLocationService, \
-    RedisOnlineUserService, RedisBlacklistService
+    RedisOnlineUserService, RedisBlacklistService, RedisPopularService
 from swipe.swipe_server.users.schemas import RatingUpdateReason
 from swipe.swipe_server.users.services import UserService
 
@@ -87,6 +87,8 @@ async def delete_user(
         user_service: UserService = Depends(),
         chat_service: ChatService = Depends(),
         redis_blacklist: RedisBlacklistService = Depends(),
+        redis_online: RedisOnlineUserService = Depends(),
+        redis_popular: RedisPopularService = Depends(),
         current_user: User = Depends(security.get_current_user)):
     # TODO send event to all chat members
     # to remove them from global message list and chats
@@ -94,9 +96,12 @@ async def delete_user(
     for chat_id in chat_ids:
         chat_service.delete_chat(chat_id)
 
+    await redis_online.remove_from_online_cache(current_user)
+    await redis_popular.remove_from_popular_cache(current_user)
+    await redis_blacklist.drop_blacklist_cache(str(current_user.id))
+
     user_service.delete_user(current_user)
 
-    await redis_blacklist.drop_blacklist_cache(str(current_user.id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

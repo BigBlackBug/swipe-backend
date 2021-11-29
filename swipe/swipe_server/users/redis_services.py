@@ -126,8 +126,8 @@ class RedisPopularService:
     async def get_popular_users(self, filter_params: PopularFilterBody) \
             -> list[str]:
         gender = filter_params.gender or 'ALL'
-        key = f'popular:{gender}:country:{filter_params.country}:' \
-              f'city:{filter_params.city}'
+        city = filter_params.city or 'ALL'
+        key = f'popular:{gender}:country:{filter_params.country}:city:{city}'
 
         logger.info(f"Getting popular for key {key}")
         return await self.redis.lrange(
@@ -142,11 +142,27 @@ class RedisPopularService:
         if not users:
             return
         gender = gender or 'ALL'
+        city = city or 'ALL'
         key = f'popular:{gender}:country:{country}:city:{city}'
         logger.info(f"Deleting and saving popular cache for {key}")
 
         await self.redis.delete(key)
         await self.redis.rpush(key, *users)
+
+    async def remove_from_popular_cache(self, user: User):
+        # add to all online sets
+        country = user.location.country
+        city = user.location.city
+        keys = [
+            f'popular:ALL:country:{country}:city:{city}',
+            f'popular:ALL:country:{country}:city:ALL'
+        ]
+        if user.gender != Gender.ATTACK_HELICOPTER:
+            keys.append(f'popular:{user.gender}:country:{country}:city:{city}')
+            keys.append(f'popular:{user.gender}:country:{country}:city:ALL')
+
+        for key in keys:
+            await self.redis.srem(key, str(user.id))
 
 
 class RedisBlacklistService:
@@ -157,7 +173,7 @@ class RedisBlacklistService:
         self.redis = redis
 
     @enable_blacklist(return_value_class=set)
-    async def get_blacklist(self, user_id: UUID) -> set[str]:
+    async def get_blacklist(self, user_id: str) -> set[str]:
         return await self.redis.smembers(f'{self.BLACKLIST_KEY}:{user_id}')
 
     @enable_blacklist()
@@ -190,7 +206,7 @@ class RedisOnlineUserService:
             -> set[str]:
         return await self.redis.smembers(cache_params.cache_key())
 
-    async def connect_user(self, user: User):
+    async def add_to_online_cache(self, user: User):
         # add to all online sets
         cache_params = OnlineUserCacheParams(
             age=user.age,
@@ -203,7 +219,7 @@ class RedisOnlineUserService:
             await self.redis.sadd(key, user_id)
         await self.redis.sadd(self.ONLINE_SET_KEY, user_id)
 
-    async def disconnect_user(self, user: User):
+    async def remove_from_online_cache(self, user: User):
         cache_params = OnlineUserCacheParams(
             age=user.age,
             country=user.location.country,
@@ -232,7 +248,7 @@ class RedisOnlineUserService:
             await self.redis.srem(key, str(user.id))
 
         # putting him back to caches with correct location
-        await self.connect_user(user)
+        await self.add_to_online_cache(user)
 
     async def invalidate_online_user_cache(self):
         for key in await self.redis.keys('online:*'):

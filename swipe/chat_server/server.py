@@ -89,7 +89,7 @@ async def websocket_endpoint(
 
     redis_online = RedisOnlineUserService(redis)
     redis_blacklist = RedisBlacklistService(redis)
-    await redis_online.connect_user(user)
+    await redis_online.add_to_online_cache(user)
 
     connected_user = ConnectedUser(user_id=user_id, connection=websocket)
 
@@ -118,7 +118,7 @@ async def websocket_endpoint(
             logger.info(f"{user_id} disconnected with code {e.code}")
             await connection_manager.disconnect(user_id)
             # removing user from online caches
-            await redis_online.disconnect_user(user)
+            await redis_online.remove_from_online_cache(user)
             # setting last_online field
             user.last_online = datetime.datetime.utcnow()
             db.commit()

@@ -385,10 +385,14 @@ async def test_decline_chat(
         image_id='345345.png', sender=initiator)
     chat.messages.extend([msg1, msg2, msg3, msg4])
     session.commit()
+
+    default_user_id = str(default_user.id)
+    recipient_id = str(recipient.id)
+
     mp = ChatServerRequestProcessor(session, fake_redis)
     json_data = BasePayload.validate({
-        'sender_id': str(default_user.id),
-        'recipient_id': str(recipient.id),
+        'sender_id': default_user_id,
+        'recipient_id': recipient_id,
         'payload': {
             'type': 'decline_chat',
             'chat_id': str(chat_id),
@@ -406,14 +410,14 @@ async def test_decline_chat(
     assert recipient in default_user.blacklist
     assert default_user in recipient.blocked_by
 
-    assert await redis_blacklist.get_blacklist(default_user.id) == \
-           {str(recipient.id)}
-    assert await redis_blacklist.get_blacklist(recipient.id) == \
-           {str(default_user.id)}
+    assert await redis_blacklist.get_blacklist(default_user_id) == \
+           {recipient_id}
+    assert await redis_blacklist.get_blacklist(recipient_id) == \
+           {default_user_id}
     url = f'{settings.CHAT_SERVER_HOST}/swipe/blacklist'
     requests_mock.post.assert_called_with(url, json={
-        'blocked_by_id': str(default_user.id),
-        'blocked_user_id': str(recipient.id)
+        'blocked_by_id': default_user_id,
+        'blocked_user_id': recipient_id
     })
 
 

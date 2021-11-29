@@ -76,7 +76,7 @@ async def test_add_to_blacklist(
 
     # --------------------------------------------------------
 
-    assert await redis_blacklist.get_blacklist(default_user.id) == \
+    assert await redis_blacklist.get_blacklist(str(default_user.id)) == \
            {str(user_1.id), str(user_2.id), str(user_3.id)}
     blacklist = await user_service.fetch_blacklist(str(default_user.id))
 

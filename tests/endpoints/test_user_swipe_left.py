@@ -37,14 +37,16 @@ async def test_swipe_left_enough_swipes(
     assert other_user in default_user.blacklist
     assert default_user in other_user.blocked_by
 
-    assert await redis_blacklist.get_blacklist(default_user.id) == \
-           {str(other_user.id)}
-    assert await redis_blacklist.get_blacklist(other_user.id) == \
-           {str(default_user.id)}
+    other_user_id = str(other_user.id)
+    default_user_id = str(default_user.id)
+    assert \
+        await redis_blacklist.get_blacklist(default_user_id) == {other_user_id}
+    assert \
+        await redis_blacklist.get_blacklist(other_user_id) == {default_user_id}
     url = f'{settings.CHAT_SERVER_HOST}/swipe/blacklist'
     requests_mock.post.assert_called_with(url, json={
-        'blocked_by_id': str(default_user.id),
-        'blocked_user_id': str(other_user.id)
+        'blocked_by_id': default_user_id,
+        'blocked_user_id': other_user_id
     })
 
 
@@ -72,6 +74,6 @@ async def test_swipe_left_not_enough_swipes(
     assert other_user not in default_user.blacklist
     assert default_user not in other_user.blocked_by
 
-    assert await redis_blacklist.get_blacklist(default_user.id) == set()
-    assert await redis_blacklist.get_blacklist(other_user.id) == set()
+    assert await redis_blacklist.get_blacklist(str(default_user.id)) == set()
+    assert await redis_blacklist.get_blacklist(str(other_user.id)) == set()
     requests_mock.post.assert_not_called()

@@ -27,20 +27,18 @@ async def test_add_to_blacklist(
     session.commit()
 
     blacklist_service = BlacklistService(session, fake_redis)
-    await blacklist_service.update_blacklist(
-        str(default_user.id), str(user_1.id))
-    await blacklist_service.update_blacklist(
-        str(default_user.id), str(user_2.id))
-    await blacklist_service.update_blacklist(
-        str(default_user.id), str(user_3.id))
+    default_user_id = str(default_user.id)
+    await blacklist_service.update_blacklist(default_user_id, str(user_1.id))
+    await blacklist_service.update_blacklist(default_user_id, str(user_2.id))
+    await blacklist_service.update_blacklist(default_user_id, str(user_3.id))
     # the reverse should add to blacklist too
     await blacklist_service.update_blacklist(
-        str(user_4.id), str(default_user.id))
+        str(user_4.id), default_user_id)
     # --------------------------------------------------------
     expected_blacklist = {str(user_1.id), str(user_2.id), str(user_3.id),
                           str(user_4.id)}
-    cached_blacklist = await redis_blacklist.get_blacklist(default_user.id)
-    db_blacklist = await user_service.fetch_blacklist(str(default_user.id))
+    cached_blacklist = await redis_blacklist.get_blacklist(default_user_id)
+    db_blacklist = await user_service.fetch_blacklist(default_user_id)
 
     assert cached_blacklist == expected_blacklist
     assert db_blacklist == expected_blacklist
