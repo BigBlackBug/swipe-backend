@@ -19,14 +19,13 @@ from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
 from swipe.chat_server.services import ChatServerRequestProcessor, \
     WSConnectionManager, ConnectedUser, ChatUserData
 from swipe.settings import settings
-from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
     RedisBlacklistService
 from swipe.swipe_server.users.schemas import UserOut
-from swipe.swipe_server.users.services import UserService, BlacklistService
+from swipe.swipe_server.users.services import UserService, FirebaseService
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +80,10 @@ async def websocket_endpoint(
         await websocket.close(1003)
         return
 
+    firebase_service = FirebaseService(db, redis)
+    # we're online so we don't need a token in cache
+    await firebase_service.remove_token_from_cache(user_id)
+
     redis_online = RedisOnlineUserService(redis)
     redis_blacklist = RedisBlacklistService(redis)
     await redis_online.connect_user(user)
@@ -115,10 +118,14 @@ async def websocket_endpoint(
         except WebSocketDisconnect as e:
             logger.info(f"{user_id} disconnected with code {e.code}")
             await connection_manager.disconnect(user_id)
+            # removing user from online caches
             await redis_online.disconnect_user(user)
-            await redis_online.drop_all_response_caches(user_id)
+            # removing all /fetch responses
+            await redis_online.drop_fetch_response_caches(user_id)
+            # removing blacklist cache
             await redis_blacklist.drop_blacklist_cache(user_id)
-
+            # going offline, gotta save the token to cache
+            await firebase_service.add_token_to_cache(user_id)
             break
 
         try:
@@ -131,7 +138,7 @@ async def websocket_endpoint(
                     str(payload.sender_id), payload.dict(
                         by_alias=True, exclude_unset=True))
             else:
-                await _send_payload(payload, user_service)
+                await _send_payload(payload, firebase_service)
         except:
             logger.exception(f"Error processing message: {raw_data}")
 
@@ -169,7 +176,8 @@ async def send_blacklist_event(blocked_by_id: str = Body(..., embed=True),
     await connection_manager.send(blocked_user_id, payload.dict(by_alias=True))
 
 
-async def _send_payload(payload: BasePayload, user_service: UserService):
+async def _send_payload(payload: BasePayload,
+                        firebase_service: FirebaseService):
     recipient_id = payload.recipient_id
     out_payload = payload.dict(by_alias=True, exclude_unset=True)
 
@@ -180,8 +188,10 @@ async def _send_payload(payload: BasePayload, user_service: UserService):
             logger.info(
                 f"{recipient_id} is offline, sending push "
                 f"notification for '{payload.payload.type_}' payload")
-            # TODO cache token
-            firebase_token = user_service.get_firebase_token(recipient_id)
+
+            # TODO limit notifications to one message per 3 mins per user
+            firebase_token = \
+                await firebase_service.get_firebase_token(str(recipient_id))
             if not firebase_token:
                 logger.error(
                     f"User {recipient_id} does not have a firebase token "

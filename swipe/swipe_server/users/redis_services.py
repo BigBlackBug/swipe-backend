@@ -180,7 +180,6 @@ class RedisBlacklistService:
 
 
 class RedisOnlineUserService:
-
     def __init__(self,
                  redis: Redis = Depends(dependencies.redis)):
         self.redis = redis
@@ -248,7 +247,7 @@ class RedisOnlineUserService:
         for key in await self.redis.keys(f'{FETCH_REQUEST_KEY}:{user_id}:*'):
             await self.redis.delete(key)
 
-    async def drop_all_response_caches(self, user_id: Optional[str] = None):
+    async def drop_fetch_response_caches(self, user_id: Optional[str] = None):
         for key in await self.redis.keys(f'{FETCH_REQUEST_KEY}:*'):
             await self.redis.delete(key)
 

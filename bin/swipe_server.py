@@ -52,7 +52,7 @@ async def run_migrations():
 async def invalidate_caches():
     redis_online = RedisOnlineUserService(dependencies.redis())
     logger.info("Invalidating online response cache")
-    await redis_online.drop_all_response_caches()
+    await redis_online.drop_fetch_response_caches()
     # TODO just for tests, because chat server is also being restarted
     logger.info("Invalidating online user cache")
     await redis_online.invalidate_online_user_cache()

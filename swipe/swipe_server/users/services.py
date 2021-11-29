@@ -226,10 +226,6 @@ class UserService:
         self.db.execute(delete(User).where(User.id == user.id))
         self.db.commit()
 
-    def get_firebase_token(self, user_id: UUID):
-        return self.db.execute(select(User.firebase_token).
-                               where(User.id == user_id)).scalar_one_or_none()
-
     def fetch_locations(self) -> dict[str, list[str]]:
         """
         Returns rows of cities grouped by country.
@@ -478,3 +474,29 @@ class BlacklistService:
                 'blocked_by_id': blocked_by_id,
                 'blocked_user_id': blocked_user_id
             })
+
+
+class FirebaseService:
+    FIREBASE_KEY = 'firebase_tokens'
+
+    def __init__(self, db: Session = Depends(dependencies.db),
+                 redis: aioredis.Redis = Depends(dependencies.redis)):
+        self.db = db
+        self.redis = redis
+
+    async def get_firebase_token(self, user_id: str):
+        return await self.redis.hget(self.FIREBASE_KEY, user_id)
+
+    async def remove_token_from_cache(self, user_id: str):
+        await self.redis.hdel(self.FIREBASE_KEY, user_id)
+
+    async def add_token_to_cache(self, user_id: str):
+        token = self.db.execute(
+            select(User.firebase_token).where(
+                User.id == user_id)).scalar_one_or_none()
+        if token:
+            await self.redis.hset(self.FIREBASE_KEY, user_id, token)
+        else:
+            logger.error(
+                f"User {user_id} does not have a firebase token in db"
+                f"which is weird")
