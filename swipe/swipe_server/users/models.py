@@ -46,6 +46,8 @@ class User(ModelBase):
     registration_date = Column(
         DateTime, nullable=False,
         default=datetime.datetime.utcnow().replace(microsecond=0))
+    last_online = Column(DateTime, nullable=False,
+                         default=datetime.datetime.utcnow().replace(microsecond=0))
     name = Column(String(30), nullable=False, default='')
 
     bio = Column(String(200), nullable=False, default='')

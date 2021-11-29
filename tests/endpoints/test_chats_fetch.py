@@ -10,6 +10,7 @@ from swipe.swipe_server.chats.models import Chat, ChatStatus, ChatMessage, \
     ChatSource
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
+from swipe.swipe_server.users.redis_services import RedisOnlineUserService
 
 
 @pytest.mark.anyio
@@ -17,6 +18,7 @@ async def test_fetch_existing_chats(
         client: AsyncClient,
         default_user: models.User,
         session: Session,
+        redis_online: RedisOnlineUserService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     other_user = randomizer.generate_random_user()
@@ -61,6 +63,8 @@ async def test_fetch_existing_chats(
     newer_chat.messages.extend([msg5, msg6, msg7])
     session.commit()
 
+    # default user is online
+    await redis_online.connect_user(default_user)
     # --------------------------------------------------------
     response: Response = await client.get(
         f"{settings.API_V1_PREFIX}/me/chats",
@@ -74,6 +78,8 @@ async def test_fetch_existing_chats(
         str(default_user.id), str(other_user.id), str(second_user.id)
     }
     assert users[str(default_user.id)]['name'] == default_user.name
+    assert users[str(default_user.id)]['online'] is True
+
     assert users[str(other_user.id)]['name'] == other_user.name
     assert users[str(second_user.id)]['name'] == second_user.name
 

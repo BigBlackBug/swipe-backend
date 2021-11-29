@@ -3,18 +3,18 @@ import re
 import uuid
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Body
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.engine import Row
 from starlette import status
-from starlette.responses import Response
 
-from swipe.swipe_server.misc import security
 from swipe.swipe_server.chats.models import Chat, GlobalChatMessage
 from swipe.swipe_server.chats.schemas import ChatOut, MultipleChatsOut, \
     ChatORMSchema, GlobalChatOut
 from swipe.swipe_server.chats.services import ChatService
+from swipe.swipe_server.misc import security
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.models import User
+from swipe.swipe_server.users.redis_services import RedisOnlineUserService
 from swipe.swipe_server.users.services import UserService
 
 router = APIRouter()
@@ -66,6 +66,7 @@ async def fetch_chats(
         only_unread: bool = False,
         chat_service: ChatService = Depends(),
         user_service: UserService = Depends(),
+        redis_online: RedisOnlineUserService = Depends(),
         current_user: User = Depends(security.get_current_user)):
     """
     When 'only_unread' is set to true, returns only chats with unread messages
@@ -79,7 +80,8 @@ async def fetch_chats(
     users: list[Row] = \
         user_service.get_user_chat_preview(list(user_ids), location=True)
     resp_data: MultipleChatsOut = \
-        MultipleChatsOut.parse_chats(chats, users, current_user.id)
+        await MultipleChatsOut.parse_chats(chats, users, current_user.id,
+                                           redis_online)
     return resp_data
 
 

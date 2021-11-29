@@ -166,6 +166,7 @@ class UserOutChatPreviewORM(BaseModel):
     id: UUID
     name: str
     photos: list[str] = []
+    last_online: datetime.datetime
     location: Optional[LocationSchema] = Field(None, alias='Location')
 
     class Config:
@@ -196,8 +197,11 @@ class UserOutGlobalChatPreviewORM(BaseModel):
 class UserOutChatPreview(BaseModel):
     id: UUID
     name: str
+    last_online: datetime.datetime
     photo_url: Optional[str] = None
     location: Optional[LocationSchema] = None
+    # filled later
+    online: Optional[bool] = None
 
     @classmethod
     def patched_from_orm(cls: UserOutChatPreview,

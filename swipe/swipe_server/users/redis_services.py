@@ -180,6 +180,8 @@ class RedisBlacklistService:
 
 
 class RedisOnlineUserService:
+    ONLINE_SET_KEY = 'online_users'
+
     def __init__(self,
                  redis: Redis = Depends(dependencies.redis)):
         self.redis = redis
@@ -196,8 +198,10 @@ class RedisOnlineUserService:
             city=user.location.city,
             gender=user.gender
         )
+        user_id = str(user.id)
         for key in cache_params.online_keys():
-            await self.redis.sadd(key, str(user.id))
+            await self.redis.sadd(key, user_id)
+        await self.redis.sadd(self.ONLINE_SET_KEY, user_id)
 
     async def disconnect_user(self, user: User):
         cache_params = OnlineUserCacheParams(
@@ -207,8 +211,28 @@ class RedisOnlineUserService:
             gender=user.gender
         )
         # removing this user from all online caches
+        user_id = str(user.id)
+        for key in cache_params.online_keys():
+            await self.redis.srem(key, user_id)
+        await self.redis.srem(self.ONLINE_SET_KEY, user_id)
+
+    async def is_online(self, user_id: str):
+        return await self.redis.sismember(self.ONLINE_SET_KEY, user_id)
+
+    async def update_user_location(
+            self, user: User, previous_location: Location):
+        cache_params = OnlineUserCacheParams(
+            age=user.age,
+            country=previous_location.country,
+            city=previous_location.city,
+            gender=user.gender
+        )
+        # removing this user from all online caches
         for key in cache_params.online_keys():
             await self.redis.srem(key, str(user.id))
+
+        # putting him back to caches with correct location
+        await self.connect_user(user)
 
     async def invalidate_online_user_cache(self):
         for key in await self.redis.keys('online:*'):
@@ -256,19 +280,3 @@ class RedisOnlineUserService:
 
         for key in await self.redis.keys(f'{FETCH_REQUEST_KEY}:{user_id}:*'):
             await self.redis.delete(key)
-
-    # --------------------------------------------
-    async def update_user_location(
-            self, user: User, previous_location: Location):
-        cache_params = OnlineUserCacheParams(
-            age=user.age,
-            country=previous_location.country,
-            city=previous_location.city,
-            gender=user.gender
-        )
-        # removing this user from all online caches
-        for key in cache_params.online_keys():
-            await self.redis.srem(key, str(user.id))
-
-        # putting him back to caches with correct location
-        await self.connect_user(user)

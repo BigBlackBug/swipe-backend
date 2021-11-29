@@ -104,8 +104,10 @@ class UserService:
             location: bool = False) -> list[Row]:
         clause = True if user_ids is None else User.id.in_(user_ids)
         if location:
+            # TODO load_only
             return self.db.execute(
-                select(User.id, User.name, User.photos, Location).
+                select(User.id, User.name, User.photos,
+                       User.last_online, Location).
                     join(Location).where(clause)).all()
         else:
             return self.db.execute(
@@ -503,5 +505,5 @@ class FirebaseService:
             await self.redis.hset(self.FIREBASE_KEY, user_id, token)
         else:
             logger.error(
-                f"User {user_id} does not have a firebase token in db"
+                f"User {user_id} does not have a firebase token in db "
                 f"which is weird")

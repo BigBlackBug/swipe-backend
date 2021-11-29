@@ -12,6 +12,7 @@ from swipe.swipe_server.chats.models import MessageStatus, ChatMessage, Chat, \
     ChatSource, GlobalChatMessage
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.models import User
+from swipe.swipe_server.users.redis_services import RedisOnlineUserService
 from swipe.swipe_server.users.schemas import UserOutGlobalChatPreviewORM, \
     UserOutChatPreview
 
@@ -100,9 +101,11 @@ class MultipleChatsOut(BaseModel):
     users: dict[UUID, UserOutChatPreview] = {}
 
     @classmethod
-    def parse_chats(cls, chats: list[Chat],
-                    users: list[User] | list[Row],
-                    current_user_id: UUID) -> MultipleChatsOut:
+    async def parse_chats(
+            cls, chats: list[Chat],
+            users: list[User] | list[Row],
+            current_user_id: UUID,
+            redis_online: RedisOnlineUserService) -> MultipleChatsOut:
         result = {'chats': [], 'requests': [], 'users': {}}
 
         # sort chats by last message date
@@ -130,7 +133,8 @@ class MultipleChatsOut(BaseModel):
                     result['chats'].append(data)
 
         for user in users:
-            user_dict: UserOutChatPreview \
+            user_data: UserOutChatPreview \
                 = UserOutChatPreview.patched_from_orm(user)
-            result['users'][user.id] = user_dict
+            user_data.online = await redis_online.is_online(str(user.id))
+            result['users'][user.id] = user_data
         return cls.parse_obj(result)

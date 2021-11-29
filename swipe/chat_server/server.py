@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import json
 import logging
 from uuid import UUID
@@ -74,6 +75,7 @@ async def websocket_endpoint(
         await websocket.close(1003)
         return
 
+    # TODO does it return db connection to the pool?
     user: User
     # loading only required fields
     if (user := user_service.get_user_login_preview_one(user_uuid)) is None:
@@ -117,13 +119,16 @@ async def websocket_endpoint(
             await connection_manager.disconnect(user_id)
             # removing user from online caches
             await redis_online.disconnect_user(user)
+            # setting last_online field
+            user.last_online = datetime.datetime.utcnow()
+            db.commit()
             # removing all /fetch responses
             await redis_online.drop_fetch_response_caches(user_id)
             # removing blacklist cache
             await redis_blacklist.drop_blacklist_cache(user_id)
             # going offline, gotta save the token to cache
             await firebase_service.add_token_to_cache(user_id)
-            break
+            return
 
         try:
             payload: BasePayload = BasePayload.validate(json.loads(raw_data))
