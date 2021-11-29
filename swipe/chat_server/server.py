@@ -94,7 +94,7 @@ async def websocket_endpoint(
     await connection_manager.connect(connected_user)
 
     # populating blacklist cache only for online users
-    blacklist: set[str] = user_service.fetch_blacklist(user_id)
+    blacklist: set[str] = await user_service.fetch_blacklist(user_id)
     await redis_blacklist.populate_blacklist(user_id, blacklist)
 
     # sending join event to all connected users

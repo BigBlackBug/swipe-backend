@@ -36,9 +36,9 @@ def enable_blacklist(
         return_value_class: Type = None):
     def _decorator(func):
         @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
+        async def wrapper(self, *args, **kwargs):
             if enable:
-                return func(self, *args, **kwargs)
+                return await func(self, *args, **kwargs)
             elif return_value_class:
                 return return_value_class()
             else:

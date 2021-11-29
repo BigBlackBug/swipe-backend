@@ -261,7 +261,7 @@ class UserService:
         return self.db.execute(query).scalars().all()
 
     @enable_blacklist(return_value_class=set)
-    def fetch_blacklist(self, user_id: str) -> set[str]:
+    async def fetch_blacklist(self, user_id: str) -> set[str]:
         blocked_by_me = select(
             cast(blacklist_table.columns.blocked_user_id, String)) \
             .where(blacklist_table.columns.blocked_by_id == user_id)

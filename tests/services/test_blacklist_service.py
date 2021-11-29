@@ -40,7 +40,7 @@ async def test_add_to_blacklist(
     expected_blacklist = {str(user_1.id), str(user_2.id), str(user_3.id),
                           str(user_4.id)}
     cached_blacklist = await redis_blacklist.get_blacklist(default_user.id)
-    db_blacklist = user_service.fetch_blacklist(str(default_user.id))
+    db_blacklist = await user_service.fetch_blacklist(str(default_user.id))
 
     assert cached_blacklist == expected_blacklist
     assert db_blacklist == expected_blacklist
