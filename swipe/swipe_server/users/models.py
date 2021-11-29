@@ -50,7 +50,7 @@ class User(ModelBase):
                          default=datetime.datetime.utcnow().replace(microsecond=0))
     name = Column(String(30), nullable=False, default='')
 
-    bio = Column(String(200), nullable=False, default='')
+    bio = Column(String(200), nullable=False, default='👋 Я здесь недавно')
     height = Column(Integer())
     gender = Column(Enum(Gender))
 
