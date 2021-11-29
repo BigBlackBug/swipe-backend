@@ -64,7 +64,7 @@ async def test_fetch_existing_chats(
     session.commit()
 
     # default user is online
-    await redis_online.add_to_online_cache(default_user)
+    await redis_online.add_to_online_caches(default_user)
     # --------------------------------------------------------
     response: Response = await client.get(
         f"{settings.API_V1_PREFIX}/me/chats",

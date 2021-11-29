@@ -52,7 +52,7 @@ async def test_user_update_location(
     default_user.gender = Gender.MALE
     session.commit()
 
-    await redis_online.add_to_online_cache(default_user)
+    await redis_online.add_to_online_caches(default_user)
 
     # assuming some other users are in the cache for Hello
     cached_user_id = str(uuid.uuid4())
@@ -123,7 +123,7 @@ async def test_user_update_location_heli(
     default_user.gender = Gender.ATTACK_HELICOPTER
     session.commit()
 
-    await redis_online.add_to_online_cache(default_user)
+    await redis_online.add_to_online_caches(default_user)
 
     # assuming some other users are in the cache for Hello male and All
     cached_user_id = str(uuid.uuid4())

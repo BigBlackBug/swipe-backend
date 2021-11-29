@@ -47,7 +47,7 @@ async def test_user_delete(
     photos: list[str] = default_user.photos
 
     user_id = str(default_user.id)
-    await redis_online.add_to_online_cache(default_user)
+    await redis_online.add_to_online_caches(default_user)
     await popular_service.populate_popular_cache()
     await redis_blacklist.add_to_blacklist_cache(
         blocked_user_id=str(user_1.id), blocked_by_id=user_id)

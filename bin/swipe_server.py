@@ -13,7 +13,8 @@ import logging
 import alembic.command
 import alembic.config
 from fastapi_utils.tasks import repeat_every
-from swipe.swipe_server.users.redis_services import RedisOnlineUserService
+from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
+    RedisUserFetchService
 from swipe.swipe_server.users.services import PopularUserService, \
     CountryCacheService
 from swipe.swipe_server.misc import dependencies
@@ -51,8 +52,9 @@ async def run_migrations():
 @app.on_event("startup")
 async def invalidate_caches():
     redis_online = RedisOnlineUserService(dependencies.redis())
+    redis_fetch = RedisUserFetchService(dependencies.redis())
     logger.info("Invalidating online response cache")
-    await redis_online.drop_fetch_response_caches()
+    await redis_fetch.drop_fetch_response_caches()
     # TODO just for tests, because chat server is also being restarted
     logger.info("Invalidating online user cache")
     await redis_online.invalidate_online_user_cache()

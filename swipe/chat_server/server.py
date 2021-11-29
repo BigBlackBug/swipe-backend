@@ -25,7 +25,7 @@ from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
-    RedisBlacklistService
+    RedisBlacklistService, RedisUserFetchService
 from swipe.swipe_server.users.services import UserService, FirebaseService
 
 logger = logging.getLogger(__name__)
@@ -84,16 +84,17 @@ async def websocket_endpoint(
         return
 
     firebase_service = FirebaseService(db, redis)
+    redis_online = RedisOnlineUserService(redis)
+    redis_blacklist = RedisBlacklistService(redis)
+    redis_fetch = RedisUserFetchService(redis)
+
     # we're online so we don't need a token in cache
     await firebase_service.remove_token_from_cache(user_id)
 
-    redis_online = RedisOnlineUserService(redis)
-    redis_blacklist = RedisBlacklistService(redis)
-    await redis_online.add_to_online_cache(user)
+    await redis_online.add_to_online_caches(user)
 
-    connected_user = ConnectedUser(user_id=user_id, connection=websocket)
-
-    await connection_manager.connect(connected_user)
+    await connection_manager.connect(
+        ConnectedUser(user_id=user_id, connection=websocket))
 
     # populating blacklist cache only for online users
     blacklist: set[str] = await user_service.fetch_blacklist(user_id)
@@ -118,12 +119,12 @@ async def websocket_endpoint(
             logger.info(f"{user_id} disconnected with code {e.code}")
             await connection_manager.disconnect(user_id)
             # removing user from online caches
-            await redis_online.remove_from_online_cache(user)
+            await redis_online.remove_from_online_caches(user)
             # setting last_online field
             user.last_online = datetime.datetime.utcnow()
             db.commit()
             # removing all /fetch responses
-            await redis_online.drop_fetch_response_caches(user_id)
+            await redis_fetch.drop_fetch_response_caches(user_id)
             # removing blacklist cache
             await redis_blacklist.drop_blacklist_cache(user_id)
             # going offline, gotta save the token to cache

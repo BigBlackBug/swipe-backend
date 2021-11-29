@@ -2,7 +2,6 @@ import logging
 import time
 from dataclasses import dataclass
 from typing import Optional, Tuple, AsyncGenerator
-from uuid import UUID
 
 from aioredis import Redis
 from fastapi import Depends
@@ -206,7 +205,7 @@ class RedisOnlineUserService:
             -> set[str]:
         return await self.redis.smembers(cache_params.cache_key())
 
-    async def add_to_online_cache(self, user: User):
+    async def add_to_online_caches(self, user: User):
         # add to all online sets
         cache_params = OnlineUserCacheParams(
             age=user.age,
@@ -219,7 +218,7 @@ class RedisOnlineUserService:
             await self.redis.sadd(key, user_id)
         await self.redis.sadd(self.ONLINE_SET_KEY, user_id)
 
-    async def remove_from_online_cache(self, user: User):
+    async def remove_from_online_caches(self, user: User):
         cache_params = OnlineUserCacheParams(
             age=user.age,
             country=user.location.country,
@@ -248,13 +247,18 @@ class RedisOnlineUserService:
             await self.redis.srem(key, str(user.id))
 
         # putting him back to caches with correct location
-        await self.add_to_online_cache(user)
+        await self.add_to_online_caches(user)
 
     async def invalidate_online_user_cache(self):
         for key in await self.redis.keys('online:*'):
             await self.redis.delete(key)
 
-    # --------------------------------------------
+
+class RedisUserFetchService:
+    def __init__(self,
+                 redis: Redis = Depends(dependencies.redis)):
+        self.redis = redis
+
     async def get_response_cache(
             self, cache_settings: FetchUserCacheKey) \
             -> set[str]:

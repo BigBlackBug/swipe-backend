@@ -96,7 +96,7 @@ async def delete_user(
     for chat_id in chat_ids:
         chat_service.delete_chat(chat_id)
 
-    await redis_online.remove_from_online_cache(current_user)
+    await redis_online.remove_from_online_caches(current_user)
     await redis_popular.remove_from_popular_cache(current_user)
     await redis_blacklist.drop_blacklist_cache(str(current_user.id))
 

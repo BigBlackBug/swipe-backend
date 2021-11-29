@@ -27,7 +27,8 @@ from swipe.swipe_server.users.models import IDList, User, AuthInfo, Location, \
     blacklist_table
 from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
     RedisBlacklistService, OnlineUserCacheParams, \
-    FetchUserCacheKey, RedisPopularService, RedisLocationService
+    FetchUserCacheKey, RedisPopularService, RedisLocationService, \
+    RedisUserFetchService
 from swipe.swipe_server.users.schemas import OnlineFilterBody, CallFeedback, \
     RatingUpdateReason
 from swipe.swipe_server.utils import enable_blacklist
@@ -320,24 +321,25 @@ class UserPool:
 
 class FetchUserService:
     def __init__(self, user_service: UserService = Depends(),
+                 redis_fetch: RedisUserFetchService = Depends(),
                  redis_online: RedisOnlineUserService = Depends(),
                  redis_blacklist: RedisBlacklistService = Depends()):
         self.user_service = user_service
+        self.redis_fetch = redis_fetch
         self.redis_online = redis_online
         self.redis_blacklist = redis_blacklist
 
     async def collect(self, current_user: User,
                       filter_params: OnlineFilterBody) -> set[str]:
         user_id = str(current_user.id)
-        request_cache_settings = FetchUserCacheKey(
+        fetch_cache_params = FetchUserCacheKey(
             session_id=filter_params.session_id,
-            user_id=user_id,
+            user_id=user_id
         )
 
-        await self.redis_online.drop_obsolete_caches(request_cache_settings)
+        await self.redis_fetch.drop_obsolete_caches(fetch_cache_params)
         cached_user_ids: set[str] = \
-            await self.redis_online.get_response_cache(
-                request_cache_settings)
+            await self.redis_fetch.get_response_cache(fetch_cache_params)
 
         age_difference = 1
 
@@ -389,10 +391,10 @@ class FetchUserService:
 
         # got enough users or max age diff reached
         logger.info(f"Adding {result} to user request cache "
-                    f"for {request_cache_settings.cache_key()}")
+                    f"for {fetch_cache_params.cache_key()}")
         # adding currently returned users to cache
-        await self.redis_online.add_to_response_cache(
-            request_cache_settings, result)
+        await self.redis_fetch.add_to_response_cache(
+            fetch_cache_params, result)
         return result
 
 
