@@ -16,6 +16,11 @@ class UserJoinPayload(BaseModel):
     avatar_url: str
 
 
+class UserLeavePayload(BaseModel):
+    type_: str = Field('leave', alias='type', const=True)
+    user_id: str
+
+
 class ChatMessagePayload(BaseModel):
     message_id: UUID
     sender_id: UUID

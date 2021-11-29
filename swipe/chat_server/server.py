@@ -16,7 +16,8 @@ from uvicorn import Server, Config
 
 from swipe import error_handlers
 from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
-    MessagePayload, CreateChatPayload, BlacklistAddPayload, UserJoinPayload
+    MessagePayload, CreateChatPayload, BlacklistAddPayload, UserJoinPayload, \
+    UserLeavePayload
 from swipe.chat_server.services import ChatServerRequestProcessor, \
     WSConnectionManager, ConnectedUser
 from swipe.settings import settings
@@ -129,6 +130,11 @@ async def websocket_endpoint(
             await redis_blacklist.drop_blacklist_cache(user_id)
             # going offline, gotta save the token to cache
             await firebase_service.add_token_to_cache(user_id)
+            # sending leave payloads to everyone
+            await connection_manager.broadcast(
+                user_id, UserLeavePayload(
+                    user_id=user_id,
+                ).dict(by_alias=True))
             return
 
         try:
