@@ -87,12 +87,12 @@ class UserService:
             select(User).where(User.id == user_id)) \
             .scalar_one_or_none()
 
-    def get_user_card_previews(self, current_user_id: UUID,
-                               user_ids: Optional[
-                      Union[Iterable[UUID], Iterable[str]]] = None) \
+    def get_user_card_previews(
+            self, current_user_id: UUID,
+            user_ids: Optional[Union[Iterable[UUID], Iterable[str]]] = None) \
             -> list[User]:
         clause = True if user_ids is None else User.id.in_(user_ids)
-        query = self.db.query(User).where(User.id != current_user_id).\
+        query = self.db.query(User).where(User.id != current_user_id). \
             where(clause).options(
             Load(User).load_only("id", "name", "date_of_birth",
                                  "rating", "photos"),
@@ -123,7 +123,7 @@ class UserService:
     def get_user_login_preview_one(self, user_id: UUID) -> Optional[User]:
         query = self.db.query(User).where(User.id == user_id).options(
             Load(User).load_only("id", "name", "date_of_birth",
-                                 "gender", "avatar_id"),
+                                 "gender", "avatar_id", "firebase_token"),
             joinedload(User.location)
         )
         return query.one_or_none()
@@ -485,12 +485,11 @@ class BlacklistService:
             })
 
 
-class FirebaseService:
+class RedisFirebaseService:
     FIREBASE_KEY = 'firebase_tokens'
 
-    def __init__(self, db: Session = Depends(dependencies.db),
+    def __init__(self,
                  redis: aioredis.Redis = Depends(dependencies.redis)):
-        self.db = db
         self.redis = redis
 
     async def get_firebase_token(self, user_id: str):
@@ -499,13 +498,7 @@ class FirebaseService:
     async def remove_token_from_cache(self, user_id: str):
         await self.redis.hdel(self.FIREBASE_KEY, user_id)
 
-    async def add_token_to_cache(self, user_id: str):
-        token = self.db.execute(
-            select(User.firebase_token).where(
-                User.id == user_id)).scalar_one_or_none()
-        if token:
-            await self.redis.hset(self.FIREBASE_KEY, user_id, token)
-        else:
-            logger.error(
-                f"User {user_id} does not have a firebase token in db "
-                f"which is weird")
+    async def add_token_to_cache(self, user_id: str, token: str):
+        if not token:
+            return
+        await self.redis.hset(self.FIREBASE_KEY, user_id, token)

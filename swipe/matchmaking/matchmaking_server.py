@@ -61,17 +61,15 @@ connection_manager = WSConnectionManager()
 @app.websocket("/connect/{user_id}")
 async def matchmaker_endpoint(
         user_id: UUID, websocket: WebSocket,
-        user_service: MMUserService = Depends(),
-        redis: aioredis.Redis = Depends(dependencies.redis),
         gender: Gender = Query(None)):
     user: User
-    # loading only age and gender
-    if (user := user_service.get_matchmaking_preview(user_id)) is None:
-        logger.info(f"User {user_id} not found")
-        await websocket.close(1003)
-        return
-
-    blacklist_service = BlacklistService(user_service.db, redis)
+    with dependencies.db_context() as session:
+        # loading only age and gender
+        user_service = MMUserService(session)
+        if (user := user_service.get_matchmaking_preview(user_id)) is None:
+            logger.info(f"User {user_id} not found")
+            await websocket.close(1003)
+            return
 
     logger.info(f"{user_id}, rounded age: {user.age} "
                 f"connected with filter: {gender}")
@@ -96,8 +94,7 @@ async def matchmaker_endpoint(
 
         try:
             base_payload: MMBasePayload = MMBasePayload.validate(data)
-            await _process_payload(
-                base_payload, connected_user, user_service, blacklist_service)
+            await _process_payload(base_payload, connected_user)
 
             if base_payload.recipient_id:
                 await connection_manager.send(
@@ -155,9 +152,7 @@ async def _process_disconnect(user_id: str):
 
 
 async def _process_payload(base_payload: MMBasePayload,
-                           connected_user: ConnectedUser,
-                           mm_user_service: MMUserService,
-                           blacklist_service: BlacklistService):
+                           connected_user: ConnectedUser):
     data_payload = base_payload.payload
     sender_id = base_payload.sender_id
     recipient_id = base_payload.recipient_id
@@ -178,8 +173,11 @@ async def _process_payload(base_payload: MMBasePayload,
 
             # a decline means we add them to each others blacklist
             if settings.ENABLE_MATCHMAKING_BLACKLIST:
-                await blacklist_service.update_blacklist(
-                    sender_id, recipient_id)
+                with dependencies.db_context() as session:
+                    blacklist_service = BlacklistService(
+                        session, dependencies.redis())
+                    await blacklist_service.update_blacklist(
+                        sender_id, recipient_id)
     elif isinstance(data_payload, MMLobbyPayload):
         if data_payload.action == MMLobbyAction.CONNECT:
             # user joined the lobby
@@ -192,13 +190,15 @@ async def _process_payload(base_payload: MMBasePayload,
                         f"settings: {mm_settings}")
             logger.info(f"Current online users {matchmaking_data.online_users}")
 
-            connections: IDList = \
-                mm_user_service.find_user_ids(
-                    sender_id,
-                    age=mm_settings.age,
-                    online_users=matchmaking_data.online_users,
-                    age_difference=mm_settings.age_diff,
-                    gender=mm_settings.gender)
+            with dependencies.db_context() as session:
+                mm_user_service = MMUserService(session)
+                connections: IDList = \
+                    mm_user_service.find_user_ids(
+                        sender_id,
+                        age=mm_settings.age,
+                        online_users=matchmaking_data.online_users,
+                        age_difference=mm_settings.age_diff,
+                        gender=mm_settings.gender)
             logger.info(f"Connections for {sender_id}: {connections}")
             matchmaking_data.connect(
                 sender_id, mm_settings, connections)

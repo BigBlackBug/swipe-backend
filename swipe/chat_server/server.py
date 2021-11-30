@@ -27,7 +27,7 @@ from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
     RedisBlacklistService, RedisUserFetchService
-from swipe.swipe_server.users.services import UserService, FirebaseService
+from swipe.swipe_server.users.services import UserService, RedisFirebaseService
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +66,6 @@ loop = asyncio.get_event_loop()
 async def websocket_endpoint(
         user_id: str,
         websocket: WebSocket,
-        user_service: UserService = Depends(),
-        db: Session = Depends(dependencies.db),
         redis: aioredis.Redis = Depends(dependencies.redis)):
     try:
         user_uuid = UUID(hex=user_id)
@@ -76,21 +74,22 @@ async def websocket_endpoint(
         await websocket.close(1003)
         return
 
-    # TODO does it return db connection to the pool?
     user: User
-    # loading only required fields
-    if (user := user_service.get_user_login_preview_one(user_uuid)) is None:
-        logger.info(f"User {user_id} not found")
-        await websocket.close(1003)
-        return
+    with dependencies.db_context() as session:
+        user_service = UserService(session)
+        # loading only required fields
+        if (user := user_service.get_user_login_preview_one(user_uuid)) is None:
+            logger.info(f"User {user_id} not found")
+            await websocket.close(1003)
+            return
 
-    firebase_service = FirebaseService(db, redis)
+    firebase_service = RedisFirebaseService(redis)
+    # we're online so we don't need a token in cache
+    await firebase_service.remove_token_from_cache(user_id)
+
     redis_online = RedisOnlineUserService(redis)
     redis_blacklist = RedisBlacklistService(redis)
     redis_fetch = RedisUserFetchService(redis)
-
-    # we're online so we don't need a token in cache
-    await firebase_service.remove_token_from_cache(user_id)
 
     await redis_online.add_to_online_caches(user)
 
@@ -112,7 +111,6 @@ async def websocket_endpoint(
             avatar_url=storage_client.get_image_url(user.avatar_id)
         ).dict(by_alias=True))
 
-    request_processor = ChatServerRequestProcessor(db, redis)
     while True:
         try:
             raw_data: str = await websocket.receive_text()
@@ -123,15 +121,18 @@ async def websocket_endpoint(
             # removing user from online caches
             await redis_online.remove_from_online_caches(user)
             # setting last_online field
-            # TODO that's bad
-            user.last_online = datetime.datetime.utcnow()
-            db.commit()
+            with dependencies.db_context() as session:
+                session.add(user)
+                # going offline, gotta save the token to cache
+                await firebase_service.add_token_to_cache(
+                    user_id, user.firebase_token)
+
+                user.last_online = datetime.datetime.utcnow()
+                session.commit()
             # removing all /fetch responses
             await redis_fetch.drop_fetch_response_caches(user_id)
             # removing blacklist cache
             await redis_blacklist.drop_blacklist_cache(user_id)
-            # going offline, gotta save the token to cache
-            await firebase_service.add_token_to_cache(user_id)
             # sending leave payloads to everyone
             await connection_manager.broadcast(
                 user_id, BasePayload(
@@ -143,13 +144,16 @@ async def websocket_endpoint(
             payload: BasePayload = BasePayload.validate(json.loads(raw_data))
             logger.info(f"Payload type: {payload.payload.type_}")
 
-            await request_processor.process(payload)
+            with dependencies.db_context() as session:
+                request_processor = ChatServerRequestProcessor(session, redis)
+                await request_processor.process(payload)
+
             if isinstance(payload.payload, GlobalMessagePayload):
                 await connection_manager.broadcast(
                     str(payload.sender_id), payload.dict(
                         by_alias=True, exclude_unset=True))
             else:
-                await _send_payload(payload, firebase_service)
+                await _send_payload(payload)
         except:
             logger.exception(f"Error processing message: {raw_data}")
 
@@ -187,8 +191,7 @@ async def send_blacklist_event(blocked_by_id: str = Body(..., embed=True),
     await connection_manager.send(blocked_user_id, payload.dict(by_alias=True))
 
 
-async def _send_payload(payload: BasePayload,
-                        firebase_service: FirebaseService):
+async def _send_payload(payload: BasePayload):
     recipient_id = payload.recipient_id
     out_payload = payload.dict(by_alias=True, exclude_unset=True)
 
@@ -201,6 +204,7 @@ async def _send_payload(payload: BasePayload,
                 f"notification for '{payload.payload.type_}' payload")
 
             # TODO limit notifications to one message per 3 mins per user
+            firebase_service = RedisFirebaseService(dependencies.redis())
             firebase_token = \
                 await firebase_service.get_firebase_token(str(recipient_id))
             if not firebase_token:

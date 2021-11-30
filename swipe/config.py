@@ -29,8 +29,9 @@ LOGGING_CONFIG: dict = {
         },
         "access": {
             "()": "uvicorn.logging.AccessFormatter",
-            "fmt": '[%(asctime)s] [%(levelname)s] [%(processName)s] %(name)s | '
-                   '%(client_addr)s - "%(request_line)s" %(status_code)s',
+            "fmt": '[%(asctime)s] [%(levelname)s] [%(processName)s] | '
+                   '%(name)s | %(client_addr)s - '
+                   '"%(request_line)s" %(status_code)s',
         },
     },
     "handlers": {
