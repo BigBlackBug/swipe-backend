@@ -142,11 +142,18 @@ class JWTPayload(AuthenticationIn):
 
 
 class PopularFilterBody(BaseModel):
-    limit: Optional[int] = 15
-    offset: Optional[int] = 0
     gender: Optional[Gender] = None
     city: Optional[str] = None
-    country: str
+    country: Optional[str] = None
+
+    limit: Optional[int] = 15
+    offset: Optional[int] = 0
+
+    @root_validator(pre=True)
+    def validate_params(cls, values: dict):
+        if values.get('city') and not values.get('country'):
+            raise ValueError("Either none of both city and country must be set")
+        return values
 
 
 class OnlineFilterBody(BaseModel):

@@ -20,7 +20,7 @@ from swipe.swipe_server.users.models import AuthInfo, User
 from swipe.swipe_server.users.redis_services import RedisBlacklistService, \
     RedisOnlineUserService, RedisPopularService, OnlineUserCacheParams
 from swipe.swipe_server.users.services import UserService, BlacklistService, \
-    PopularUserService
+    PopularUserService, CountryCacheService
 
 
 @pytest.mark.anyio
@@ -34,7 +34,7 @@ async def test_user_delete(
         fake_redis: aioredis.Redis,
         redis_online: RedisOnlineUserService,
         redis_blacklist: RedisBlacklistService,
-        redis_popular: RedisPopularService,
+        # redis_popular: RedisPopularService,
         default_user_auth_headers: dict[str, str]):
     default_user.gender = Gender.MALE
 
@@ -48,7 +48,12 @@ async def test_user_delete(
 
     user_id = str(default_user.id)
     await redis_online.add_to_online_caches(default_user)
+    # populating caches
+    cache_service = CountryCacheService(session, fake_redis)
+    await cache_service.populate_country_cache()
+    popular_service = PopularUserService(session, fake_redis)
     await popular_service.populate_popular_cache()
+
     await redis_blacklist.add_to_blacklist_cache(
         blocked_user_id=str(user_1.id), blocked_by_id=user_id)
 

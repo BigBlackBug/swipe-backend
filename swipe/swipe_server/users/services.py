@@ -88,11 +88,14 @@ class UserService:
             .scalar_one_or_none()
 
     def get_user_card_previews(
-            self, current_user_id: UUID,
+            self, current_user_id: Optional[UUID] = None,
             user_ids: Optional[Union[Iterable[UUID], Iterable[str]]] = None) \
             -> list[User]:
         clause = True if user_ids is None else User.id.in_(user_ids)
-        query = self.db.query(User).where(User.id != current_user_id). \
+        id_clause = True if current_user_id is None \
+            else User.id != current_user_id
+        query = self.db.query(User). \
+            where(id_clause). \
             where(clause).options(
             Load(User).load_only("id", "name", "date_of_birth",
                                  "rating", "photos"),
@@ -256,16 +259,21 @@ class UserService:
             result[row.country.country] = list(row.cities)[0]
         return result
 
-    def fetch_popular(self, country: str,
+    def fetch_popular(self, country: Optional[str] = None,
                       gender: Optional[Gender] = None,
                       city: Optional[str] = None,
                       limit: int = 100) -> list[str]:
+        if city and not country:
+            raise SwipeError("Either none or both country and city must be set")
+
         city_clause = True if not city else Location.city == city
+        country_clause = True if not country else Location.country == country
         gender_clause = True if not gender else User.gender == gender
+
         query = select(cast(User.id, String)).join(User.location). \
-            where(Location.country == country). \
-            where(gender_clause). \
+            where(country_clause). \
             where(city_clause). \
+            where(gender_clause). \
             order_by(desc(User.rating)).limit(limit)
         return self.db.execute(query).scalars().all()
 
@@ -413,18 +421,21 @@ class FetchUserService:
 
 
 class PopularUserService:
-    def __init__(self, db: Session, redis: aioredis.Redis):
+    def __init__(self, db: Session = Depends(dependencies.db),
+                 redis: aioredis.Redis = Depends(dependencies.redis)):
         self.user_service = UserService(db)
         self.redis_popular = RedisPopularService(redis)
         self.redis_locations = RedisLocationService(redis)
 
-    async def _fill_cache(self, country, city: Optional[str] = None,
+    async def _fill_cache(self, country: Optional[str] = None,
+                          city: Optional[str] = None,
                           gender: Optional[Gender] = None):
         users = self.user_service.fetch_popular(
             country=country, city=city, gender=gender)
         logger.info(
             f"Got {len(users)} popular users from db for: "
-            f"{country}, city:{city or 'ALL'}, {gender or 'ALL'}")
+            f"country:{country or 'ALL'}, city:{city or 'ALL'}, "
+            f"{gender or 'ALL'}")
         await self.redis_popular.save_popular_users(
             country=country, city=city, gender=gender, users=users)
 
@@ -432,20 +443,26 @@ class PopularUserService:
         logger.info("Populating popular cache")
         locations = self.redis_locations.fetch_locations()
 
+        # global popular cache
+        logger.info("Populating global cache")
+        await self._fill_cache(gender=Gender.MALE)
+        await self._fill_cache(gender=Gender.FEMALE)
+        await self._fill_cache()
+
         async for country, cities in locations:
             logger.info(f"Populating cache for country: '{country}'")
-            await self._fill_cache(country, gender=Gender.MALE)
-            await self._fill_cache(country, gender=Gender.FEMALE)
-            await self._fill_cache(country)
+            await self._fill_cache(country=country, gender=Gender.MALE)
+            await self._fill_cache(country=country, gender=Gender.FEMALE)
+            await self._fill_cache(country=country)
 
             logger.info(f"Populating cities cache for '{country}', "
                         f"cities: '{cities}'")
             for city in cities:
-                await self._fill_cache(country, city=city,
-                                       gender=Gender.MALE)
-                await self._fill_cache(country, city=city,
-                                       gender=Gender.FEMALE)
-                await self._fill_cache(country, city=city)
+                await self._fill_cache(
+                    country=country, city=city, gender=Gender.MALE)
+                await self._fill_cache(
+                    country=country, city=city, gender=Gender.FEMALE)
+                await self._fill_cache(country=country, city=city)
 
 
 class CountryCacheService:

@@ -11,9 +11,9 @@ from swipe.swipe_server.misc import security
 from swipe.swipe_server.users import schemas
 from swipe.swipe_server.users.models import User, Location
 from swipe.swipe_server.users.redis_services import RedisLocationService, \
-    RedisOnlineUserService, RedisBlacklistService, RedisPopularService
+    RedisOnlineUserService, RedisBlacklistService
 from swipe.swipe_server.users.schemas import RatingUpdateReason
-from swipe.swipe_server.users.services import UserService
+from swipe.swipe_server.users.services import UserService, PopularUserService
 
 IMAGE_CONTENT_TYPE_REGEXP = 'image/(png|jpe?g)'
 
@@ -67,6 +67,7 @@ async def patch_user(
         user_service: UserService = Depends(),
         redis_location: RedisLocationService = Depends(),
         redis_online: RedisOnlineUserService = Depends(),
+        # redis_popular: RedisPopularService = Depends(),
         user_id: UUID = Depends(security.get_current_user_id)):
     current_user = user_service.get_user(user_id)
     previous_location: Location = current_user.location
@@ -79,6 +80,9 @@ async def patch_user(
         logger.info("Removing user from old online request caches")
         await redis_online.update_user_location(
             current_user, previous_location)
+        # TODO I should update popular lists for his country, new country and global
+        # await redis_popular.update_user_location(
+        #     current_user, previous_location)
 
     return current_user
 
@@ -91,7 +95,7 @@ async def delete_user(
         chat_service: ChatService = Depends(),
         redis_blacklist: RedisBlacklistService = Depends(),
         redis_online: RedisOnlineUserService = Depends(),
-        redis_popular: RedisPopularService = Depends(),
+        popular_service: PopularUserService = Depends(),
         user_id: UUID = Depends(security.get_current_user_id)):
     current_user = user_service.get_user(user_id)
     # TODO send event to all chat members
@@ -101,9 +105,11 @@ async def delete_user(
         chat_service.delete_chat(chat_id)
 
     await redis_online.remove_from_online_caches(current_user)
-    await redis_popular.remove_from_popular_cache(current_user)
     await redis_blacklist.drop_blacklist_cache(str(current_user.id))
 
+    # yes I know that's an overkill, but I don't want to think too much
+    # also this won't happen THAT often
+    await popular_service.populate_popular_cache()
     user_service.delete_user(current_user)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)

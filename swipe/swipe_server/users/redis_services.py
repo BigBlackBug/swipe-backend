@@ -131,7 +131,8 @@ class RedisPopularService:
             -> list[str]:
         gender = filter_params.gender or 'ALL'
         city = filter_params.city or 'ALL'
-        key = f'popular:{gender}:country:{filter_params.country}:city:{city}'
+        country = filter_params.country or 'ALL'
+        key = f'popular:{gender}:country:{country}:city:{city}'
 
         logger.info(f"Getting popular for key {key}")
         return await self.redis.lrange(
@@ -140,33 +141,19 @@ class RedisPopularService:
 
     async def save_popular_users(self,
                                  users: list[str],
-                                 country: str,
+                                 country: Optional[str] = None,
                                  gender: Optional[Gender] = None,
                                  city: Optional[str] = None):
         if not users:
             return
         gender = gender or 'ALL'
         city = city or 'ALL'
+        country = country or 'ALL'
         key = f'popular:{gender}:country:{country}:city:{city}'
         logger.info(f"Deleting and saving popular cache for {key}")
 
         await self.redis.delete(key)
         await self.redis.rpush(key, *users)
-
-    async def remove_from_popular_cache(self, user: User):
-        # add to all online sets
-        country = user.location.country
-        city = user.location.city
-        keys = [
-            f'popular:ALL:country:{country}:city:{city}',
-            f'popular:ALL:country:{country}:city:ALL'
-        ]
-        if user.gender != Gender.ATTACK_HELICOPTER:
-            keys.append(f'popular:{user.gender}:country:{country}:city:{city}')
-            keys.append(f'popular:{user.gender}:country:{country}:city:ALL')
-
-        for key in keys:
-            await self.redis.srem(key, str(user.id))
 
 
 class RedisBlacklistService:
