@@ -179,7 +179,13 @@ class WSConnectionManager:
         for user_id, user in self.active_connections.items():
             if user_id == sender_id:
                 continue
-            logger.info(f"Sending payload to {user_id}")
+            # TODO stupid workaround
+            if 'payload' in payload:
+                payload_type = payload['payload'].get('type', '???')
+            else:
+                payload_type = payload.get('type', '???')
+
+            logger.info(f"Sending payload '{payload_type}' to {user_id}")
             await user.connection.send_text(
                 json.dumps(payload, cls=PayloadEncoder))
 

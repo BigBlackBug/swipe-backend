@@ -16,6 +16,7 @@ class ChatMessagePayload(BaseModel):
     timestamp: datetime.datetime
     text: Optional[str] = None
     image_id: Optional[str] = None
+    image_url: Optional[str] = None
 
 
 class MessagePayload(BaseModel):
@@ -24,6 +25,7 @@ class MessagePayload(BaseModel):
     timestamp: datetime.datetime
     text: Optional[str] = None
     image_id: Optional[str] = None
+    image_url: Optional[str] = None
 
 
 class GlobalMessagePayload(BaseModel):
