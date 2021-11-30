@@ -167,11 +167,17 @@ class WSConnectionManager:
             del self.active_connections[user_id]
 
     async def send(self, user_id: str, payload: dict):
-        logger.info(f"Sending payload {payload} to {user_id}")
         if user_id not in self.active_connections:
             logger.info(f"{user_id} is not online, payload won't be sent")
             return
 
+        # TODO stupid workaround
+        if 'payload' in payload:
+            payload_type = payload['payload'].get('type', '???')
+        else:
+            payload_type = payload.get('type', '???')
+
+        logger.info(f"Sending '{payload_type}' payload to {user_id}")
         await self.active_connections[user_id].connection.send_text(
             json.dumps(payload, cls=PayloadEncoder))
 
@@ -185,7 +191,7 @@ class WSConnectionManager:
             else:
                 payload_type = payload.get('type', '???')
 
-            logger.info(f"Sending payload '{payload_type}' to {user_id}")
+            logger.info(f"Sending '{payload_type}' payload to {user_id}")
             await user.connection.send_text(
                 json.dumps(payload, cls=PayloadEncoder))
 

@@ -30,8 +30,8 @@ def get_auth_token(auth_header: str = Security(auth_header_dep)) -> str:
     return token
 
 
-def get_current_user(user_service: UserService = Depends(),
-                     token: str = Depends(get_auth_token)) -> UUID:
+def get_current_user_id(user_service: UserService = Depends(),
+                        token: str = Depends(get_auth_token)) -> UUID:
     try:
         payload = jwt.decode(
             token, settings.SWIPE_SECRET_KEY, algorithms=[ALGORITHMS.HS256, ]

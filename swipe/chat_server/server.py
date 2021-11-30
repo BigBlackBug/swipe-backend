@@ -143,7 +143,6 @@ async def websocket_endpoint(
 
         try:
             payload: BasePayload = BasePayload.validate(json.loads(raw_data))
-            logger.info(f"Payload type: {payload.payload.type_}")
 
             with dependencies.db_context() as session:
                 request_processor = ChatServerRequestProcessor(session, redis)
