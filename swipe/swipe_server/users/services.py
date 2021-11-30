@@ -94,11 +94,14 @@ class UserService:
         clause = True if user_ids is None else User.id.in_(user_ids)
         id_clause = True if current_user_id is None \
             else User.id != current_user_id
+
         query = self.db.query(User). \
             where(id_clause). \
             where(clause).options(
-            Load(User).load_only("id", "name", "date_of_birth",
-                                 "rating", "photos"),
+            Load(User).load_only('id', 'name', 'bio', 'zodiac_sign',
+                                 'date_of_birth', 'rating', 'interests',
+                                 'photos', 'instagram_profile',
+                                 'tiktok_profile', 'snapchat_profile'),
             joinedload(User.location)
         )
         return query.all()

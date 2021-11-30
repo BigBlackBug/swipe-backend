@@ -59,11 +59,20 @@ class UserBase(BaseModel):
 class UserCardPreviewOut(BaseModel):
     id: UUID
     name: str
+    bio: str
+    zodiac_sign: ZodiacSign
     date_of_birth: datetime.date
+
     rating: int
     location: LocationSchema
+
+    interests: list[UserInterests] = []
     photos: Optional[list[str]] = []
     photo_urls: Optional[list[str]] = []
+
+    instagram_profile: Optional[str] = None
+    tiktok_profile: Optional[str] = None
+    snapchat_profile: Optional[str] = None
 
     @classmethod
     def patched_from_orm(cls: UserOut, obj: Any) -> UserOut:

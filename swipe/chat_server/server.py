@@ -101,8 +101,7 @@ async def websocket_endpoint(
     await redis_blacklist.populate_blacklist(user_id, blacklist)
 
     # sending join event to all connected users
-    logger.info(f"{user_id} connected from {websocket.client}, "
-                f"sending join event")
+    logger.info(f"{user_id} connected from {websocket.client}")
     # TODO make it unified
     await connection_manager.broadcast(
         user_id, UserJoinPayload(
