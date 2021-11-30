@@ -24,32 +24,27 @@ async def test_user_fetch_basic(
         user_service: UserService,
         redis_online: RedisOnlineUserService,
         default_user_auth_headers: dict[str, str]):
-    default_user.set_date_of_birth(
-        datetime.date.today().replace(year=2000))
+    default_user.date_of_birth = datetime.date.today().replace(year=2000)
 
     # --------------------------------------------------------------------------
     user_1 = randomizer.generate_random_user()
     user_1.location.country = 'Russia'
-    user_1.set_date_of_birth(
-        datetime.date.today().replace(year=2000))
+    user_1.date_of_birth = datetime.date.today().replace(year=2000)
     await redis_online.add_to_online_caches(user_1)
 
     user_2 = randomizer.generate_random_user()
     user_2.location.country = 'Russia'
-    user_2.set_date_of_birth(
-        datetime.date.today().replace(year=2000))
+    user_2.date_of_birth = datetime.date.today().replace(year=2000)
     await redis_online.add_to_online_caches(user_2)
 
     user_3 = randomizer.generate_random_user()
     user_3.location.country = 'Russia'
-    user_3.set_date_of_birth(
-        datetime.date.today().replace(year=2001))
+    user_3.date_of_birth = datetime.date.today().replace(year=2001)
     await redis_online.add_to_online_caches(user_3)
 
     user_4 = randomizer.generate_random_user()
     user_4.location.country = 'Russia'
-    user_4.set_date_of_birth(
-        datetime.date.today().replace(year=2005))
+    user_4.date_of_birth = datetime.date.today().replace(year=2005)
     await redis_online.add_to_online_caches(user_4)
     session.commit()
     # --------------------------------------------------------------------------
@@ -80,28 +75,26 @@ async def test_user_fetch_small_limit(
         user_service: UserService,
         redis_online: RedisOnlineUserService,
         default_user_auth_headers: dict[str, str]):
-    default_user.set_date_of_birth(
-        datetime.date.today().replace(year=2000))
+    default_user.date_of_birth = datetime.date.today().replace(year=2000)
 
     # --------------------------------------------------------------------------
     user_1 = randomizer.generate_random_user()
     user_1.location.country = 'Russia'
-    user_1.set_date_of_birth(
-        datetime.date.today().replace(year=2000))
+    user_1.date_of_birth = datetime.date.today().replace(year=2000)
     await redis_online.add_to_online_caches(user_1)
 
     user_2 = randomizer.generate_random_user()
-    user_2.set_date_of_birth(datetime.date.today().replace(year=2001))
+    user_2.date_of_birth = datetime.date.today().replace(year=2001)
     user_2.location.country = 'Russia'
     await redis_online.add_to_online_caches(user_2)
 
     user_3 = randomizer.generate_random_user()
-    user_3.set_date_of_birth(datetime.date.today().replace(year=2002))
+    user_3.date_of_birth = datetime.date.today().replace(year=2002)
     user_3.location.country = 'Russia'
     await redis_online.add_to_online_caches(user_3)
 
     user_4 = randomizer.generate_random_user()
-    user_4.set_date_of_birth(datetime.date.today().replace(year=2003))
+    user_4.date_of_birth = datetime.date.today().replace(year=2003)
     user_4.location.country = 'Russia'
     session.commit()
     # --------------------------------------------------------------------------
@@ -133,43 +126,37 @@ async def test_user_fetch_gender(
         user_service: UserService,
         session: Session,
         default_user_auth_headers: dict[str, str]):
-    default_user.set_date_of_birth(
-        datetime.date.today().replace(year=2000))
+    default_user.date_of_birth = datetime.date.today().replace(year=2000)
 
     # --------------------------------------------------------------------------
     user_1 = randomizer.generate_random_user()
     user_1.name = 'user1'
-    user_1.set_date_of_birth(
-        datetime.date.today().replace(year=2000))
+    user_1.date_of_birth = datetime.date.today().replace(year=2000)
     user_1.gender = Gender.FEMALE
     user_1.location.country = 'Russia'
 
     user_2 = randomizer.generate_random_user()
     user_2.name = 'user2'
-    user_2.set_date_of_birth(
-        datetime.date.today().replace(year=2000))
+    user_2.date_of_birth = datetime.date.today().replace(year=2000)
     user_2.gender = Gender.FEMALE
     user_2.location.country = 'Russia'
 
     user_3 = randomizer.generate_random_user()
     user_3.name = 'user3'
-    user_3.set_date_of_birth(
-        datetime.date.today().replace(year=2001))
+    user_3.date_of_birth = datetime.date.today().replace(year=2001)
     user_3.gender = Gender.MALE
     await redis_online.add_to_online_caches(user_3)
     user_3.location.country = 'Russia'
 
     user_4 = randomizer.generate_random_user()
     user_4.name = 'user4'
-    user_4.set_date_of_birth(
-        datetime.date.today().replace(year=2005))
+    user_4.date_of_birth = datetime.date.today().replace(year=2005)
     user_4.gender = Gender.MALE
     user_4.location.country = 'Russia'
 
     user_5 = randomizer.generate_random_user()
     user_5.name = 'user5'
-    user_5.set_date_of_birth(
-        datetime.date.today().replace(year=2002))
+    user_5.date_of_birth = datetime.date.today().replace(year=2002)
     user_5.gender = Gender.ATTACK_HELICOPTER
     user_5.location.country = 'Russia'
     session.commit()
@@ -192,7 +179,7 @@ async def test_user_fetch_gender(
 
 
 @pytest.mark.anyio
-async def test_user_fetch_online_city_cached_requests(
+async def test_user_fetch_online_city_cached_requests_all_countries(
         client: AsyncClient,
         default_user: User,
         randomizer: RandomEntityGenerator,
@@ -201,14 +188,12 @@ async def test_user_fetch_online_city_cached_requests(
         user_service: UserService,
         session: Session,
         default_user_auth_headers: dict[str, str]):
-    default_user.set_date_of_birth(
-        datetime.date.today().replace(year=2000))
+    default_user.date_of_birth = datetime.date.today().replace(year=2000)
 
     # --------------------------------------------------------------------------
     user_1 = randomizer.generate_random_user()
     user_1.name = 'user1'
-    user_1.set_date_of_birth(
-        datetime.date.today().replace(year=2000))
+    user_1.date_of_birth = datetime.date.today().replace(year=2000)
     user_1.gender = Gender.FEMALE
     user_1.set_location({
         'country': 'Russia', 'city': 'Moscow', 'flag': 'F'
@@ -217,8 +202,7 @@ async def test_user_fetch_online_city_cached_requests(
 
     user_2 = randomizer.generate_random_user()
     user_2.name = 'user2'
-    user_2.set_date_of_birth(
-        datetime.date.today().replace(year=2000))
+    user_2.date_of_birth = datetime.date.today().replace(year=2000)
     user_2.gender = Gender.FEMALE
     user_2.set_location({
         'country': 'Russia', 'city': 'Moscow', 'flag': 'F'
@@ -227,8 +211,7 @@ async def test_user_fetch_online_city_cached_requests(
 
     user_3 = randomizer.generate_random_user()
     user_3.name = 'user3'
-    user_3.set_date_of_birth(
-        datetime.date.today().replace(year=2001))
+    user_3.date_of_birth = datetime.date.today().replace(year=2001)
     user_3.gender = Gender.MALE
     user_3.set_location({
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
@@ -238,8 +221,7 @@ async def test_user_fetch_online_city_cached_requests(
 
     user_4 = randomizer.generate_random_user()
     user_4.name = 'user4'
-    user_4.set_date_of_birth(
-        datetime.date.today().replace(year=2005))
+    user_4.date_of_birth = datetime.date.today().replace(year=2005)
     user_4.gender = Gender.MALE
     user_4.set_location({
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
@@ -249,8 +231,7 @@ async def test_user_fetch_online_city_cached_requests(
 
     user_44 = randomizer.generate_random_user()
     user_44.name = 'user44'
-    user_44.set_date_of_birth(
-        datetime.date.today().replace(year=2005))
+    user_44.date_of_birth = datetime.date.today().replace(year=2005)
     user_44.gender = Gender.ATTACK_HELICOPTER
     user_44.set_location({
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
@@ -260,13 +241,22 @@ async def test_user_fetch_online_city_cached_requests(
 
     user_5 = randomizer.generate_random_user()
     user_5.name = 'user5'
-    user_5.set_date_of_birth(
-        datetime.date.today().replace(year=2003))
+    user_5.date_of_birth = datetime.date.today().replace(year=2003)
     user_5.gender = Gender.MALE
     user_5.set_location({
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
     })
     session.add(user_5)
+
+    user_6 = randomizer.generate_random_user()
+    user_6.name = 'user5'
+    user_6.date_of_birth = datetime.date.today().replace(year=2003)
+    user_6.gender = Gender.MALE
+    user_6.set_location({
+        'country': 'USA', 'city': 'New York', 'flag': 'U'
+    })
+    session.add(user_6)
+    await redis_online.add_to_online_caches(user_6)
     session.commit()
 
     # --------------------------------------------------------------------------
@@ -344,6 +334,41 @@ async def test_user_fetch_online_city_cached_requests(
                           user_id=str(default_user.id)))
     assert cached_response == {str(user_2.id)}
 
+    # -------------------invalidating cache with new settings----------------
+    # settings changed, sending invalidate cache
+    # FETCHING EVERYONE
+    await redis_online.remove_from_online_caches(user_2)
+    previous_session_id = new_session_id
+    new_session_id = str(uuid.uuid4())
+    response: Response = await client.post(
+        f"{settings.API_V1_PREFIX}/users/fetch",
+        headers=default_user_auth_headers,
+        json={
+            'session_id': new_session_id
+        }
+    )
+    assert response.status_code == 200
+    resp_data = response.json()
+    assert {user['id'] for user in resp_data} == {
+        str(user_3.id), str(user_4.id), str(user_44.id),
+        str(user_5.id), str(user_6.id)
+    }
+
+    # old cache is dead
+    old_cached_response = await redis_fetch.get_response_cache(
+        FetchUserCacheKey(session_id=previous_session_id,
+                          user_id=str(default_user.id)))
+    assert old_cached_response == set()
+
+    # new cache contains everyone
+    cached_response = await redis_fetch.get_response_cache(
+        FetchUserCacheKey(session_id=new_session_id,
+                          user_id=str(default_user.id)))
+    assert cached_response == {
+        str(user_3.id), str(user_4.id), str(user_44.id),
+        str(user_5.id), str(user_6.id)
+    }
+
 
 @pytest.mark.anyio
 async def test_user_fetch_with_blacklist(
@@ -356,13 +381,12 @@ async def test_user_fetch_with_blacklist(
         redis_online: RedisOnlineUserService,
         redis_blacklist: RedisBlacklistService,
         default_user_auth_headers: dict[str, str]):
-    default_user.set_date_of_birth(
-        datetime.date.today().replace(year=2000))
+    default_user.date_of_birth = datetime.date.today().replace(year=2000)
 
     # --------------------------------------------------------------------------
     user_1 = randomizer.generate_random_user()
     user_1.name = 'user1'
-    user_1.set_date_of_birth(datetime.date.today().replace(year=2000))
+    user_1.date_of_birth = datetime.date.today().replace(year=2000)
     user_1.gender = Gender.FEMALE
     user_1.set_location({
         'country': 'Russia', 'city': 'Moscow', 'flag': 'F'
@@ -370,7 +394,7 @@ async def test_user_fetch_with_blacklist(
 
     user_2 = randomizer.generate_random_user()
     user_2.name = 'user2'
-    user_2.set_date_of_birth(datetime.date.today().replace(year=2000))
+    user_2.date_of_birth = datetime.date.today().replace(year=2000)
     user_2.gender = Gender.FEMALE
     user_2.set_location({
         'country': 'Russia', 'city': 'Moscow', 'flag': 'F'
@@ -378,7 +402,7 @@ async def test_user_fetch_with_blacklist(
 
     user_3 = randomizer.generate_random_user()
     user_3.name = 'user3'
-    user_3.set_date_of_birth(datetime.date.today().replace(year=2001))
+    user_3.date_of_birth = datetime.date.today().replace(year=2001)
     user_3.gender = Gender.MALE
     user_3.set_location({
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
@@ -386,7 +410,7 @@ async def test_user_fetch_with_blacklist(
 
     user_4 = randomizer.generate_random_user()
     user_4.name = 'user4'
-    user_4.set_date_of_birth(datetime.date.today().replace(year=2005))
+    user_4.date_of_birth = datetime.date.today().replace(year=2005)
     user_4.gender = Gender.MALE
     user_4.set_location({
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'
@@ -394,7 +418,7 @@ async def test_user_fetch_with_blacklist(
 
     user_5 = randomizer.generate_random_user()
     user_5.name = 'user5'
-    user_5.set_date_of_birth(datetime.date.today().replace(year=2002))
+    user_5.date_of_birth = datetime.date.today().replace(year=2002)
     user_5.gender = Gender.ATTACK_HELICOPTER
     user_5.set_location({
         'country': 'Russia', 'city': 'Saint Petersburg', 'flag': 'F'

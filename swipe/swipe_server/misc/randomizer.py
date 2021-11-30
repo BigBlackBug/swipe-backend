@@ -54,7 +54,6 @@ class RandomEntityGenerator:
             year=random.randint(1985, 2003),
             month=random.randint(1, 12),
             day=random.randint(1, 25))
-        new_user.age = relativedelta(datetime.date.today(), birth_date).years
         new_user.date_of_birth = birth_date
         new_user.zodiac_sign = ZodiacSign.from_date(birth_date)
         new_user.rating = random.randint(5, 150)

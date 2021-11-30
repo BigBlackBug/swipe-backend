@@ -20,25 +20,29 @@ logger = logging.getLogger(__name__)
 @dataclass
 class OnlineUserCacheParams:
     age: int
-    country: str
+    country: Optional[str] = None
     city: Optional[str] = None
     gender: Optional[Gender] = None
 
     def cache_key(self) -> str:
         gender = self.gender or 'ALL'
         city = self.city or 'ALL'
-        return f'online:{self.country}:{city}:{self.age}:{gender}'
+        country = self.country or 'ALL'
+        return f'online:{country}:{city}:{self.age}:{gender}'
 
     def online_keys(self):
-        if not self.city or not self.gender:
-            raise SwipeError("city and gender must be set")
+        if not self.city or not self.gender or not self.country:
+            raise SwipeError("country, city and gender must be set")
+
         result = [
             f'online:{self.country}:{self.city}:{self.age}:ALL',
             f'online:{self.country}:ALL:{self.age}:ALL',
+            f'online:ALL:ALL:{self.age}:ALL',
         ]
         if self.gender != Gender.ATTACK_HELICOPTER:
             # attack helicopters go only to ALL gender cache
             result.extend([
+                f'online:ALL:ALL:{self.age}:{self.gender}',
                 f'online:{self.country}:ALL:{self.age}:{self.gender}',
                 f'online:{self.country}:{self.city}:{self.age}:{self.gender}'
             ])
@@ -195,8 +199,6 @@ class RedisBlacklistService:
 
 
 class RedisOnlineUserService:
-    ONLINE_SET_KEY = 'online_users'
-
     def __init__(self,
                  redis: Redis = Depends(dependencies.redis)):
         self.redis = redis
@@ -216,7 +218,6 @@ class RedisOnlineUserService:
         user_id = str(user.id)
         for key in cache_params.online_keys():
             await self.redis.sadd(key, user_id)
-        await self.redis.sadd(self.ONLINE_SET_KEY, user_id)
 
     async def remove_from_online_caches(self, user: User):
         cache_params = OnlineUserCacheParams(
@@ -229,10 +230,11 @@ class RedisOnlineUserService:
         user_id = str(user.id)
         for key in cache_params.online_keys():
             await self.redis.srem(key, user_id)
-        await self.redis.srem(self.ONLINE_SET_KEY, user_id)
 
-    async def is_online(self, user_id: str):
-        return await self.redis.sismember(self.ONLINE_SET_KEY, user_id)
+    async def is_online(self, user_id: str, user_age: int):
+        cache_params = OnlineUserCacheParams(age=user_age)
+        return await self.redis.sismember(
+            cache_params.cache_key(), user_id)
 
     async def update_user_location(
             self, user: User, previous_location: Location):

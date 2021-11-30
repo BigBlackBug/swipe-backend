@@ -4,6 +4,7 @@ import datetime
 from typing import Optional, Any
 from uuid import UUID
 
+from dateutil.relativedelta import relativedelta
 from pydantic import BaseModel, validator
 from sqlalchemy.engine import Row
 
@@ -135,6 +136,10 @@ class MultipleChatsOut(BaseModel):
         for user in users:
             user_data: UserOutChatPreview \
                 = UserOutChatPreview.patched_from_orm(user)
-            user_data.online = await redis_online.is_online(str(user.id))
+            user_age = relativedelta(
+                datetime.datetime.utcnow().date(),
+                user.date_of_birth).years
+            user_data.online = \
+                await redis_online.is_online(str(user.id), user_age)
             result['users'][user.id] = user_data
         return cls.parse_obj(result)

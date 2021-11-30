@@ -55,7 +55,6 @@ class User(ModelBase):
     gender = Column(Enum(Gender))
 
     date_of_birth = Column(Date)
-    age = Column(Integer)
     zodiac_sign = Column(Enum(ZodiacSign))
 
     smoking = Column(Enum(RecurrenceRate))
@@ -93,11 +92,10 @@ class User(ModelBase):
         primaryjoin=id == blacklist_table.c.blocked_user_id,  # noqa
         secondaryjoin=id == blacklist_table.c.blocked_by_id)  # noqa
 
-    def set_date_of_birth(self, date_of_birth: datetime.date):
-        age_delta = relativedelta(datetime.date.today(), date_of_birth)
-
-        self.date_of_birth = date_of_birth
-        self.age = age_delta.years
+    @property
+    def age(self):
+        return relativedelta(datetime.datetime.utcnow().date(),
+                             self.date_of_birth).years
 
     def set_location(self, location: dict[str, str]):
         # location rows are unique with regards to city/country
@@ -145,6 +143,9 @@ class Location(ModelBase):
     city = Column(String, nullable=False)
     country = Column(String, nullable=False)
     flag = Column(String, nullable=False)
+
+    def __str__(self):
+        return f'Country: {self.country}, city: {self.city}'
 
 
 Index('idx_location_city', Location.city)

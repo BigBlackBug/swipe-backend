@@ -104,6 +104,7 @@ async def websocket_endpoint(
     # sending join event to all connected users
     logger.info(f"{user_id} connected from {websocket.client}, "
                 f"sending join event")
+    # TODO make it unified
     await connection_manager.broadcast(
         user_id, UserJoinPayload(
             user_id=user_id,
@@ -122,6 +123,7 @@ async def websocket_endpoint(
             # removing user from online caches
             await redis_online.remove_from_online_caches(user)
             # setting last_online field
+            # TODO that's bad
             user.last_online = datetime.datetime.utcnow()
             db.commit()
             # removing all /fetch responses
@@ -132,9 +134,9 @@ async def websocket_endpoint(
             await firebase_service.add_token_to_cache(user_id)
             # sending leave payloads to everyone
             await connection_manager.broadcast(
-                user_id, UserLeavePayload(
-                    user_id=user_id,
-                ).dict(by_alias=True))
+                user_id, BasePayload(
+                    sender_id=UUID(hex=user_id),
+                    payload=UserLeavePayload()).dict(by_alias=True))
             return
 
         try:

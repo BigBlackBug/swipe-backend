@@ -42,5 +42,5 @@ class MMUserService:
 
     def get_matchmaking_preview(self, user_id: UUID):
         return self.db.query(User).where(User.id == user_id). \
-            options(load_only(User.gender, User.age))\
+            options(load_only(User.gender))\
             .one_or_none()

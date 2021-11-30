@@ -107,7 +107,7 @@ class UserService:
         if location:
             # TODO load_only
             return self.db.execute(
-                select(User.id, User.name, User.photos,
+                select(User.id, User.name, User.photos, User.date_of_birth,
                        User.last_online, Location).
                     join(Location).where(clause)).all()
         else:
@@ -122,7 +122,8 @@ class UserService:
 
     def get_user_login_preview_one(self, user_id: UUID) -> Optional[User]:
         query = self.db.query(User).where(User.id == user_id).options(
-            Load(User).load_only("id", "name", "age", "gender", "avatar_id"),
+            Load(User).load_only("id", "name", "date_of_birth",
+                                 "gender", "avatar_id"),
             joinedload(User.location)
         )
         return query.one_or_none()
@@ -134,8 +135,6 @@ class UserService:
         for k, v in user_update.dict(exclude_unset=True).items():
             if k == 'location':
                 user_object.set_location(v)
-            elif k == 'date_of_birth':
-                user_object.set_date_of_birth(v)
             else:
                 setattr(user_object, k, v)
                 if k == 'photos':

@@ -155,11 +155,12 @@ class PopularFilterBody(BaseModel):
 
 
 class OnlineFilterBody(BaseModel):
-    country: str
     session_id: str
-    limit: Optional[int] = 15
-    gender: Optional[Gender] = None
+
+    country: Optional[str] = None
     city: Optional[str] = None
+    gender: Optional[Gender] = None
+    limit: Optional[int] = 15
 
 
 class UserOutChatPreviewORM(BaseModel):

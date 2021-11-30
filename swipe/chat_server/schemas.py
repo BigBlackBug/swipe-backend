@@ -9,18 +9,6 @@ from pydantic import BaseModel, Field
 from swipe.swipe_server.chats.models import MessageStatus, ChatSource
 
 
-class UserJoinPayload(BaseModel):
-    type_: str = Field('join', alias='type', const=True)
-    user_id: str
-    name: str
-    avatar_url: str
-
-
-class UserLeavePayload(BaseModel):
-    type_: str = Field('leave', alias='type', const=True)
-    user_id: str
-
-
 class ChatMessagePayload(BaseModel):
     message_id: UUID
     sender_id: UUID
@@ -80,11 +68,15 @@ class OpenChatPayload(BaseModel):
     chat_id: UUID
 
 
-class UserJoinPayloadOut(BaseModel):
+class UserJoinPayload(BaseModel):
     type_: str = Field('join', alias='type', const=True)
-    user_id: UUID
+    user_id: str
     name: str
     avatar_url: str
+
+
+class UserLeavePayload(BaseModel):
+    type_: str = Field('leave', alias='type', const=True)
 
 
 class BlacklistAddPayload(BaseModel):
@@ -99,7 +91,8 @@ class BasePayload(BaseModel):
         MessagePayload, GlobalMessagePayload,
         MessageStatusPayload, MessageLikePayload,
         DeclineChatPayload, AcceptChatPayload, CreateChatPayload,
-        OpenChatPayload, BlacklistAddPayload
+        OpenChatPayload, BlacklistAddPayload, UserJoinPayload,
+        UserLeavePayload
     ]
 
     @classmethod
