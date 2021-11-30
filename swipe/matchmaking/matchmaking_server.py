@@ -1,10 +1,8 @@
 import asyncio
 import logging
-from uuid import UUID
 
-import aioredis
 import requests
-from fastapi import FastAPI, Body, Query, Depends
+from fastapi import FastAPI, Body, Query
 from fastapi import WebSocket
 from pydantic import BaseModel
 from starlette.requests import Request
@@ -15,7 +13,7 @@ from uvicorn import Config, Server
 from swipe.chat_server.services import ConnectedUser, WSConnectionManager, \
     MMUserData
 from swipe.matchmaking.schemas import MMBasePayload, MMMatchPayload, \
-    MMResponseAction, MMLobbyPayload, MMLobbyAction, MMSettings, MMDataCache, \
+    MMResponseAction, MMLobbyPayload, MMLobbyAction, MMSettings, MMRoundData, \
     MMChatPayload, MMChatAction
 from swipe.matchmaking.services import MMUserService
 from swipe.settings import settings
@@ -54,13 +52,13 @@ async def docs(json_data: MMBasePayload = Body(..., examples={
 
 
 loop = asyncio.get_event_loop()
-matchmaking_data = MMDataCache()
+matchmaking_data = MMRoundData()
 connection_manager = WSConnectionManager()
 
 
 @app.websocket("/connect/{user_id}")
 async def matchmaker_endpoint(
-        user_id: UUID, websocket: WebSocket,
+        user_id: str, websocket: WebSocket,
         gender: Gender = Query(None)):
     user: User
     with dependencies.db_context() as session:
@@ -74,12 +72,9 @@ async def matchmaker_endpoint(
     logger.info(f"{user_id}, rounded age: {user.age} "
                 f"connected with filter: {gender}")
 
-    user_id = str(user_id)
     connected_user = ConnectedUser(
         user_id=user_id, connection=websocket,
-        data=MMUserData(age=user.age,
-                        gender_filter=gender,
-                        gender=user.gender))
+        data=MMUserData(age=user.age, gender_filter=gender, gender=user.gender))
     await connection_manager.connect(connected_user)
 
     while True:
@@ -247,7 +242,7 @@ async def send_match_data(request: Request):
     return Response()
 
 
-@app.get('/new_round_data', response_model=MMDataCache)
+@app.get('/new_round_data', response_model=MMRoundData)
 async def fetch_new_round_data(request: Request):
     response_data = matchmaking_data.dict(
         exclude={'sent_matches', 'online_users'})

@@ -40,7 +40,7 @@ class MMUserService:
             where(~User.blocked_by.any(id=current_user_id))
         return self.db.execute(query).scalars().all()
 
-    def get_matchmaking_preview(self, user_id: UUID):
+    def get_matchmaking_preview(self, user_id: str):
         return self.db.query(User).where(User.id == user_id). \
-            options(load_only(User.gender))\
+            options(load_only(User.gender, User.date_of_birth))\
             .one_or_none()

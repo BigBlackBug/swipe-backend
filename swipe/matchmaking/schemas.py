@@ -118,7 +118,7 @@ class Match:
     accepted: bool = False
 
 
-class MMDataCache(BaseModel):
+class MMRoundData(BaseModel):
     new_users: dict[str, VertexData] = {}
     returning_users: set[str] = set()
     disconnected_users: set[str] = set()

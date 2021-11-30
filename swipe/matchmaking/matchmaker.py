@@ -6,7 +6,7 @@ from typing import Optional, Iterator, Tuple
 
 import requests
 
-from swipe.matchmaking.schemas import Match, MMSettings, MMDataCache
+from swipe.matchmaking.schemas import Match, MMSettings, MMRoundData
 from swipe.matchmaking.services import MMUserService
 from swipe.settings import settings
 from swipe.swipe_server.misc.database import SessionLocal
@@ -85,7 +85,7 @@ class Matchmaker:
         # current connection graph
         self._connection_graph: dict[str, Vertex] = {}
 
-    def run_matchmaking_round(self, incoming_data: MMDataCache) \
+    def run_matchmaking_round(self, incoming_data: MMRoundData) \
             -> Iterator[Match]:
         # round starts
         logger.info(f"Round started, current graph\n"
@@ -247,7 +247,7 @@ class Matchmaker:
                             f"can connect to {vertex_1.user_id}")
                 vertex_2.connect(vertex_1.user_id, False)
 
-    def _process_disconnected_users(self, incoming_data: MMDataCache):
+    def _process_disconnected_users(self, incoming_data: MMRoundData):
         for user_id in incoming_data.disconnected_users:
             logger.info(f"{user_id} disconnected during previous round, "
                         f"removing him from the old and new graphs")
@@ -269,13 +269,13 @@ class Matchmaker:
             logger.info(f"Removing {user_id} from graph")
             del self._connection_graph[user_id]
 
-    def _process_returning_users(self, incoming_data: MMDataCache):
+    def _process_returning_users(self, incoming_data: MMRoundData):
         for user_id in incoming_data.returning_users:
             # enable edges
             logger.info(f"Enabling {user_id}")
             self._connection_graph[user_id].matched = False
 
-    def _process_decline_pairs(self, incoming_data: MMDataCache):
+    def _process_decline_pairs(self, incoming_data: MMRoundData):
         for user_a_id, user_b_id in incoming_data.decline_pairs:
             logger.info(f"Processing {user_a_id}, {user_b_id}")
             if settings.ENABLE_MATCHMAKING_BLACKLIST:
@@ -290,7 +290,7 @@ class Matchmaker:
             self._connection_graph[user_b_id].matched = False
             # self._connection_graph[user_b_id].waiting = True
 
-    def _merge_graphs(self, incoming_data: MMDataCache):
+    def _merge_graphs(self, incoming_data: MMRoundData):
         for incoming_user_id, incoming_vertex \
                 in incoming_data.new_users.items():
             logger.info(
@@ -386,7 +386,7 @@ def start_matchmaker(round_length_secs: int = 5):
                 timeout=2)
             json_data = response.json()
 
-            incoming_data = MMDataCache.parse_obj(json_data)
+            incoming_data = MMRoundData.parse_obj(json_data)
             logger.info(f"New round data\n"
                         f"{incoming_data.repr_matchmaking()}")
 
