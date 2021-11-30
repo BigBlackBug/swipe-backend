@@ -37,7 +37,7 @@ async def test_free_swipes_can_not_be_reaped(
     time_in_the_future = datetime.datetime.now() + datetime.timedelta(hours=1)
     time_in_the_future = int(time_in_the_future.timestamp())
     await redis_swipes.reset_swipe_reap_timestamp(
-        default_user, time_in_the_future)
+        default_user.id, time_in_the_future)
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/me/swipes/reap",
         headers=default_user_auth_headers

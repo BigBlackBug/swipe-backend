@@ -27,7 +27,7 @@ async def test_auth_new_user(
 
     user = user_service.get_user(response.json().get('user_id'))
     # free swipes cache is set
-    assert await redis_swipes.get_swipe_reap_timestamp(user)
+    assert await redis_swipes.get_swipe_reap_timestamp(user.id)
 
 
 @pytest.mark.anyio
@@ -49,4 +49,4 @@ async def test_auth_existing_user(
     assert response.json().get('user_id')
 
     # free swipes cache is set
-    assert await redis_swipes.get_swipe_reap_timestamp(default_user)
+    assert await redis_swipes.get_swipe_reap_timestamp(default_user.id)

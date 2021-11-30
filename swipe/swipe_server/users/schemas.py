@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Optional, Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, root_validator
 from sqlalchemy.engine import Row
 
 from swipe.swipe_server.misc.storage import storage_client
@@ -137,13 +137,8 @@ class AuthenticationOut(BaseModel):
 
 
 class JWTPayload(AuthenticationIn):
-    user_id: UUID
+    user_id: str
     created_at: int
-
-    @validator("user_id")
-    def cast_user_id(cls, value: UUID,
-                     values: dict[str, Any]) -> Any:
-        return str(value)
 
 
 class PopularFilterBody(BaseModel):

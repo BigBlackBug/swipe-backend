@@ -66,6 +66,7 @@ async def test_fetch_existing_chats(
     # default user is online
     await redis_online.add_to_online_caches(default_user)
     # --------------------------------------------------------
+    print("Sending request")
     response: Response = await client.get(
         f"{settings.API_V1_PREFIX}/me/chats",
         headers=default_user_auth_headers
@@ -422,6 +423,7 @@ async def test_fetch_single_chat(
     chat.messages.extend([msg1, msg2, msg3, msg4])
     session.commit()
 
+    print('done')
     response: Response = await client.get(
         f"{settings.API_V1_PREFIX}/me/chats/{chat.id}",
         headers=default_user_auth_headers

@@ -11,6 +11,7 @@ from sqlalchemy.engine import Row
 from swipe.swipe_server.chats.models import MessageStatus, ChatMessage, Chat, \
     ChatStatus, \
     ChatSource, GlobalChatMessage
+from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.redis_services import RedisOnlineUserService

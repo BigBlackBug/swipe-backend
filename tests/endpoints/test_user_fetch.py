@@ -49,7 +49,6 @@ async def test_user_fetch_basic(
     session.commit()
     # --------------------------------------------------------------------------
 
-    # ignore+offline+all genders+whole country
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch",
         headers=default_user_auth_headers,
@@ -59,7 +58,6 @@ async def test_user_fetch_basic(
             'limit': 10
         }
     )
-
     assert response.status_code == 200
     resp_data = response.json()
     assert {user['id'] for user in resp_data} == \

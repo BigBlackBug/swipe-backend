@@ -2,6 +2,7 @@ import logging
 import time
 from dataclasses import dataclass
 from typing import Optional, Tuple, AsyncGenerator
+from uuid import UUID
 
 from aioredis import Redis
 from fastapi import Depends
@@ -65,14 +66,14 @@ class FetchUserCacheKey:
 
 
 class RedisSwipeReaperService:
-    FREE_SWIPES_REDIS_PREFIX = 'free_swipes_cooldown_'
+    FREE_SWIPES_REDIS_PREFIX = 'free_swipes_cooldown'
 
     def __init__(self,
                  redis: Redis = Depends(dependencies.redis)):
         self.redis = redis
 
     async def reset_swipe_reap_timestamp(
-            self, user_object: User,
+            self, user_id: UUID,
             reap_timestamp: Optional[int] = None) -> int:
         """
         Sets the timestamp for when the free swipes can be reaped
@@ -85,18 +86,18 @@ class RedisSwipeReaperService:
             reap_timestamp = \
                 int(time.time() + constants.FREE_SWIPES_COOLDOWN_SEC)
         await self.redis.setex(
-            f'{self.FREE_SWIPES_REDIS_PREFIX}{user_object.id}',
+            f'{self.FREE_SWIPES_REDIS_PREFIX}:{user_id}',
             time=constants.FREE_SWIPES_COOLDOWN_SEC,
             value=reap_timestamp)
         return reap_timestamp
 
-    async def get_swipe_reap_timestamp(self, user_object: User) \
+    async def get_swipe_reap_timestamp(self, user_id: UUID) \
             -> Optional[int]:
         """
         Returns the timestamp for when the free swipes can be reaped
         """
         reap_timestamp = await self.redis.get(
-            f'{self.FREE_SWIPES_REDIS_PREFIX}{user_object.id}')
+            f'{self.FREE_SWIPES_REDIS_PREFIX}:{str(user_id)}')
         return int(reap_timestamp) if reap_timestamp else None
 
 

@@ -26,7 +26,9 @@ router = APIRouter()
     '',
     name="Get current users profile",
     response_model=schemas.UserOut)
-async def fetch_user(current_user: User = Depends(security.get_current_user)):
+async def fetch_user(user_service: UserService = Depends(),
+                     user_id: UUID = Depends(security.get_current_user)):
+    current_user = user_service.get_user(user_id)
     user_out: schemas.UserOut = schemas.UserOut.patched_from_orm(current_user)
     return user_out
 
@@ -47,8 +49,8 @@ async def fetch_user(current_user: User = Depends(security.get_current_user)):
 async def add_rating(
         reason: RatingUpdateReason = Body(..., embed=True),
         user_service: UserService = Depends(),
-        current_user: User = Depends(security.get_current_user)):
-    new_rating: int = user_service.add_rating(current_user, reason)
+        user_id: UUID = Depends(security.get_current_user)):
+    new_rating: int = user_service.add_rating(user_id, reason)
 
     return {
         'rating': new_rating
@@ -65,7 +67,8 @@ async def patch_user(
         user_service: UserService = Depends(),
         redis_location: RedisLocationService = Depends(),
         redis_online: RedisOnlineUserService = Depends(),
-        current_user: User = Depends(security.get_current_user)):
+        user_id: UUID = Depends(security.get_current_user)):
+    current_user = user_service.get_user(user_id)
     previous_location: Location = current_user.location
     current_user: User = user_service.update_user(current_user, user_body)
 
@@ -89,7 +92,8 @@ async def delete_user(
         redis_blacklist: RedisBlacklistService = Depends(),
         redis_online: RedisOnlineUserService = Depends(),
         redis_popular: RedisPopularService = Depends(),
-        current_user: User = Depends(security.get_current_user)):
+        user_id: UUID = Depends(security.get_current_user)):
+    current_user = user_service.get_user(user_id)
     # TODO send event to all chat members
     # to remove them from global message list and chats
     chat_ids: list[UUID] = chat_service.fetch_chat_ids(current_user.id)
@@ -124,15 +128,13 @@ async def delete_user(
 async def add_photo(
         file: UploadFile = File(...),
         user_service: UserService = Depends(UserService),
-        current_user: User = Depends(security.get_current_user)):
-    if not current_user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-
+        user_id: UUID = Depends(security.get_current_user)):
     if not re.match(IMAGE_CONTENT_TYPE_REGEXP, file.content_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='Unsupported image type')
 
+    current_user = user_service.get_user(user_id)
     if len(current_user.photos) == User.MAX_ALLOWED_PHOTOS:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -153,7 +155,8 @@ async def add_photo(
 async def delete_photo(
         photo_id: str,
         user_service: UserService = Depends(UserService),
-        current_user: User = Depends(security.get_current_user)):
+        user_id: UUID = Depends(security.get_current_user)):
+    current_user = user_service.get_user(user_id)
     try:
         logger.info(f"Deleting photo {photo_id}")
         user_service.delete_photo(current_user, photo_id)

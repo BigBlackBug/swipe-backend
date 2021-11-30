@@ -125,6 +125,6 @@ async def authenticate_user(auth_payload: user_schemas.AuthenticationIn,
 
         response.status_code = status.HTTP_201_CREATED
 
-    await redis_swipe.reset_swipe_reap_timestamp(user)
+    await redis_swipe.reset_swipe_reap_timestamp(user.id)
     return user_schemas.AuthenticationOut(
         user_id=user.id, access_token=new_token)

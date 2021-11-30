@@ -1,4 +1,5 @@
 import logging
+from uuid import UUID
 
 from fastapi import Depends, HTTPException, Security
 from fastapi.security import APIKeyHeader
@@ -30,7 +31,7 @@ def get_auth_token(auth_header: str = Security(auth_header_dep)) -> str:
 
 
 def get_current_user(user_service: UserService = Depends(),
-                     token: str = Depends(get_auth_token)) -> models.User:
+                     token: str = Depends(get_auth_token)) -> UUID:
     try:
         payload = jwt.decode(
             token, settings.SWIPE_SECRET_KEY, algorithms=[ALGORITHMS.HS256, ]
@@ -42,15 +43,11 @@ def get_current_user(user_service: UserService = Depends(),
             status_code=status.HTTP_403_FORBIDDEN,
             detail='Error validating token',
         )
-    user = user_service.get_user(token_payload.user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="User not found")
-
-    if user.auth_info.access_token != token:
+    auth_info = user_service.check_token(token_payload.user_id, token)
+    if not auth_info:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail='Token has been invalidated')
+            detail='No user found with provided token')
 
-    logger.debug(f'{user.id} has successfully authenticated')
-    return user
+    logger.debug(f'{token_payload.user_id} has successfully authenticated')
+    return UUID(hex=token_payload.user_id)

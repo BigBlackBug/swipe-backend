@@ -11,7 +11,7 @@ from dateutil.relativedelta import relativedelta
 from fastapi import Depends
 from jose import jwt
 from jose.constants import ALGORITHMS
-from sqlalchemy import select, delete, func, desc, String, cast, insert
+from sqlalchemy import select, delete, func, desc, String, cast, insert, update
 from sqlalchemy.engine import Row
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, Bundle, Load, joinedload
@@ -128,6 +128,12 @@ class UserService:
         )
         return query.one_or_none()
 
+    def get_user_date_of_birth(self, user_id: UUID):
+        query = self.db.query(User).where(User.id == user_id).options(
+            Load(User).load_only("date_of_birth"),
+        )
+        return query.one_or_none()
+
     def update_user(
             self,
             user_object: User,
@@ -203,26 +209,26 @@ class UserService:
 
     def create_access_token(self, user_object: User,
                             payload: schemas.AuthenticationIn) -> str:
+        payload = schemas.JWTPayload(
+            **payload.dict(), user_id=str(user_object.id),
+            created_at=time.time_ns()).dict()
         access_token = jwt.encode(
-            schemas.JWTPayload(
-                **payload.dict(),
-                user_id=user_object.id,
-                created_at=time.time_ns()
-            ).dict(),
+            payload,
             settings.SWIPE_SECRET_KEY, algorithm=ALGORITHMS.HS256)
         user_object.auth_info.access_token = access_token
         self.db.commit()
         return access_token
 
-    def add_swipes(self, user_object: User, swipe_number: int) -> User:
+    def add_swipes(self, user_id: UUID, swipe_number: int) -> int:
         if swipe_number < 0:
             raise ValueError("swipe_number must be positive")
         logger.info(f"Adding {swipe_number} swipes")
 
-        user_object.swipes += swipe_number
-        self.db.commit()
-        self.db.refresh(user_object)
-        return user_object
+        new_swipes = self.db.execute(
+            update(User).where(User.id == user_id).
+                values(swipes=(User.swipes + swipe_number)).
+                returning(User.swipes)).scalar_one()
+        return new_swipes
 
     def get_photo_url(self, image_id: str):
         return storage_client.get_image_url(image_id)
@@ -293,7 +299,7 @@ class UserService:
         target_user.swipes -= number_of_swipes
         self.db.commit()
 
-    def add_rating(self, user: User, reason: RatingUpdateReason):
+    def add_rating(self, user_id: UUID, reason: RatingUpdateReason):
         # TODO move to enum
         if reason == RatingUpdateReason.AD_WATCHED:
             rating_diff = constants.RATING_UPDATE_AD_WATCHED
@@ -306,10 +312,20 @@ class UserService:
         else:
             rating_diff = 0
 
-        user.rating += rating_diff
+        new_rating = self.db.execute(
+            update(User).where(User.id == user_id).
+                values(rating=(User.rating + rating_diff)).
+                returning(User.rating)).scalar_one()
         self.db.commit()
 
-        return user.rating
+        return new_rating
+
+    def check_token(self, user_id: str, token: str):
+        return self.db.execute(
+            select(AuthInfo)
+                .where(AuthInfo.user_id == user_id) \
+                .where(AuthInfo.access_token == token)) \
+            .scalar_one_or_none()
 
 
 @dataclass
@@ -328,9 +344,8 @@ class FetchUserService:
         self.redis_online = redis_online
         self.redis_blacklist = redis_blacklist
 
-    async def collect(self, current_user: User,
+    async def collect(self, user_id: str, user_age: int,
                       filter_params: OnlineFilterBody) -> set[str]:
-        user_id = str(current_user.id)
         fetch_cache_params = FetchUserCacheKey(
             session_id=filter_params.session_id,
             user_id=user_id
@@ -356,8 +371,8 @@ class FetchUserService:
         result = set()
         while len(result) < filter_params.limit \
                 and age_difference <= settings.ONLINE_USER_MAX_AGE_DIFF:
-            age_range = range(current_user.age - age_difference,
-                              current_user.age + age_difference + 1)
+            age_range = range(user_age - age_difference,
+                              user_age + age_difference + 1)
 
             # filling current user pool
             for current_age in age_range:

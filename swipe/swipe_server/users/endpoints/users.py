@@ -30,7 +30,7 @@ async def fetch_list_of_popular_users(
         filter_params: PopularFilterBody = Body(...),
         user_service: UserService = Depends(),
         redis_popular: RedisPopularService = Depends(),
-        current_user: User = Depends(security.get_current_user)):
+        current_user_id: UUID = Depends(security.get_current_user)):
     """
     If the size of the returned list is smaller than limit, it means
     there are no more users and further requests make no sense
@@ -42,7 +42,7 @@ async def fetch_list_of_popular_users(
 
     logger.info(f"Got popular users for {filter_params}: {popular_users}")
     collected_users = user_service.get_user_card_previews(
-        current_user.id, user_ids=popular_users)
+        current_user_id, user_ids=popular_users)
     # TODO don't need to sort that?
     collected_users = sorted(collected_users,
                              key=lambda user: user.rating, reverse=True)
@@ -65,19 +65,22 @@ async def fetch_list_of_online_users(
         filter_params: OnlineFilterBody = Body(...),
         fetch_service: FetchUserService = Depends(),
         user_service: UserService = Depends(),
-        current_user: User = Depends(security.get_current_user)):
+        current_user_id: UUID = Depends(security.get_current_user)):
     """
     If the size of the returned list is smaller than limit, it means
     there are no more users and further requests make no sense
     """
+    current_user: User = user_service.get_user_date_of_birth(current_user_id)
     collected_user_ids = \
-        await fetch_service.collect(current_user, filter_params)
+        await fetch_service.collect(str(current_user_id),
+                                    user_age=current_user.age,
+                                    filter_params=filter_params)
 
     if not collected_user_ids:
         return []
 
     collected_users = user_service.get_user_card_previews(
-        current_user.id, user_ids=collected_user_ids)
+        current_user_id, user_ids=collected_user_ids)
 
     collected_users = sorted(
         collected_users,
@@ -109,13 +112,13 @@ async def block_user(
         user_id: UUID,
         user_service: UserService = Depends(),
         blacklist_service: BlacklistService = Depends(),
-        current_user: User = Depends(security.get_current_user)):
+        current_user_id: UUID = Depends(security.get_current_user)):
     target_user = user_service.get_user(user_id)
     if not target_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail='Not found')
 
-    blocked_by_id = str(current_user.id)
+    blocked_by_id = str(current_user_id)
     blocked_user_id = str(user_id)
 
     await blacklist_service.update_blacklist(
@@ -136,7 +139,7 @@ async def call_feedback(
         user_id: UUID,
         feedback: CallFeedback = Body(..., embed=True),
         user_service: UserService = Depends(),
-        current_user: User = Depends(security.get_current_user)):
+        current_user_id: UUID = Depends(security.get_current_user)):
     target_user = user_service.get_user(user_id)
     if not target_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
@@ -161,14 +164,14 @@ async def decline_card_offer(
         user_id: UUID,
         user_service: UserService = Depends(),
         blacklist_service: BlacklistService = Depends(),
-        current_user: User = Depends(security.get_current_user)):
+        current_user_id: UUID = Depends(security.get_current_user)):
     target_user = user_service.get_user(user_id)
     if not target_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail='Not found')
 
     user_service.use_swipes(target_user)
-    blocked_by_id = str(current_user.id)
+    blocked_by_id = str(current_user_id)
     blocked_user_id = str(user_id)
 
     await blacklist_service.update_blacklist(
@@ -184,7 +187,7 @@ async def decline_card_offer(
 async def fetch_user(
         user_id: UUID,
         user_service: UserService = Depends(),
-        current_user: User = Depends(security.get_current_user)):
+        current_user_id: UUID = Depends(security.get_current_user)):
     user = user_service.get_user(user_id)
     user_out: UserOut = UserOut.patched_from_orm(user)
     return user_out

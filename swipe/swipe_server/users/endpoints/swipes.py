@@ -1,5 +1,6 @@
 import logging
 import time
+from uuid import UUID
 
 from fastapi import Depends, Body, HTTPException, APIRouter
 from starlette import status
@@ -7,7 +8,6 @@ from starlette.responses import Response
 
 from swipe.settings import constants
 from swipe.swipe_server.misc import security
-from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.redis_services import RedisSwipeReaperService
 from swipe.swipe_server.users.services import UserService
 
@@ -23,10 +23,10 @@ router = APIRouter()
 async def add_swipes(
         swipes: int = Body(...),
         reason: str = Body(...),
-        current_user: User = Depends(security.get_current_user),
+        user_id: UUID = Depends(security.get_current_user),
         user_service: UserService = Depends(UserService)
 ):
-    user_service.add_swipes(current_user, swipes)
+    user_service.add_swipes(user_id, swipes)
     logger.info(f'{swipes} swipes have been added. Reason {reason}')
     return Response(status_code=status.HTTP_201_CREATED)
 
@@ -47,10 +47,10 @@ async def add_swipes(
         }
     })
 async def get_free_swipe_status(
-        current_user: User = Depends(security.get_current_user),
+        user_id: UUID = Depends(security.get_current_user),
         redis_swipe: RedisSwipeReaperService = Depends()):
     reap_timestamp = \
-        await redis_swipe.get_swipe_reap_timestamp(current_user) or -1
+        await redis_swipe.get_swipe_reap_timestamp(user_id) or -1
     return {
         'reap_timestamp': reap_timestamp
     }
@@ -77,11 +77,11 @@ async def get_free_swipe_status(
         }
     })
 async def get_free_swipes(
-        current_user: User = Depends(security.get_current_user),
+        user_id: UUID = Depends(security.get_current_user),
         user_service: UserService = Depends(UserService),
         redis_swipe: RedisSwipeReaperService = Depends()):
     reap_timestamp: int = \
-        await redis_swipe.get_swipe_reap_timestamp(current_user)
+        await redis_swipe.get_swipe_reap_timestamp(user_id)
 
     if reap_timestamp:
         raise HTTPException(
@@ -89,12 +89,12 @@ async def get_free_swipes(
             detail=f"Free swipes will be available "
                    f"in {reap_timestamp - int(time.time())} seconds")
 
-    current_user = user_service.add_swipes(
-        current_user, constants.FREE_SWIPES_PER_TIME_PERIOD)
+    new_swipes = user_service.add_swipes(
+        user_id, constants.FREE_SWIPES_PER_TIME_PERIOD)
     reap_timestamp = \
-        await redis_swipe.reset_swipe_reap_timestamp(current_user)
+        await redis_swipe.reset_swipe_reap_timestamp(user_id)
 
     return {
-        'swipes': current_user.swipes,
+        'swipes': new_swipes,
         'reap_timestamp': reap_timestamp
     }
