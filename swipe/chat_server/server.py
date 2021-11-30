@@ -134,7 +134,6 @@ async def websocket_endpoint(
             # removing blacklist cache
             await redis_blacklist.drop_blacklist_cache(user_id)
             # sending leave payloads to everyone
-            logger.info(f"Broadcasting 'leave' event of {user_id}")
             await connection_manager.broadcast(
                 user_id, BasePayload(
                     sender_id=UUID(hex=user_id),

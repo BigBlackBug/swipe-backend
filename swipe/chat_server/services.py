@@ -182,14 +182,17 @@ class WSConnectionManager:
             json.dumps(payload, cls=PayloadEncoder))
 
     async def broadcast(self, sender_id: str, payload: dict):
+        # TODO stupid workaround
+        if 'payload' in payload:
+            payload_type = payload['payload'].get('type', '???')
+        else:
+            payload_type = payload.get('type', '???')
+
+        logger.info(f"Broadcasting '{payload_type}' event of {sender_id}")
+
         for user_id, user in self.active_connections.items():
             if user_id == sender_id:
                 continue
-            # TODO stupid workaround
-            if 'payload' in payload:
-                payload_type = payload['payload'].get('type', '???')
-            else:
-                payload_type = payload.get('type', '???')
 
             logger.info(f"Sending '{payload_type}' payload to {user_id}")
             await user.connection.send_text(
