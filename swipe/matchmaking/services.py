@@ -1,16 +1,15 @@
 import datetime
 import logging
 from typing import Optional, Iterable
-from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
 from fastapi import Depends
-from sqlalchemy import select, insert
+from sqlalchemy import select, cast, String
 from sqlalchemy.orm import Session, load_only
 
 import swipe.swipe_server.misc.dependencies as dependencies
 from swipe.swipe_server.users.enums import Gender
-from swipe.swipe_server.users.models import IDList, User, blacklist_table
+from swipe.swipe_server.users.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -25,14 +24,14 @@ class MMUserService:
                       age_difference,
                       online_users: Iterable[str],
                       gender: Optional[Gender] = None,
-                      ) -> IDList:
+                      ) -> list[str]:
         gender_clause = True if not gender else User.gender == gender
         min_age = datetime.datetime.utcnow() - relativedelta(
             years=age + age_difference)
         max_age = datetime.datetime.utcnow() + relativedelta(
             years=age + age_difference)
 
-        query = select(User.id). \
+        query = select(cast(User.id, String)). \
             where(gender_clause). \
             where(User.date_of_birth.between(min_age, max_age)). \
             where(User.id != current_user_id). \
@@ -42,5 +41,5 @@ class MMUserService:
 
     def get_matchmaking_preview(self, user_id: str):
         return self.db.query(User).where(User.id == user_id). \
-            options(load_only(User.gender, User.date_of_birth))\
+            options(load_only(User.gender, User.date_of_birth)) \
             .one_or_none()

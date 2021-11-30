@@ -145,12 +145,12 @@ class MMRoundData(BaseModel):
         self.decline_pairs.append((user_a_id, user_b_id))
 
     def connect(self, user_id: str, mm_settings: MMSettings,
-                connections: IDList):
+                connections: list[str]):
         self.online_users.add(user_id)
 
         new_vertex = VertexData(user_id=user_id, mm_settings=mm_settings)
         for connection in connections:
-            new_vertex.edges.add(str(connection))
+            new_vertex.edges.add(connection)
         self.new_users[user_id] = new_vertex
 
     def repr_matchmaking(self):

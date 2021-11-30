@@ -187,7 +187,7 @@ async def _process_payload(base_payload: MMBasePayload,
 
             with dependencies.db_context() as session:
                 mm_user_service = MMUserService(session)
-                connections: IDList = \
+                connections: list[str] = \
                     mm_user_service.find_user_ids(
                         sender_id,
                         age=mm_settings.age,

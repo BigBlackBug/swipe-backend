@@ -11,7 +11,6 @@ from swipe.matchmaking.services import MMUserService
 from swipe.settings import settings
 from swipe.swipe_server.misc.database import SessionLocal
 from swipe.swipe_server.users.enums import Gender
-from swipe.swipe_server.users.models import IDList
 
 logger = logging.getLogger('matchmaker')
 
@@ -87,6 +86,29 @@ class Matchmaker:
 
     def run_matchmaking_round(self, incoming_data: MMRoundData) \
             -> Iterator[Match]:
+        self.prepare_round(incoming_data)
+        # put new users to the heap
+        # building a heap out of all
+        # some users might have disconnected
+        logger.info("Building current round heap")
+        # excluding matched, because they haven't returned to lobby
+        # excluding waiting, because they are skipping this round
+        current_round_heap: list[HeapItem] = [
+            HeapItem(user_id, graph_vertex.mm_settings.current_weight)
+            for user_id, graph_vertex in self._connection_graph.items()
+            if not graph_vertex.matched and not graph_vertex.waiting
+        ]
+        heapq.heapify(current_round_heap)
+
+        logger.info("Generating")
+        yield from self._generate_matches(current_round_heap)
+
+        # before the end of the round, reset all processed flags
+        logger.info("Resetting processed flags")
+        self._reset_processed_flags()
+
+    def prepare_round(self, incoming_data: MMRoundData):
+        before = time.time()
         # round starts
         logger.info(f"Round started, current graph\n"
                     f"{self._connection_graph}")
@@ -118,25 +140,7 @@ class Matchmaker:
                     f"{self._empty_candidates}")
         self._process_empty_candidates()
 
-        # put new users to the heap
-        # building a heap out of all
-        # some users might have disconnected
-        logger.info("Building current round heap")
-        # excluding matched, because they haven't returned to lobby
-        # excluding waiting, because they are skipping this round
-        current_round_heap: list[HeapItem] = [
-            HeapItem(user_id, graph_vertex.mm_settings.current_weight)
-            for user_id, graph_vertex in self._connection_graph.items()
-            if not graph_vertex.matched and not graph_vertex.waiting
-        ]
-        heapq.heapify(current_round_heap)
-
-        logger.info("Generating")
-        yield from self._generate_matches(current_round_heap)
-
-        # before the end of the round, reset all processed flags
-        logger.info("Resetting processed flags")
-        self._reset_processed_flags()
+        logger.info(f"Round prepared in: {time.time()-before}s")
 
     def _generate_matches(self, current_round_heap: list[HeapItem]) \
             -> Iterator[Match]:
@@ -305,7 +309,7 @@ class Matchmaker:
                 continue
 
             logger.info(f"Removing incoming edges of {incoming_user_id} "
-                        f"that are not in the graph. current edges\n"
+                        f"that are not in the graph, incoming edges\n"
                         f"{incoming_vertex.edges}")
             # user might have disconnected before, so he won't be in the
             # connection graph
@@ -342,7 +346,7 @@ class Matchmaker:
                 logger.info(f"{user_id} is not in the graph anymore, skipping")
                 continue
 
-            connections: IDList = \
+            connections: list[str] = \
                 self._user_service.find_user_ids(
                     user_id,
                     age=vertex.mm_settings.age,
@@ -352,7 +356,6 @@ class Matchmaker:
 
             logger.info(f"New connections for {user_id}: {connections}")
             for connection_user_id in connections:
-                connection_user_id = str(connection_user_id)
                 # new fetched user already in graph
                 # otherwise he's not in matchmaking -> not adding
                 if reverse_vertex := self._connection_graph.get(
@@ -386,7 +389,7 @@ def start_matchmaker(round_length_secs: int = 5):
                 timeout=2)
             json_data = response.json()
 
-            incoming_data = MMRoundData.parse_obj(json_data)
+            incoming_data: MMRoundData = MMRoundData.parse_obj(json_data)
             logger.info(f"New round data\n"
                         f"{incoming_data.repr_matchmaking()}")
 
