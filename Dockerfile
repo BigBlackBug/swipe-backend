@@ -4,6 +4,7 @@ LABEL maintainer="Evgeny Shakhmaev"
 ENV PYTHONUNBUFFERED=1
 ENV TZ='Europe/Moscow'
 
+RUN apt update && apt install -y vim
 RUN mkdir /etc/swipe
 
 WORKDIR /code
