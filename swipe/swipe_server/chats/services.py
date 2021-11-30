@@ -60,7 +60,7 @@ class ChatService:
             recipient_id: UUID,
             timestamp: datetime.datetime,
             message: Optional[str] = None,
-            image_id: Optional[UUID] = None,
+            image_id: Optional[str] = None,
             is_liked: Optional[bool] = False,
             status: Optional[MessageStatus] = MessageStatus.SENT):
         """

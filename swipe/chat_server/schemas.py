@@ -14,16 +14,16 @@ class ChatMessagePayload(BaseModel):
     sender_id: UUID
     recipient_id: UUID
     timestamp: datetime.datetime
-    text: Optional[str]
-    image_id: Optional[UUID]
+    text: Optional[str] = None
+    image_id: Optional[str] = None
 
 
 class MessagePayload(BaseModel):
     type_: str = Field('message', alias='type', const=True)
     message_id: UUID
     timestamp: datetime.datetime
-    text: Optional[str]
-    image_id: Optional[UUID]
+    text: Optional[str] = None
+    image_id: Optional[str] = None
 
 
 class GlobalMessagePayload(BaseModel):
