@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     CHAT_SERVER_HOST: Optional[str]
     MATCHMAKING_SERVER_HOST: Optional[str]
     MATCHMAKING_SERVER_PORT: Optional[int]
+    MATCHMAKING_TEXT_CHAT_SERVER_PORT: Optional[int]
 
     MATCHMAKING_ROUND_LENGTH_SECS = 5
     MATCHMAKING_DEFAULT_AGE_DIFF = 20
