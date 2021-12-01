@@ -1,7 +1,6 @@
 import heapq
 import logging
 import time
-from dataclasses import dataclass
 from typing import Optional, Iterator, Tuple
 
 import requests
@@ -58,10 +57,10 @@ class Vertex:
                f'matched: {self.matched}, waiting: {self.waiting}]\n'
 
 
-@dataclass
 class HeapItem:
-    user_id: str
-    weight: int
+    def __init__(self, user_id: str, weight: int):
+        self.user_id = user_id
+        self.weight = weight
 
     def __lt__(self, other: 'HeapItem'):
         # yes they are fucking inverted, because I need a maxheap
@@ -108,7 +107,6 @@ class Matchmaker:
         self._reset_processed_flags()
 
     def prepare_round(self, incoming_data: MMRoundData):
-        before = time.time()
         # round starts
         logger.info(f"Round started, current graph\n"
                     f"{self._connection_graph}")
@@ -139,8 +137,6 @@ class Matchmaker:
         logger.info(f"Processing empty candidates\n"
                     f"{self._empty_candidates}")
         self._process_empty_candidates()
-
-        logger.info(f"Round prepared in: {time.time()-before}s")
 
     def _generate_matches(self, current_round_heap: list[HeapItem]) \
             -> Iterator[Match]:
@@ -329,8 +325,6 @@ class Matchmaker:
             logger.info(f"Adding {incoming_vertex.user_id} to graph")
             self._connection_graph[incoming_user_id] = incoming_vertex
 
-        # logger.info("Clearing incoming users")
-        # self._shared_data.new_users.clear()
         logger.info(f"Graphs merged, current graph\n"
                     f"{self._connection_graph.values()}")
 

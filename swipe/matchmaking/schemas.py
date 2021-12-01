@@ -129,10 +129,10 @@ class MMRoundData(BaseModel):
     online_users: set[str] = set()
 
     def clear(self):
-        self.new_users.clear()
-        self.returning_users.clear()
-        self.disconnected_users.clear()
-        self.decline_pairs.clear()
+        self.new_users = {}
+        self.returning_users = set()
+        self.disconnected_users = set()
+        self.decline_pairs = []
 
     def disconnect(self, user_id: str):
         self.disconnected_users.add(user_id)
