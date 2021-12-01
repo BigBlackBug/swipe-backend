@@ -300,12 +300,13 @@ class UserService:
         target_user.rating = new_rating
         self.db.commit()
 
-    def use_swipes(self, target_user: User, number_of_swipes: int = 1):
+    def use_swipes(self, target_user: User, number_of_swipes: int = 1) -> int:
         if target_user.swipes < 1:
             raise SwipeError(f"{target_user.id} has 0 swipes left")
 
         target_user.swipes -= number_of_swipes
         self.db.commit()
+        return target_user.swipes
 
     def add_rating(self, user_id: UUID, reason: RatingUpdateReason):
         # TODO move to enum

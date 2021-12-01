@@ -50,5 +50,4 @@ def auth_user_id(user_service: UserService = Depends(),
             status_code=status.HTTP_403_FORBIDDEN,
             detail='No user found with provided token')
 
-    logger.info(f'{token_payload.user_id} has successfully authenticated')
     return UUID(hex=token_payload.user_id)

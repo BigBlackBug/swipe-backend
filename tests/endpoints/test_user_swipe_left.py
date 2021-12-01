@@ -30,9 +30,11 @@ async def test_swipe_left_enough_swipes(
         f"{settings.API_V1_PREFIX}/users/{other_user.id}/swipe_left",
         headers=default_user_auth_headers)
     session.refresh(default_user)
+
+    assert response.json()['swipes'] == previous_swipes - 1
     assert default_user.swipes == previous_swipes - 1
 
-    assert response.status_code == 204
+    assert response.status_code == 200
     assert len(default_user.blacklist) == 1
     assert other_user in default_user.blacklist
     assert default_user in other_user.blocked_by

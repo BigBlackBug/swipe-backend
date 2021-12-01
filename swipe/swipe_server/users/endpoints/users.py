@@ -153,7 +153,7 @@ async def call_feedback(
     '/{user_id}/swipe_left',
     name='Decline user card',
     responses={
-        204: {
+        200: {
             'description': 'OK',
         },
         409: {
@@ -170,14 +170,16 @@ async def decline_card_offer(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail='Not found')
 
-    user_service.use_swipes(current_user)
+    new_swipes = user_service.use_swipes(current_user)
     blocked_by_id = str(current_user_id)
     blocked_user_id = str(user_id)
 
     await blacklist_service.update_blacklist(
         blocked_by_id, blocked_user_id, send_blacklist_event=True)
 
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return {
+        'swipes': new_swipes
+    }
 
 
 @router.get(
