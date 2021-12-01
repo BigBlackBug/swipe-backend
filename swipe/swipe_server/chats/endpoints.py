@@ -32,7 +32,7 @@ async def fetch_global_chat(
         last_message_id: UUID = None,
         chat_service: ChatService = Depends(),
         user_service: UserService = Depends(),
-        user_id: UUID = Depends(security.get_current_user_id)):
+        user_id: UUID = Depends(security.auth_user_id)):
     chats: list[GlobalChatMessage] = \
         chat_service.fetch_global_chat(last_message_id)
     users: list[Row] = \
@@ -50,7 +50,7 @@ async def fetch_chat(
         chat_id: UUID,
         only_unread: bool = False,
         chat_service: ChatService = Depends(),
-        user_id: UUID = Depends(security.get_current_user_id)):
+        user_id: UUID = Depends(security.auth_user_id)):
     chat: Chat = chat_service.fetch_chat(chat_id, only_unread)
     resp_data = ChatORMSchema.parse_chat(chat, user_id)
     return resp_data
@@ -66,7 +66,7 @@ async def fetch_chats(
         chat_service: ChatService = Depends(),
         user_service: UserService = Depends(),
         redis_online: RedisOnlineUserService = Depends(),
-        user_id: UUID = Depends(security.get_current_user_id)):
+        user_id: UUID = Depends(security.auth_user_id)):
     """
     When 'only_unread' is set to true, returns only chats with unread messages
     """
@@ -101,7 +101,7 @@ async def fetch_chats(
     status_code=status.HTTP_201_CREATED)
 async def upload_image(
         file: UploadFile = File(...),
-        user_id: UUID = Depends(security.get_current_user_id)):
+        user_id: UUID = Depends(security.auth_user_id)):
     if not re.match(IMAGE_CONTENT_TYPE_REGEXP, file.content_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

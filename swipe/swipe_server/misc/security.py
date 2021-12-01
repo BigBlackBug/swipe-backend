@@ -30,8 +30,8 @@ def get_auth_token(auth_header: str = Security(auth_header_dep)) -> str:
     return token
 
 
-def get_current_user_id(user_service: UserService = Depends(),
-                        token: str = Depends(get_auth_token)) -> UUID:
+def auth_user_id(user_service: UserService = Depends(),
+                 token: str = Depends(get_auth_token)) -> UUID:
     try:
         payload = jwt.decode(
             token, settings.SWIPE_SECRET_KEY, algorithms=[ALGORITHMS.HS256, ]
@@ -43,11 +43,12 @@ def get_current_user_id(user_service: UserService = Depends(),
             status_code=status.HTTP_403_FORBIDDEN,
             detail='Error validating token',
         )
+
     auth_info = user_service.check_token(token_payload.user_id, token)
     if not auth_info:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail='No user found with provided token')
 
-    logger.debug(f'{token_payload.user_id} has successfully authenticated')
+    logger.info(f'{token_payload.user_id} has successfully authenticated')
     return UUID(hex=token_payload.user_id)

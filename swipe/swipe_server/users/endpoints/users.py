@@ -30,7 +30,7 @@ async def fetch_list_of_popular_users(
         filter_params: PopularFilterBody = Body(...),
         user_service: UserService = Depends(),
         redis_popular: RedisPopularService = Depends(),
-        current_user_id: UUID = Depends(security.get_current_user_id)):
+        current_user_id: UUID = Depends(security.auth_user_id)):
     """
     If the size of the returned list is smaller than limit, it means
     there are no more users and further requests make no sense
@@ -65,7 +65,7 @@ async def fetch_list_of_online_users(
         filter_params: OnlineFilterBody = Body(...),
         fetch_service: FetchUserService = Depends(),
         user_service: UserService = Depends(),
-        current_user_id: UUID = Depends(security.get_current_user_id)):
+        current_user_id: UUID = Depends(security.auth_user_id)):
     """
     If the size of the returned list is smaller than limit, it means
     there are no more users and further requests make no sense
@@ -112,7 +112,7 @@ async def block_user(
         user_id: UUID,
         user_service: UserService = Depends(),
         blacklist_service: BlacklistService = Depends(),
-        current_user_id: UUID = Depends(security.get_current_user_id)):
+        current_user_id: UUID = Depends(security.auth_user_id)):
     target_user = user_service.get_user(user_id)
     if not target_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
@@ -139,7 +139,7 @@ async def call_feedback(
         user_id: UUID,
         feedback: CallFeedback = Body(..., embed=True),
         user_service: UserService = Depends(),
-        current_user_id: UUID = Depends(security.get_current_user_id)):
+        current_user_id: UUID = Depends(security.auth_user_id)):
     target_user = user_service.get_user(user_id)
     if not target_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
@@ -164,7 +164,7 @@ async def decline_card_offer(
         user_id: UUID,
         user_service: UserService = Depends(),
         blacklist_service: BlacklistService = Depends(),
-        current_user_id: UUID = Depends(security.get_current_user_id)):
+        current_user_id: UUID = Depends(security.auth_user_id)):
     current_user = user_service.get_user(current_user_id)
     if not current_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
@@ -187,7 +187,7 @@ async def decline_card_offer(
 async def fetch_user(
         user_id: UUID,
         user_service: UserService = Depends(),
-        current_user_id: UUID = Depends(security.get_current_user_id)):
+        current_user_id: UUID = Depends(security.auth_user_id)):
     user = user_service.get_user(user_id)
     user_out: UserOut = UserOut.patched_from_orm(user)
     return user_out

@@ -23,7 +23,7 @@ router = APIRouter()
 async def add_swipes(
         swipes: int = Body(...),
         reason: str = Body(...),
-        user_id: UUID = Depends(security.get_current_user_id),
+        user_id: UUID = Depends(security.auth_user_id),
         user_service: UserService = Depends(UserService)
 ):
     user_service.add_swipes(user_id, swipes)
@@ -47,7 +47,7 @@ async def add_swipes(
         }
     })
 async def get_free_swipe_status(
-        user_id: UUID = Depends(security.get_current_user_id),
+        user_id: UUID = Depends(security.auth_user_id),
         redis_swipe: RedisSwipeReaperService = Depends()):
     reap_timestamp = \
         await redis_swipe.get_swipe_reap_timestamp(user_id) or -1
@@ -77,7 +77,7 @@ async def get_free_swipe_status(
         }
     })
 async def get_free_swipes(
-        user_id: UUID = Depends(security.get_current_user_id),
+        user_id: UUID = Depends(security.auth_user_id),
         user_service: UserService = Depends(UserService),
         redis_swipe: RedisSwipeReaperService = Depends()):
     reap_timestamp: int = \
