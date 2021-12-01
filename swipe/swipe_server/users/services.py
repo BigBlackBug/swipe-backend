@@ -365,7 +365,8 @@ class FetchUserService:
 
         age_difference = 1
 
-        logger.info(f"Got filter params {filter_params}")
+        logger.info(f"Got filter params {filter_params}, "
+                    f"previous cache {cached_user_ids}")
 
         # premium filtered by gender
         # premium filtered by location(whole country/my city)

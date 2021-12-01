@@ -263,6 +263,8 @@ class RedisUserFetchService:
             # no key with current session
             # but there is an older one
             if await self.redis.keys(cache_settings.key_user_wildcard()):
+                logger.info(
+                    f"Removing previous cache for {cache_settings.user_id}")
                 # drop other requests for other session_ids
                 await self.drop_response_cache(cache_settings.user_id)
 
