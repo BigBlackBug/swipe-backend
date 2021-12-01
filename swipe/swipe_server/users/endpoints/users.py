@@ -165,12 +165,12 @@ async def decline_card_offer(
         user_service: UserService = Depends(),
         blacklist_service: BlacklistService = Depends(),
         current_user_id: UUID = Depends(security.get_current_user_id)):
-    target_user = user_service.get_user(user_id)
-    if not target_user:
+    current_user = user_service.get_user(current_user_id)
+    if not current_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail='Not found')
 
-    user_service.use_swipes(target_user)
+    user_service.use_swipes(current_user)
     blocked_by_id = str(current_user_id)
     blocked_user_id = str(user_id)
 
