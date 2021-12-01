@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from starlette import status
 
 from swipe.settings import settings
-from swipe.swipe_server.users import schemas, models
+from swipe.swipe_server.users import schemas
 from swipe.swipe_server.users.services import UserService
 
 logger = logging.getLogger(__name__)

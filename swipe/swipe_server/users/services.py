@@ -88,15 +88,12 @@ class UserService:
             .scalar_one_or_none()
 
     def get_user_card_previews(
-            self, current_user_id: Optional[UUID] = None,
+            self,
             user_ids: Optional[Union[Iterable[UUID], Iterable[str]]] = None) \
             -> list[User]:
         clause = True if user_ids is None else User.id.in_(user_ids)
-        id_clause = True if current_user_id is None \
-            else User.id != current_user_id
 
         query = self.db.query(User). \
-            where(id_clause). \
             where(clause).options(
             Load(User).load_only('id', 'name', 'bio', 'zodiac_sign',
                                  'date_of_birth', 'rating', 'interests',
@@ -403,7 +400,8 @@ class FetchUserService:
                     candidate = current_pool.online_users[current_pool.head]
                     current_pool.head += 1
                     if candidate not in cached_user_ids \
-                            and candidate not in blacklist:
+                            and candidate not in blacklist \
+                            and candidate != user_id:
                         result.add(candidate)
 
                 if len(result) == filter_params.limit:

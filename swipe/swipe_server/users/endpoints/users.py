@@ -80,7 +80,7 @@ async def fetch_list_of_online_users(
         return []
 
     collected_users = user_service.get_user_card_previews(
-        current_user_id=current_user_id, user_ids=collected_user_ids)
+        user_ids=collected_user_ids)
 
     collected_users = sorted(
         collected_users,
