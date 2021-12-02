@@ -3,6 +3,8 @@ import sys
 
 import uvicorn
 
+from swipe.swipe_server.misc.storage import storage_client
+
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 from swipe import config
@@ -58,6 +60,11 @@ async def invalidate_caches():
     # TODO just for tests, because chat server is also being restarted
     logger.info("Invalidating online user cache")
     await redis_online.invalidate_online_user_cache()
+
+
+@app.on_event("startup")
+async def init_storage_buckets():
+    storage_client.initialize_buckets()
 
 
 @app.on_event("startup")
