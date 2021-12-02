@@ -1,6 +1,6 @@
 import logging
-import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Optional, Tuple, AsyncGenerator
 from uuid import UUID
 
@@ -72,33 +72,34 @@ class RedisSwipeReaperService:
                  redis: Redis = Depends(dependencies.redis)):
         self.redis = redis
 
-    async def reset_swipe_reap_timestamp(
-            self, user_id: UUID,
-            reap_timestamp: Optional[int] = None) -> int:
+    async def reset_swipe_reap_timestamp(self, user_id: UUID) -> datetime:
         """
         Sets the timestamp for when the free swipes can be reaped
         for the specified user
-
-        :param user_object:
-        :return: new timestamp
         """
-        if not reap_timestamp:
-            reap_timestamp = \
-                int(time.time() + constants.FREE_SWIPES_COOLDOWN_SEC)
+        # this "optional parameter" junk is required only so that
+        # I could test the method
+
+        reap_date = datetime.utcnow() + timedelta(
+            seconds=constants.FREE_SWIPES_COOLDOWN_SEC)
+        reap_date = reap_date.replace(microsecond=0)
+
         await self.redis.setex(
             f'{self.FREE_SWIPES_REDIS_PREFIX}:{user_id}',
             time=constants.FREE_SWIPES_COOLDOWN_SEC,
-            value=reap_timestamp)
-        return reap_timestamp
+            value=int(reap_date.timestamp()))
+
+        return reap_date
 
     async def get_swipe_reap_timestamp(self, user_id: UUID) \
-            -> Optional[int]:
+            -> Optional[datetime]:
         """
         Returns the timestamp for when the free swipes can be reaped
         """
         reap_timestamp = await self.redis.get(
             f'{self.FREE_SWIPES_REDIS_PREFIX}:{str(user_id)}')
-        return int(reap_timestamp) if reap_timestamp else None
+        return datetime.fromtimestamp(int(reap_timestamp)) \
+            if reap_timestamp else None
 
 
 class RedisLocationService:
