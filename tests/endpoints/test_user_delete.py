@@ -1,6 +1,6 @@
 import datetime
 import uuid
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock, call, ANY
 from uuid import UUID
 
 import aioredis
@@ -34,15 +34,15 @@ async def test_user_delete(
         fake_redis: aioredis.Redis,
         redis_online: RedisOnlineUserService,
         redis_blacklist: RedisBlacklistService,
-        # redis_popular: RedisPopularService,
         default_user_auth_headers: dict[str, str]):
     default_user.gender = Gender.MALE
 
-    popular_service = PopularUserService(session, fake_redis)
-    user_1 = randomizer.generate_random_user()
     mock_user_storage: MagicMock = \
         mocker.patch('swipe.swipe_server.users.models.storage_client')
+    mock_requests = \
+        mocker.patch('swipe.swipe_server.users.endpoints.me.requests')
 
+    user_1 = randomizer.generate_random_user()
     auth_info_id: UUID = default_user.auth_info.id
     photos: list[str] = default_user.photos
 
@@ -66,6 +66,11 @@ async def test_user_delete(
     await client.delete(
         f"{settings.API_V1_PREFIX}/me",
         headers=default_user_auth_headers)
+
+    # no chats -> no event
+    url = f'{settings.CHAT_SERVER_HOST}/events/user_deleted'
+    assert not mock_requests.post.call_args_list
+    assert call(url, json=ANY) not in mock_requests.post.call_args_list
 
     mock_user_storage.delete_image.assert_has_calls(
         delete_image_calls, any_order=True)
@@ -122,6 +127,8 @@ async def test_user_delete_with_chats(
         mocker.patch('swipe.swipe_server.users.models.storage_client')
     mock_chat_storage: MagicMock = \
         mocker.patch('swipe.swipe_server.chats.models.storage_client')
+    mock_requests = \
+        mocker.patch('swipe.swipe_server.users.endpoints.me.requests')
 
     other_user = randomizer.generate_random_user()
     photos: list[str] = default_user.photos
@@ -150,9 +157,11 @@ async def test_user_delete_with_chats(
     session.commit()
 
     auth_info_id: UUID = default_user.auth_info.id
+    # ---------------------------------------------------------------------
     await client.delete(
         f"{settings.API_V1_PREFIX}/me",
         headers=default_user_auth_headers)
+    # --------------------------------------------------------------------
 
     calls = []
     for photo in photos:
@@ -162,6 +171,12 @@ async def test_user_delete_with_chats(
         calls, any_order=True)
 
     mock_chat_storage.delete_chat_image.assert_called_with('345345.png')
+
+    url = f'{settings.CHAT_SERVER_HOST}/events/user_deleted'
+    mock_requests.post.assert_called_with(url, json={
+        'user_id': str(default_user.id),
+        'recipients': [str(other_user.id),]
+    })
 
     assert not user_service.get_user(default_user.id)
     assert not session.execute(

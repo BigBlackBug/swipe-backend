@@ -34,7 +34,7 @@ async def test_add_to_blacklist(
         f"{settings.API_V1_PREFIX}/users/{user_1.id}/block",
         headers=default_user_auth_headers
     )
-    url = f'{settings.CHAT_SERVER_HOST}/swipe/blacklist'
+    url = f'{settings.CHAT_SERVER_HOST}/events/blacklist'
     requests_mock.post.assert_called_with(url, json={
         'blocked_by_id': str(default_user.id),
         'blocked_user_id': str(user_1.id)

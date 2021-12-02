@@ -70,20 +70,23 @@ class OpenChatPayload(BaseModel):
     chat_id: UUID
 
 
-class UserJoinPayload(BaseModel):
+class UserJoinEventPayload(BaseModel):
     type_: str = Field('join', alias='type', const=True)
     user_id: str
     name: str
     avatar_url: str
 
 
-class UserLeavePayload(BaseModel):
+class UserLeaveEventPayload(BaseModel):
     type_: str = Field('leave', alias='type', const=True)
 
 
-class BlacklistAddPayload(BaseModel):
-    type_: str = Field('blacklist', alias='type', const=True)
-    blocked_by_id: str
+class BlacklistEventPayload(BaseModel):
+    type_: str = Field('blacklisted', alias='type', const=True)
+
+
+class UserDeletedEventPayload(BaseModel):
+    type_: str = Field('user_deleted', alias='type', const=True)
 
 
 class BasePayload(BaseModel):
@@ -93,8 +96,10 @@ class BasePayload(BaseModel):
         MessagePayload, GlobalMessagePayload,
         MessageStatusPayload, MessageLikePayload,
         DeclineChatPayload, AcceptChatPayload, CreateChatPayload,
-        OpenChatPayload, BlacklistAddPayload, UserJoinPayload,
-        UserLeavePayload
+        OpenChatPayload,
+
+        UserDeletedEventPayload, BlacklistEventPayload,
+        UserJoinEventPayload, UserLeaveEventPayload,
     ]
 
     @classmethod

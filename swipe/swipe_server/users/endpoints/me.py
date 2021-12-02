@@ -2,10 +2,13 @@ import logging
 import re
 from uuid import UUID
 
+import requests
 from fastapi import Depends, Body, HTTPException, UploadFile, File, APIRouter
 from starlette import status
 from starlette.responses import Response
 
+from swipe.settings import settings
+from swipe.swipe_server.chats.models import Chat
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc import security
 from swipe.swipe_server.users import schemas
@@ -97,12 +100,18 @@ async def delete_user(
         redis_online: RedisOnlineUserService = Depends(),
         popular_service: PopularUserService = Depends(),
         user_id: UUID = Depends(security.auth_user_id)):
-    current_user = user_service.get_user(user_id)
-    # TODO send event to all chat members
-    # to remove them from global message list and chats
-    chat_ids: list[UUID] = chat_service.fetch_chat_ids(current_user.id)
-    for chat_id in chat_ids:
-        chat_service.delete_chat(chat_id)
+    current_user: User = user_service.get_user(user_id)
+
+    recipients = []
+    # fetching only id and user ids
+    chats: list[Chat] = chat_service.fetch_chat_members(current_user.id)
+    for chat in chats:
+        if user_id == chat.initiator_id:
+            recipients.append(str(chat.the_other_person_id))
+        elif user_id == chat.the_other_person_id:
+            recipients.append(str(chat.initiator_id))
+        # not relying on cascades because we need to delete images manually
+        chat_service.delete_chat(chat.id)
 
     await redis_online.remove_from_online_caches(current_user)
     await redis_blacklist.drop_blacklist_cache(str(current_user.id))
@@ -112,7 +121,14 @@ async def delete_user(
     await popular_service.populate_popular_cache()
     user_service.delete_user(current_user)
 
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    if recipients:
+        # we gotta notify every chat participant that the user is gone
+        url = f'{settings.CHAT_SERVER_HOST}/events/user_deleted'
+        requests.post(url, json={
+            'user_id': str(user_id),
+            'recipients': recipients
+        })
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(

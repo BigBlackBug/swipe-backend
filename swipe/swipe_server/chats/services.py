@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import Depends
 from sqlalchemy import select, update, delete, union_all
-from sqlalchemy.orm import Session, selectinload, contains_eager
+from sqlalchemy.orm import Session, selectinload, contains_eager, load_only
 
 from swipe.swipe_server.chats.models import Chat, ChatStatus, ChatMessage, \
     MessageStatus, \
@@ -162,12 +162,15 @@ class ChatService:
             result = self.db.execute(query).scalars().all()
         return result
 
-    def fetch_chat_ids(self, user_id: UUID) -> list[UUID]:
-        query = select(Chat.id). \
-            where(((Chat.initiator_id == user_id) |
-                   (Chat.the_other_person_id == user_id)))
-        result = self.db.execute(query).scalars().all()
-        return result
+    def fetch_chat_members(self, user_id: UUID) -> list[Chat]:
+        query = self.db.query(Chat). \
+            where((
+                (Chat.initiator_id == user_id) |
+                (Chat.the_other_person_id == user_id)
+        )).options(
+            load_only('id', 'initiator_id', 'the_other_person_id')
+        )
+        return query.all()
 
     def fetch_global_chat(self, last_message_id: Optional[UUID] = None) \
             -> list[GlobalChatMessage]:

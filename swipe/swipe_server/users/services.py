@@ -513,7 +513,7 @@ class BlacklistService:
 
         if send_blacklist_event:
             # sending 'add to blacklist' event to blocked_user_id
-            url = f'{settings.CHAT_SERVER_HOST}/swipe/blacklist'
+            url = f'{settings.CHAT_SERVER_HOST}/events/blacklist'
             requests.post(url, json={
                 'blocked_by_id': blocked_by_id,
                 'blocked_user_id': blocked_user_id

@@ -45,7 +45,7 @@ async def test_swipe_left_enough_swipes(
         await redis_blacklist.get_blacklist(default_user_id) == {other_user_id}
     assert \
         await redis_blacklist.get_blacklist(other_user_id) == {default_user_id}
-    url = f'{settings.CHAT_SERVER_HOST}/swipe/blacklist'
+    url = f'{settings.CHAT_SERVER_HOST}/events/blacklist'
     requests_mock.post.assert_called_with(url, json={
         'blocked_by_id': default_user_id,
         'blocked_user_id': other_user_id
