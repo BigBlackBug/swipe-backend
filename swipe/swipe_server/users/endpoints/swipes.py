@@ -17,23 +17,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post(
-    '',
-    name='Add swipes',
-    status_code=status.HTTP_201_CREATED)
-async def add_swipes(
-        swipes: int = Body(...),
-        reason: str = Body(...),
-        user_id: UUID = Depends(security.auth_user_id),
-        user_service: UserService = Depends(UserService)
-):
-    raise HTTPException(
-        status_code=status.HTTP_418_IM_A_TEAPOT,
-        detail='Not implemented YET'
-    )
-    # user_service.add_swipes(user_id, swipes)
-    # logger.info(f'{swipes} swipes have been added. Reason {reason}')
-    # return Response(status_code=status.HTTP_201_CREATED)
+# @router.post(
+#     '',
+#     name='Add swipes',
+#     status_code=status.HTTP_201_CREATED)
+# async def add_swipes(
+#         swipes: int = Body(...),
+#         reason: str = Body(...),
+#         user_id: UUID = Depends(security.auth_user_id),
+#         user_service: UserService = Depends(UserService)
+# ):
+#     user_service.add_swipes(user_id, swipes)
+#     logger.info(f'{swipes} swipes have been added. Reason {reason}')
+#     return Response(status_code=status.HTTP_201_CREATED)
 
 
 @router.get(
