@@ -59,13 +59,11 @@ async def fetch_chat(
 @router.get(
     '',
     name='Fetch all chats',
-    response_model_exclude_none=True,
     response_model=MultipleChatsOut)
 async def fetch_chats(
         only_unread: bool = False,
         chat_service: ChatService = Depends(),
         user_service: UserService = Depends(),
-        redis_online: RedisOnlineUserService = Depends(),
         user_id: UUID = Depends(security.auth_user_id)):
     """
     When 'only_unread' is set to true, returns only chats with unread messages
@@ -79,7 +77,7 @@ async def fetch_chats(
     users: list[Row] = \
         user_service.get_user_chat_preview(list(user_ids), location=True)
     resp_data: MultipleChatsOut = \
-        await MultipleChatsOut.parse_chats(chats, users, user_id, redis_online)
+        await MultipleChatsOut.parse_chats(chats, users, user_id)
     return resp_data
 
 

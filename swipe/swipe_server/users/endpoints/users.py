@@ -1,3 +1,4 @@
+import functools
 import logging
 from uuid import UUID
 
@@ -82,10 +83,10 @@ async def fetch_list_of_online_users(
     collected_users = user_service.get_user_card_previews(
         user_ids=collected_user_ids)
 
-    collected_users = sorted(
-        collected_users,
-        key=lambda user:
-        abs(current_user.date_of_birth - user.date_of_birth).days
+    collected_users.sort(
+        key=functools.partial(user_service.card_preview_key,
+                              current_user_dob=current_user.date_of_birth),
+        reverse=True
     )
 
     return [

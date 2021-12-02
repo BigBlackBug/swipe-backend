@@ -4,17 +4,14 @@ import datetime
 from typing import Optional, Any
 from uuid import UUID
 
-from dateutil.relativedelta import relativedelta
 from pydantic import BaseModel, validator
 from sqlalchemy.engine import Row
 
 from swipe.swipe_server.chats.models import MessageStatus, ChatMessage, Chat, \
     ChatStatus, \
     ChatSource, GlobalChatMessage
-from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.redis_services import RedisOnlineUserService
 from swipe.swipe_server.users.schemas import UserOutGlobalChatPreviewORM, \
     UserOutChatPreview
 
@@ -102,22 +99,22 @@ class MultipleChatsOut(BaseModel):
     chats: list[ChatOut] = []
     users: dict[UUID, UserOutChatPreview] = {}
 
+    @staticmethod
+    # sort chats by last message date
+    def _date_sort_key(_chat: Chat):
+        if not _chat.messages:
+            return datetime.datetime.now()
+        else:
+            return _chat.messages[0].timestamp
+
     @classmethod
     async def parse_chats(
             cls, chats: list[Chat],
             users: list[User] | list[Row],
-            current_user_id: UUID,
-            redis_online: RedisOnlineUserService) -> MultipleChatsOut:
+            current_user_id: UUID) -> MultipleChatsOut:
         result = {'chats': [], 'requests': [], 'users': {}}
 
-        # sort chats by last message date
-        def _date_sort_key(_chat: Chat):
-            if not _chat.messages:
-                return datetime.datetime.now()
-            else:
-                return _chat.messages[0].timestamp
-
-        chats.sort(key=_date_sort_key, reverse=True)
+        chats.sort(key=MultipleChatsOut._date_sort_key, reverse=True)
 
         for chat in chats:
             data: dict = ChatORMSchema.parse_chat(chat, current_user_id)
@@ -137,10 +134,5 @@ class MultipleChatsOut(BaseModel):
         for user in users:
             user_data: UserOutChatPreview \
                 = UserOutChatPreview.patched_from_orm(user)
-            user_age = relativedelta(
-                datetime.datetime.utcnow().date(),
-                user.date_of_birth).years
-            user_data.online = \
-                await redis_online.is_online(str(user.id), user_age)
             result['users'][user.id] = user_data
         return cls.parse_obj(result)

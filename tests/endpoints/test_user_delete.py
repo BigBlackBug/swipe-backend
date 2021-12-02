@@ -80,9 +80,6 @@ async def test_user_delete(
         select(AuthInfo).where(AuthInfo.id == auth_info_id)). \
         scalars().one_or_none()
 
-    assert not await redis_online.is_online(
-        str(default_user.id), default_user.age)
-
     all_settings = OnlineUserCacheParams(
         age=default_user.age,
         country=default_user.location.country,

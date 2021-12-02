@@ -78,7 +78,10 @@ async def websocket_endpoint(
     with dependencies.db_context() as session:
         user_service = UserService(session)
         # loading only required fields
-        if (user := user_service.get_user_login_preview_one(user_uuid)) is None:
+        if user := user_service.get_user_login_preview_one(user_uuid):
+            user.last_online = None
+            session.commit()
+        else:
             logger.info(f"User {user_id} not found")
             await websocket.close(1003)
             return
@@ -117,8 +120,6 @@ async def websocket_endpoint(
         except WebSocketDisconnect as e:
             logger.info(f"{user_id} disconnected with code {e.code}")
             await connection_manager.disconnect(user_id)
-            # removing user from online caches
-            await redis_online.remove_from_online_caches(user)
             # setting last_online field
             with dependencies.db_context() as session:
                 session.add(user)
@@ -128,6 +129,10 @@ async def websocket_endpoint(
 
                 user.last_online = datetime.datetime.utcnow()
                 session.commit()
+            # adding him to recently online
+            # such users are cleared every 10 minutes
+            # check main server @startup events
+            await redis_online.add_to_recently_online_cache(user)
             # removing all /fetch responses
             await redis_fetch.drop_fetch_response_caches(user_id)
             # removing blacklist cache

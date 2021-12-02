@@ -22,6 +22,9 @@ async def test_fetch_existing_chats(
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     other_user = randomizer.generate_random_user()
+    # he's offline
+    other_user.last_online = datetime.datetime.utcnow()
+
     older_chat = Chat(
         status=ChatStatus.ACCEPTED,
         source=ChatSource.VIDEO_LOBBY,
@@ -66,7 +69,6 @@ async def test_fetch_existing_chats(
     # default user is online
     await redis_online.add_to_online_caches(default_user)
     # --------------------------------------------------------
-    print("Sending request")
     response: Response = await client.get(
         f"{settings.API_V1_PREFIX}/me/chats",
         headers=default_user_auth_headers
@@ -79,10 +81,14 @@ async def test_fetch_existing_chats(
         str(default_user.id), str(other_user.id), str(second_user.id)
     }
     assert users[str(default_user.id)]['name'] == default_user.name
-    assert users[str(default_user.id)]['online'] is True
+    assert users[str(default_user.id)]['last_online'] is None
 
+    # this dude should be offline
     assert users[str(other_user.id)]['name'] == other_user.name
+    assert users[str(other_user.id)]['last_online']
+
     assert users[str(second_user.id)]['name'] == second_user.name
+    assert users[str(second_user.id)]['last_online'] is None
 
     chats = response.json()['chats']
     assert len(chats) == 2

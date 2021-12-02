@@ -2,6 +2,7 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, date
 from typing import Optional, Union, Iterable
 from uuid import UUID
 
@@ -97,7 +98,7 @@ class UserService:
             where(clause).options(
             Load(User).load_only('id', 'name', 'bio', 'zodiac_sign',
                                  'date_of_birth', 'rating', 'interests',
-                                 'photos', 'instagram_profile',
+                                 'photos', 'instagram_profile', 'last_online',
                                  'tiktok_profile', 'snapchat_profile'),
             joinedload(User.location)
         )
@@ -336,6 +337,19 @@ class UserService:
                 .where(AuthInfo.access_token == token)) \
             .scalar_one_or_none()
 
+    @staticmethod
+    def card_preview_key(user: User, current_user_dob: date):
+        # offline dudes should come last
+        if user.last_online:
+            # grouping by 10 minutes
+            key = 100 * relativedelta(
+                datetime.utcnow(), user.last_online).minutes % 10
+        else:
+            # online users come first
+            key = 100_000_000
+        key -= 1000 * abs(current_user_dob - user.date_of_birth).days
+        return key
+
 
 @dataclass
 class UserPool:
@@ -364,7 +378,7 @@ class FetchUserService:
         cached_user_ids: set[str] = \
             await self.redis_fetch.get_response_cache(fetch_cache_params)
 
-        age_difference = 1
+        age_difference = settings.ONLINE_USER_DEFAULT_AGE_DIFF
 
         logger.info(f"Got filter params {filter_params}, "
                     f"previous cache {cached_user_ids}")
@@ -381,11 +395,18 @@ class FetchUserService:
         result = set()
         while len(result) < filter_params.limit \
                 and age_difference <= settings.ONLINE_USER_MAX_AGE_DIFF:
-            age_range = range(user_age - age_difference,
-                              user_age + age_difference + 1)
+            shift = -1
+            # we're going age+0,-1,1,-2,2 etc
+            sorted_age_range = [user_age]
+            logger.info(f"Current age {user_age}, diff {age_difference}")
+            while len(sorted_age_range) < age_difference * 2 + 1:
+                sorted_age_range.append(user_age + shift)
+                sorted_age_range.append(user_age - shift)
+                shift = - (abs(shift) + 1)
+            logger.info(f"Checking age range {sorted_age_range}")
 
             # filling current user pool
-            for current_age in age_range:
+            for current_age in sorted_age_range:
                 cache_params = OnlineUserCacheParams(
                     age=current_age, country=filter_params.country,
                     city=filter_params.city, gender=filter_params.gender)
@@ -393,9 +414,12 @@ class FetchUserService:
                 if current_age not in online_users_pool:
                     user_cache = \
                         await self.redis_online.get_online_users(cache_params)
-                    online_users_pool[current_age] = UserPool(list(user_cache))
+                    user_cache = list(user_cache)
+                    online_users_pool[current_age] = UserPool(user_cache)
+                    logger.info(f"Got {len(user_cache)} online users "
+                                f"for age={current_age}")
 
-            for current_age in age_range:
+            for current_age in sorted_age_range:
                 current_pool: UserPool = online_users_pool[current_age]
                 # getting one user per age pool
                 if current_pool.head < len(current_pool.online_users):
@@ -404,6 +428,9 @@ class FetchUserService:
                     if candidate not in cached_user_ids \
                             and candidate not in blacklist \
                             and candidate != user_id:
+                        logger.info(
+                            f"Found {candidate} in user pool "
+                            f"for age={current_age}")
                         result.add(candidate)
 
                 if len(result) == filter_params.limit:
@@ -411,7 +438,10 @@ class FetchUserService:
                     break
             else:
                 # online users depleted, extend age_diff and try again
-                age_difference += 2
+                age_difference += settings.ONLINE_USER_AGE_DIFF_STEP
+                logger.info(
+                    f"Online users depleted for range {sorted_age_range}, "
+                    f"increasing age_difference to {age_difference}")
                 continue
 
         # got enough users or max age diff reached

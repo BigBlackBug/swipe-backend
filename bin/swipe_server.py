@@ -3,8 +3,6 @@ import sys
 
 import uvicorn
 
-from swipe.swipe_server.misc.storage import storage_client
-
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 from swipe import config
@@ -19,6 +17,7 @@ from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
     RedisUserFetchService
 from swipe.swipe_server.users.services import PopularUserService, \
     CountryCacheService
+from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.misc import dependencies
 from swipe.settings import settings, constants
 from swipe.swipe_server import swipe_app
@@ -64,6 +63,7 @@ async def invalidate_caches():
 
 @app.on_event("startup")
 async def init_storage_buckets():
+    logger.info("Initializing storage buckets")
     storage_client.initialize_buckets()
 
 
@@ -76,12 +76,22 @@ async def populate_country_cache():
 
 
 @app.on_event("startup")
-@repeat_every(seconds=60 * 60, logger=logger)
+@repeat_every(seconds=constants.POPULAR_CACHE_POPULATE_JOB_TIMEOUT_SEC,
+              logger=logger)
 async def populate_popular_cache():
     logger.info("Populating popular cache")
     with dependencies.db_context() as db:
         service = PopularUserService(db, dependencies.redis())
         await service.populate_popular_cache()
+
+
+@app.on_event("startup")
+@repeat_every(seconds=constants.RECENTLY_ONLINE_CLEAR_JOB_TIMEOUT_SEC,
+              logger=logger, wait_first=True)
+async def remove_recently_online_cache():
+    logger.info("Filtering recently online users")
+    service = RedisOnlineUserService(dependencies.redis())
+    await service.update_recently_online_cache()
 
 
 if __name__ == '__main__':

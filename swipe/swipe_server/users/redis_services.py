@@ -1,4 +1,6 @@
+import json
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional, Tuple, AsyncGenerator
@@ -188,6 +190,8 @@ class RedisBlacklistService:
 
 
 class RedisOnlineUserService:
+    RECENTLY_ONLINE_KEY = 'recently_online'
+
     def __init__(self,
                  redis: Redis = Depends(dependencies.redis)):
         self.redis = redis
@@ -220,11 +224,6 @@ class RedisOnlineUserService:
         for key in cache_params.online_keys():
             await self.redis.srem(key, user_id)
 
-    async def is_online(self, user_id: str, user_age: int):
-        cache_params = OnlineUserCacheParams(age=user_age)
-        return await self.redis.sismember(
-            cache_params.cache_key(), user_id)
-
     async def update_user_location(
             self, user: User, previous_location: Location):
         cache_params = OnlineUserCacheParams(
@@ -243,6 +242,38 @@ class RedisOnlineUserService:
     async def invalidate_online_user_cache(self):
         for key in await self.redis.keys('online:*'):
             await self.redis.delete(key)
+
+    async def update_recently_online_cache(
+            self, recently_online_ttl=constants.RECENTLY_ONLINE_TTL_SEC):
+        for key in await self.redis.keys(f'{self.RECENTLY_ONLINE_KEY}:*'):
+            user_data = await self.redis.get(key)
+            user_data = json.loads(user_data)
+            # dude's been gone for too long
+            online_time_diff = (int(time.time()) - user_data['last_online'])
+            if online_time_diff > recently_online_ttl:
+                # removing this dude from the recently_online list
+                await self.redis.delete(key)
+
+                cache_params = OnlineUserCacheParams(
+                    age=user_data['age'], country=user_data['country'],
+                    city=user_data['city'], gender=user_data['gender'])
+                user_id = str(key).split(":")[1]
+
+                # removing this dude from all online caches
+                for online_key in cache_params.online_keys():
+                    await self.redis.srem(online_key, user_id)
+
+    async def add_to_recently_online_cache(self, user: User):
+        key = f'{self.RECENTLY_ONLINE_KEY}:{user.id}'
+        value = {
+            # I'm intentionally not using field value from user object
+            'last_online': int(time.time()),
+            'age': user.age,
+            'country': user.location.country,
+            'city': user.location.city,
+            'gender': user.gender.value
+        }
+        await self.redis.set(key, json.dumps(value))
 
 
 class RedisUserFetchService:

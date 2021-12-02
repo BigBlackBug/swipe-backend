@@ -32,6 +32,7 @@ class MMUserService:
         max_age = datetime.datetime.utcnow() + relativedelta(
             years=age + age_difference)
 
+        # TODO this motherfucker might be slow
         a_to_b = select(Chat.the_other_person_id).where(
             Chat.initiator_id == current_user_id
         )

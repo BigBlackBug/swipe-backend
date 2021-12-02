@@ -87,9 +87,9 @@ async def test_user_fetch_popular(
     )
     assert response.status_code == 200
     resp_data = response.json()
-    assert {user['id'] for user in resp_data} == \
-           {str(user_1.id), str(user_2.id), str(user_3.id),
-            str(default_user.id)}
+    assert [user['id'] for user in resp_data] == \
+           [str(default_user.id), str(user_1.id), str(user_2.id),
+            str(user_3.id)]
 
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch_popular",
@@ -101,8 +101,8 @@ async def test_user_fetch_popular(
     )
     assert response.status_code == 200
     resp_data = response.json()
-    assert {user['id'] for user in resp_data} == \
-           {str(user_3.id)}
+    assert [user['id'] for user in resp_data] == \
+           [str(user_3.id)]
 
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch_popular",
@@ -113,8 +113,8 @@ async def test_user_fetch_popular(
     )
     assert response.status_code == 200
     resp_data = response.json()
-    assert {user['id'] for user in resp_data} == \
-           {str(user_2.id), str(user_5.id)}
+    assert [user['id'] for user in resp_data] == \
+           [str(user_2.id), str(user_5.id)]
 
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch_popular",
@@ -124,9 +124,9 @@ async def test_user_fetch_popular(
     )
     assert response.status_code == 200
     resp_data = response.json()
-    assert {user['id'] for user in resp_data} == \
-           {str(default_user.id), str(user_1.id), str(user_2.id),
-            str(user_3.id), str(user_4.id), str(user_5.id)}
+    assert [user['id'] for user in resp_data] == \
+           [str(default_user.id), str(user_1.id), str(user_2.id),
+            str(user_3.id), str(user_4.id), str(user_5.id)]
 
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch_popular",
