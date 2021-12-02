@@ -6,9 +6,10 @@ from pydantic import BaseSettings, PostgresDsn, RedisDsn
 
 
 class Constants(BaseSettings):
-    FREE_SWIPES_PER_TIME_PERIOD = 50
+    SWIPES_PER_TIME_PERIOD = 50
     # TODO make it 30 mins
-    FREE_SWIPES_COOLDOWN_SEC = 10
+    SWIPES_REAP_TIMEOUT_SEC = 5 * 60
+    SWIPES_DEFAULT_NUMBER = 30
 
     CALL_FEEDBACK_RATING_DIFF = 5
 

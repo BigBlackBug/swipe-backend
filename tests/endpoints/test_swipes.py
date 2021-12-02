@@ -28,7 +28,7 @@ async def test_free_swipes_can_be_reaped(
     session.refresh(default_user)
     assert response.status_code == 200
     assert default_user.swipes == \
-           old_swipes + constants.FREE_SWIPES_PER_TIME_PERIOD
+           old_swipes + constants.SWIPES_PER_TIME_PERIOD
     assert response.json()['swipes'] == default_user.swipes
 
 

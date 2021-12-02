@@ -10,6 +10,7 @@ from sqlalchemy import Column, String, Boolean, Integer, Enum, ARRAY, \
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, object_session
 
+from swipe.settings import constants
 from swipe.swipe_server.misc.database import ModelBase
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.enums import UserInterests, Gender, \
@@ -76,7 +77,8 @@ class User(ModelBase):
     firebase_token = Column(String)
     # variables
     rating = Column(Integer, nullable=False, default=0)
-    swipes = Column(Integer, nullable=False, default=0)
+    swipes = Column(Integer, nullable=False,
+                    default=constants.SWIPES_DEFAULT_NUMBER)
     is_premium = Column(Boolean, nullable=False, default=False)
 
     blacklist = relationship(

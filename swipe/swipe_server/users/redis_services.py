@@ -81,12 +81,12 @@ class RedisSwipeReaperService:
         # I could test the method
 
         reap_date = datetime.utcnow() + timedelta(
-            seconds=constants.FREE_SWIPES_COOLDOWN_SEC)
+            seconds=constants.SWIPES_REAP_TIMEOUT_SEC)
         reap_date = reap_date.replace(microsecond=0)
 
         await self.redis.setex(
             f'{self.FREE_SWIPES_REDIS_PREFIX}:{user_id}',
-            time=constants.FREE_SWIPES_COOLDOWN_SEC,
+            time=constants.SWIPES_REAP_TIMEOUT_SEC,
             value=int(reap_date.timestamp()))
 
         return reap_date

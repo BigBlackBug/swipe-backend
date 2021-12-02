@@ -91,7 +91,7 @@ async def get_free_swipes(
                    f"in {diff} seconds")
 
     new_swipes = user_service.add_swipes(
-        user_id, constants.FREE_SWIPES_PER_TIME_PERIOD)
+        user_id, constants.SWIPES_PER_TIME_PERIOD)
     reap_timestamp: datetime = \
         await redis_swipe.reset_swipe_reap_timestamp(user_id)
 
