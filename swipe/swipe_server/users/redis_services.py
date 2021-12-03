@@ -163,13 +163,17 @@ class RedisPopularService:
         await self.redis.delete(key)
         for user in users:
             await self.redis.rpush(key, str(user.id))
-            json_data = UserCardPreviewOut.patched_from_orm(user).json()
-            # TODO man, I need a separate connection without decoding
-            # but I don't wanna do that atm
-            # json_data = zlib.compress(json_data.encode('utf-8'))
-
-            await self.redis.set(
-                f'{self.POPULAR_USER_KEY}:{user.id}', json_data)
+            try:
+                json_data = UserCardPreviewOut.patched_from_orm(user).json()
+            except:
+                logger.error(f"{user.id} won't be added to popular list"
+                             f"because the model is broken")
+            else:
+                # TODO man, I need a separate connection without decoding
+                # but I don't wanna do that atm
+                # json_data = zlib.compress(json_data.encode('utf-8'))
+                await self.redis.set(
+                    f'{self.POPULAR_USER_KEY}:{user.id}', json_data)
 
     async def get_user_card_previews(self, user_ids: Iterable[str]) \
             -> list[str]:
