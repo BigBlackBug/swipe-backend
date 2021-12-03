@@ -13,10 +13,10 @@ from swipe.swipe_server.users.services import UserService, CountryCacheService, 
 
 
 @pytest.mark.anyio
-async def test_redis_fetch_online_country(
+async def test_redis_popular(
         default_user: models.User,
         user_service: UserService,
-        redis_popular:RedisPopularService,
+        redis_popular: RedisPopularService,
         fake_redis: aioredis.Redis,
         randomizer: RandomEntityGenerator,
         session: Session):
@@ -77,16 +77,17 @@ async def test_redis_fetch_online_country(
     popular_service = PopularUserService(session, fake_redis)
     await popular_service.populate_popular_cache()
 
-    result: list[str] = await redis_popular.get_popular_users(
+    result: list[str] = await redis_popular.get_popular_user_ids(
         PopularFilterBody(gender=Gender.MALE, country='Russia'))
-    assert result == [str(user_r_s_m2.id), str(user_r_s_m.id), str(user_r_s_m3.id)]
+    assert result == [str(user_r_s_m2.id), str(user_r_s_m.id),
+                      str(user_r_s_m3.id)]
 
-    result: list[str] = await redis_popular.get_popular_users(
+    result: list[str] = await redis_popular.get_popular_user_ids(
         PopularFilterBody(gender=Gender.FEMALE, city='New York', country='USA'))
     assert set(result) == {
         str(user_u_n_f.id)}
 
-    result: list[str] = await redis_popular.get_popular_users(
+    result: list[str] = await redis_popular.get_popular_user_ids(
         PopularFilterBody(country='USA'))
     assert set(result) == {
         str(user_u_n_f.id), str(user_u_n_h.id)}

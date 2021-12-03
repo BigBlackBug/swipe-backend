@@ -7,6 +7,7 @@ from uuid import UUID
 
 import aioredis
 import requests
+from aioredis import Redis
 from dateutil.relativedelta import relativedelta
 from fastapi import Depends
 from jose import jwt
@@ -253,19 +254,24 @@ class UserService:
     def fetch_popular(self, country: Optional[str] = None,
                       gender: Optional[Gender] = None,
                       city: Optional[str] = None,
-                      limit: int = 100) -> list[str]:
+                      limit: int = 100) -> list[User]:
         if city and not country:
             raise SwipeError("Either none or both country and city must be set")
 
         city_clause = True if not city else Location.city == city
         country_clause = True if not country else Location.country == country
         gender_clause = True if not gender else User.gender == gender
+        query = self.db.query(User). \
+            join(User.location). \
+            where(country_clause).where(city_clause).where(gender_clause). \
+            options(
+            Load(User).load_only('id', 'name', 'bio', 'zodiac_sign',
+                                 'date_of_birth', 'rating', 'interests',
+                                 'photos', 'instagram_profile',
+                                 'tiktok_profile', 'snapchat_profile',
+                                 'last_online'),
+        ).order_by(desc(User.rating)).limit(limit)
 
-        query = select(cast(User.id, String)).join(User.location). \
-            where(country_clause). \
-            where(city_clause). \
-            where(gender_clause). \
-            order_by(desc(User.rating)).limit(limit)
         return self.db.execute(query).scalars().all()
 
     @enable_blacklist(return_value_class=set)
@@ -336,12 +342,11 @@ class UserPool:
 
 class FetchUserService:
     def __init__(self,
-                 redis_fetch: RedisUserFetchService = Depends(),
-                 redis_online: RedisOnlineUserService = Depends(),
-                 redis_blacklist: RedisBlacklistService = Depends()):
-        self.redis_fetch = redis_fetch
-        self.redis_online = redis_online
-        self.redis_blacklist = redis_blacklist
+                 redis: Redis = Depends(dependencies.redis)):
+        self.redis_fetch = RedisUserFetchService(redis)
+        self.redis_popular = RedisPopularService(redis)
+        self.redis_online = RedisOnlineUserService(redis)
+        self.redis_blacklist = RedisBlacklistService(redis)
 
     async def collect(self, user_id: str, user_age: int,
                       filter_params: OnlineFilterBody) -> set[str]:
@@ -428,9 +433,17 @@ class FetchUserService:
             fetch_cache_params, result)
         return result
 
-    async def get_user_card_previews(self, user_ids: Iterable[str]) \
+    async def get_online_card_previews(self, user_ids: Iterable[str]) \
             -> list[UserCardPreviewOut]:
         users_data = await self.redis_online.get_user_card_previews(user_ids)
+        return [
+            UserCardPreviewOut.parse_raw(user_data)
+            for user_data in users_data
+        ]
+
+    async def get_popular_card_previews(self, user_ids: Iterable[str]) \
+            -> list[UserCardPreviewOut]:
+        users_data = await self.redis_popular.get_user_card_previews(user_ids)
         return [
             UserCardPreviewOut.parse_raw(user_data)
             for user_data in users_data
@@ -447,12 +460,12 @@ class PopularUserService:
     async def _fill_cache(self, country: Optional[str] = None,
                           city: Optional[str] = None,
                           gender: Optional[Gender] = None):
-        users = self.user_service.fetch_popular(
+        users: list[User] = self.user_service.fetch_popular(
             country=country, city=city, gender=gender)
         logger.info(
             f"Got {len(users)} popular users from db for: "
             f"country:{country or 'ALL'}, city:{city or 'ALL'}, "
-            f"{gender or 'ALL'}")
+            f"gender: {gender or 'ALL'}")
         await self.redis_popular.save_popular_users(
             country=country, city=city, gender=gender, users=users)
 
@@ -460,6 +473,7 @@ class PopularUserService:
         logger.info("Populating popular cache")
         locations = self.redis_locations.fetch_locations()
 
+        await self.redis_popular.clear_popular_users()
         # global popular cache
         logger.info("Populating global cache")
         await self._fill_cache(gender=Gender.MALE)

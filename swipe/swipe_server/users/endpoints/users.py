@@ -29,7 +29,7 @@ router = APIRouter()
     response_model=list[UserCardPreviewOut])
 async def fetch_list_of_popular_users(
         filter_params: PopularFilterBody = Body(...),
-        user_service: UserService = Depends(),
+        fetch_service: FetchUserService = Depends(),
         redis_popular: RedisPopularService = Depends(),
         current_user_id: UUID = Depends(security.auth_user_id)):
     """
@@ -39,11 +39,11 @@ async def fetch_list_of_popular_users(
     logger.info(f"Fetching popular users with {filter_params}")
     # TODO maybe store whole users?
     popular_users: list[str] = \
-        await redis_popular.get_popular_users(filter_params)
+        await redis_popular.get_popular_user_ids(filter_params)
 
     logger.info(f"Got popular users for {filter_params}: {popular_users}")
     collected_users = \
-        user_service.get_user_card_previews(user_ids=popular_users)
+        await fetch_service.get_popular_card_previews(user_ids=popular_users)
     # TODO don't need to sort that?
     collected_users = sorted(collected_users,
                              key=lambda user: user.rating, reverse=True)
@@ -81,7 +81,7 @@ async def fetch_list_of_online_users(
         return []
 
     collected_users: list[UserCardPreviewOut] \
-        = await fetch_service.get_user_card_previews(collected_user_ids)
+        = await fetch_service.get_online_card_previews(collected_user_ids)
 
     collected_users.sort(
         key=functools.partial(UserCardPreviewOut.sort_key,

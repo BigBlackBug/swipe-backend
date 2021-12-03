@@ -127,16 +127,19 @@ class RedisLocationService:
 
 
 class RedisPopularService:
+    POPULAR_LIST_KEY = 'popular'
+    POPULAR_USER_KEY = 'popular_user'
+
     def __init__(self,
                  redis: Redis = Depends(dependencies.redis)):
         self.redis = redis
 
-    async def get_popular_users(self, filter_params: PopularFilterBody) \
+    async def get_popular_user_ids(self, filter_params: PopularFilterBody) \
             -> list[str]:
         gender = filter_params.gender or 'ALL'
         city = filter_params.city or 'ALL'
         country = filter_params.country or 'ALL'
-        key = f'popular:{gender}:country:{country}:city:{city}'
+        key = f'{self.POPULAR_LIST_KEY}:{gender}:country:{country}:city:{city}'
 
         logger.info(f"Getting popular for key {key}")
         return await self.redis.lrange(
@@ -144,7 +147,7 @@ class RedisPopularService:
             filter_params.offset + filter_params.limit - 1)
 
     async def save_popular_users(self,
-                                 users: list[str],
+                                 users: list[User],
                                  country: Optional[str] = None,
                                  gender: Optional[Gender] = None,
                                  city: Optional[str] = None):
@@ -153,11 +156,30 @@ class RedisPopularService:
         gender = gender or 'ALL'
         city = city or 'ALL'
         country = country or 'ALL'
-        key = f'popular:{gender}:country:{country}:city:{city}'
-        logger.info(f"Deleting and saving popular cache for {key}")
+        key = f'{self.POPULAR_LIST_KEY}:{gender}:country:{country}:city:{city}'
+        logger.info(f"Deleting and saving popular cache "
+                    f"of {len(users)} users for {key}")
 
         await self.redis.delete(key)
-        await self.redis.rpush(key, *users)
+        for user in users:
+            await self.redis.rpush(key, str(user.id))
+            json_data = UserCardPreviewOut.patched_from_orm(user).json()
+            # TODO man, I need a separate connection without decoding
+            # but I don't wanna do that atm
+            # json_data = zlib.compress(json_data.encode('utf-8'))
+
+            await self.redis.set(
+                f'{self.POPULAR_USER_KEY}:{user.id}', json_data)
+
+    async def get_user_card_previews(self, user_ids: Iterable[str]):
+        return await self.redis.mget([
+            f'{self.POPULAR_USER_KEY}:{user_id}' for user_id in user_ids
+        ])
+
+    async def clear_popular_users(self):
+        if keys := await self.redis.keys(f'{self.POPULAR_USER_KEY}:*'):
+            logger.info(f"Clearing {len(keys)} cached popular users")
+            await self.redis.delete(*keys)
 
 
 class RedisBlacklistService:
