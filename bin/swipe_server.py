@@ -1,7 +1,9 @@
+import datetime
 import os
 import sys
 
 import uvicorn
+from sqlalchemy import select
 
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
@@ -13,6 +15,7 @@ import logging
 import alembic.command
 import alembic.config
 from fastapi_utils.tasks import repeat_every
+from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
     RedisUserFetchService
 from swipe.swipe_server.users.services import PopularUserService, \
@@ -65,6 +68,23 @@ async def invalidate_caches():
 async def init_storage_buckets():
     logger.info("Initializing storage buckets")
     storage_client.initialize_buckets()
+
+
+# TODO just for devs, remove
+@app.on_event("startup")
+async def populate_online_cache():
+    redis_online = RedisOnlineUserService(dependencies.redis())
+    with dependencies.db_context() as db:
+        last_online = datetime.datetime.utcnow() - datetime.timedelta(hours=1)
+        last_online_users = \
+            db.execute(select(User).where(
+                User.last_online > last_online
+            )).scalars().all()
+        logger.info(f"Found {len(last_online_users)} "
+                    f"online users during previous hour")
+        for user in last_online_users:
+            await redis_online.add_to_recently_online_cache(user)
+            await redis_online.add_to_online_caches(user)
 
 
 @app.on_event("startup")
