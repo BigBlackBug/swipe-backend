@@ -232,6 +232,7 @@ class UserService:
             update(User).where(User.id == user_id).
                 values(swipes=(User.swipes + swipe_number)).
                 returning(User.swipes)).scalar_one()
+        self.db.commit()
         return new_swipes
 
     def get_photo_url(self, image_id: str):
