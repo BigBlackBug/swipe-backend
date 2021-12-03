@@ -69,8 +69,8 @@ async def get_free_swipe_status(
             "content": {
                 "application/json": {
                     "example": {
-                        "swipes": "100500",
-                        "reap_timestamp": 1500
+                        "swipes": 100500,
+                        "reap_timestamp": '2021-10-02T15:57:44'
                     }
                 }
             },
