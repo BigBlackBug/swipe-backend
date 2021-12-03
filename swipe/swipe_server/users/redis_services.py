@@ -171,7 +171,8 @@ class RedisPopularService:
             await self.redis.set(
                 f'{self.POPULAR_USER_KEY}:{user.id}', json_data)
 
-    async def get_user_card_previews(self, user_ids: Iterable[str]):
+    async def get_user_card_previews(self, user_ids: Iterable[str]) \
+            -> list[str]:
         return await self.redis.mget([
             f'{self.POPULAR_USER_KEY}:{user_id}' for user_id in user_ids
         ])

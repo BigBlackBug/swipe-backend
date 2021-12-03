@@ -443,10 +443,11 @@ class FetchUserService:
 
     async def get_popular_card_previews(self, user_ids: Iterable[str]) \
             -> list[UserCardPreviewOut]:
-        users_data = await self.redis_popular.get_user_card_previews(user_ids)
+        users_data: list[str] = \
+            await self.redis_popular.get_user_card_previews(user_ids)
         return [
             UserCardPreviewOut.parse_raw(user_data)
-            for user_data in users_data
+            for user_data in users_data if user_data is not None
         ]
 
 

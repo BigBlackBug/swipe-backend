@@ -41,9 +41,12 @@ async def fetch_list_of_popular_users(
     popular_users: list[str] = \
         await redis_popular.get_popular_user_ids(filter_params)
 
-    logger.info(f"Got popular users for {filter_params}: {popular_users}")
+    logger.info(f"Got {len(popular_users)} popular users for {filter_params}")
     collected_users = \
         await fetch_service.get_popular_card_previews(user_ids=popular_users)
+
+    logger.info(f"Got {len(collected_users)} popular users card "
+                f"previews for {filter_params}")
     # TODO don't need to sort that?
     collected_users = sorted(collected_users,
                              key=lambda user: user.rating, reverse=True)
