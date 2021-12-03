@@ -75,7 +75,7 @@ async def websocket_endpoint(
         return
 
     user: User
-    with dependencies.db_context() as session:
+    with dependencies.db_context(expire_on_commit=False) as session:
         user_service = UserService(session)
         # loading only required fields
         if user := user_service.get_user_card_preview(user_uuid):
@@ -124,7 +124,7 @@ async def websocket_endpoint(
             logger.info(f"{user_id} disconnected with code {e.code}")
             await connection_manager.disconnect(user_id)
             # setting last_online field
-            with dependencies.db_context() as session:
+            with dependencies.db_context(expire_on_commit=False) as session:
                 session.add(user)
                 # going offline, gotta save the token to cache
                 await firebase_service.add_token_to_cache(

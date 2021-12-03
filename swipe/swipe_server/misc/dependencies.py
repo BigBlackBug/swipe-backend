@@ -19,8 +19,8 @@ def db() -> Session:
 
 
 @contextmanager
-def db_context() -> Session:
-    session = SessionLocal()
+def db_context(expire_on_commit: bool = True) -> Session:
+    session = SessionLocal(expire_on_commit=expire_on_commit)
     try:
         yield session
     finally:
