@@ -78,7 +78,8 @@ async def populate_online_cache():
         last_online = datetime.datetime.utcnow() - datetime.timedelta(hours=1)
         last_online_users = \
             db.execute(select(User).where(
-                User.last_online > last_online
+                (User.last_online > last_online) &
+                (User.last_online != None) # noqa
             )).scalars().all()
         logger.info(f"Found {len(last_online_users)} "
                     f"online users during previous hour")
