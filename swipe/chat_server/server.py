@@ -78,7 +78,7 @@ async def websocket_endpoint(
     with dependencies.db_context() as session:
         user_service = UserService(session)
         # loading only required fields
-        if user := user_service.get_user_login_preview_one(user_uuid):
+        if user := user_service.get_user_card_preview(user_uuid):
             user.last_online = None
             session.commit()
         else:
@@ -94,7 +94,10 @@ async def websocket_endpoint(
     redis_blacklist = RedisBlacklistService(redis)
     redis_fetch = RedisUserFetchService(redis)
 
+    # gender, dob, location, name, firebase_token, avatar_id + avatar_url
     await redis_online.add_to_online_caches(user)
+    # we may have returned before the cache is dropped
+    await redis_online.remove_from_recently_online(user_id)
 
     await connection_manager.connect(
         ConnectedUser(user_id=user_id, connection=websocket))

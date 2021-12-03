@@ -3,7 +3,7 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, AsyncGenerator
+from typing import Optional, Tuple, AsyncGenerator, Iterable
 from uuid import UUID
 
 from aioredis import Redis
@@ -14,7 +14,8 @@ from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import User, Location
-from swipe.swipe_server.users.schemas import PopularFilterBody
+from swipe.swipe_server.users.schemas import PopularFilterBody, \
+    UserCardPreviewOut
 from swipe.swipe_server.utils import enable_blacklist
 
 logger = logging.getLogger(__name__)
@@ -190,7 +191,8 @@ class RedisBlacklistService:
 
 
 class RedisOnlineUserService:
-    RECENTLY_ONLINE_KEY = 'recently_online'
+    RECENTLY_ONLINE_KEY = 'recently_online_user'
+    ONLINE_USER_KEY = 'online_user'
 
     def __init__(self,
                  redis: Redis = Depends(dependencies.redis)):
@@ -212,6 +214,13 @@ class RedisOnlineUserService:
         for key in cache_params.online_keys():
             await self.redis.sadd(key, user_id)
 
+        json_data = UserCardPreviewOut.patched_from_orm(user).json()
+        # TODO man, I need a separate connection without decoding
+        # but I don't wanna do that atm
+        # json_data = zlib.compress(json_data.encode('utf-8'))
+
+        await self.redis.set(f'{self.ONLINE_USER_KEY}:{user.id}', json_data)
+
     async def remove_from_online_caches(self, user: User):
         cache_params = OnlineUserCacheParams(
             age=user.age,
@@ -223,6 +232,7 @@ class RedisOnlineUserService:
         user_id = str(user.id)
         for key in cache_params.online_keys():
             await self.redis.srem(key, user_id)
+        await self.redis.delete(f'{self.ONLINE_USER_KEY}:{user.id}')
 
     async def update_user_location(
             self, user: User, previous_location: Location):
@@ -264,16 +274,37 @@ class RedisOnlineUserService:
                     await self.redis.srem(online_key, user_id)
 
     async def add_to_recently_online_cache(self, user: User):
-        key = f'{self.RECENTLY_ONLINE_KEY}:{user.id}'
-        value = {
+        last_online = datetime.utcnow()
+        user_data = {
             # I'm intentionally not using field value from user object
-            'last_online': int(time.time()),
+            'last_online': int(last_online.timestamp()),
             'age': user.age,
             'country': user.location.country,
             'city': user.location.city,
             'gender': user.gender.value
         }
-        await self.redis.set(key, json.dumps(value))
+        # user_data = zlib.compress(json.dumps(user_data).encode('utf-8'))
+        await self.redis.set(
+            f'{self.RECENTLY_ONLINE_KEY}:{user.id}', json.dumps(user_data))
+
+        # update last_online field here so that we could sort these entities
+        # without touching the cache again
+        cached_user = await self.redis.get(
+            f'{self.ONLINE_USER_KEY}:{user.id}'
+        )
+        cached_user = json.loads(cached_user)
+        cached_user['last_online'] = last_online.isoformat()
+        await self.redis.set(f'{self.ONLINE_USER_KEY}:{user.id}',
+                             json.dumps(cached_user))
+
+    async def remove_from_recently_online(self, user_id: str):
+        await self.redis.delete(f'{self.RECENTLY_ONLINE_KEY}:{user_id}')
+
+    async def get_user_card_previews(self, user_ids: Iterable[str]) \
+            -> Iterable[str]:
+        return await self.redis.mget([
+            f'{self.ONLINE_USER_KEY}:{user_id}' for user_id in user_ids
+        ])
 
 
 class RedisUserFetchService:

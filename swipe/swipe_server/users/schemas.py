@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Optional, Any
 from uuid import UUID
 
+from dateutil.relativedelta import relativedelta
 from pydantic import BaseModel, Field, root_validator
 from sqlalchemy.engine import Row
 
@@ -60,7 +61,7 @@ class UserCardPreviewOut(BaseModel):
     id: UUID
     name: str
     bio: str
-    zodiac_sign: ZodiacSign
+    zodiac_sign: str
     date_of_birth: datetime.date
 
     rating: int
@@ -74,6 +75,8 @@ class UserCardPreviewOut(BaseModel):
     tiktok_profile: Optional[str] = None
     snapchat_profile: Optional[str] = None
 
+    last_online: Optional[datetime.datetime] = None
+
     @classmethod
     def patched_from_orm(cls: UserOut, obj: Any) -> UserOut:
         schema_obj = cls.from_orm(obj)
@@ -82,6 +85,19 @@ class UserCardPreviewOut(BaseModel):
             patched_photos.append(storage_client.get_image_url(photo_id))
         schema_obj.photo_urls = patched_photos
         return schema_obj
+
+    @staticmethod
+    def sort_key(user: UserCardPreviewOut, current_user_dob: datetime.date):
+        # offline dudes should come last
+        if user.last_online:
+            # grouping by 10 minutes
+            key = 100 * relativedelta(
+                datetime.datetime.utcnow(), user.last_online).minutes % 10
+        else:
+            # online users come first
+            key = 100_000_000
+        key -= 1000 * abs(current_user_dob - user.date_of_birth).days
+        return key
 
     class Config:
         # allows Pydantic to read orm models and not just dicts
@@ -210,7 +226,6 @@ class UserOutGlobalChatPreviewORM(BaseModel):
 class UserOutChatPreview(BaseModel):
     id: UUID
     name: str
-    # TODO remove
     online: bool = False
     # None if he is online
     last_online: Optional[datetime.datetime] = None
@@ -225,4 +240,5 @@ class UserOutChatPreview(BaseModel):
         if orm_schema.photos:
             photo = orm_schema.photos[0]
             schema_obj.photo_url = storage_client.get_image_url(photo)
+        schema_obj.online = schema_obj.last_online is None
         return schema_obj

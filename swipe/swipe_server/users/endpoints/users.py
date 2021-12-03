@@ -80,11 +80,11 @@ async def fetch_list_of_online_users(
     if not collected_user_ids:
         return []
 
-    collected_users = user_service.get_user_card_previews(
-        user_ids=collected_user_ids)
+    collected_users: list[UserCardPreviewOut] \
+        = await fetch_service.get_user_card_previews(collected_user_ids)
 
     collected_users.sort(
-        key=functools.partial(user_service.card_preview_key,
+        key=functools.partial(UserCardPreviewOut.sort_key,
                               current_user_dob=current_user.date_of_birth),
         reverse=True
     )

@@ -2,8 +2,7 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, date
-from typing import Optional, Union, Iterable
+from typing import Optional, Iterable
 from uuid import UUID
 
 import aioredis
@@ -31,7 +30,7 @@ from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
     FetchUserCacheKey, RedisPopularService, RedisLocationService, \
     RedisUserFetchService
 from swipe.swipe_server.users.schemas import OnlineFilterBody, CallFeedback, \
-    RatingUpdateReason
+    RatingUpdateReason, UserCardPreviewOut
 from swipe.swipe_server.utils import enable_blacklist
 
 logger = logging.getLogger(__name__)
@@ -88,21 +87,19 @@ class UserService:
             select(User).where(User.id == user_id)) \
             .scalar_one_or_none()
 
-    def get_user_card_previews(
-            self,
-            user_ids: Optional[Union[Iterable[UUID], Iterable[str]]] = None) \
-            -> list[User]:
-        clause = True if user_ids is None else User.id.in_(user_ids)
-
+    def get_user_card_preview(self, user_id: UUID) -> User:
         query = self.db.query(User). \
-            where(clause).options(
+            where(User.id == user_id).options(
             Load(User).load_only('id', 'name', 'bio', 'zodiac_sign',
                                  'date_of_birth', 'rating', 'interests',
-                                 'photos', 'instagram_profile', 'last_online',
-                                 'tiktok_profile', 'snapchat_profile'),
+                                 'photos', 'instagram_profile',
+                                 'tiktok_profile', 'snapchat_profile',
+
+                                 'gender', 'avatar_id', 'firebase_token',
+                                 'last_online'),
             joinedload(User.location)
         )
-        return query.all()
+        return query.one_or_none()
 
     def get_user_chat_preview(
             self, user_ids: Optional[IDList] = None,
@@ -123,14 +120,6 @@ class UserService:
         clause = True if user_ids is None else User.id.in_(user_ids)
         return self.db.execute(
             select(User.id, User.name, User.avatar_id).where(clause)).all()
-
-    def get_user_login_preview_one(self, user_id: UUID) -> Optional[User]:
-        query = self.db.query(User).where(User.id == user_id).options(
-            Load(User).load_only("id", "name", "date_of_birth",
-                                 "gender", "avatar_id", "firebase_token"),
-            joinedload(User.location)
-        )
-        return query.one_or_none()
 
     def get_user_date_of_birth(self, user_id: UUID):
         query = self.db.query(User).where(User.id == user_id).options(
@@ -338,19 +327,6 @@ class UserService:
                 .where(AuthInfo.access_token == token)) \
             .scalar_one_or_none()
 
-    @staticmethod
-    def card_preview_key(user: User, current_user_dob: date):
-        # offline dudes should come last
-        if user.last_online:
-            # grouping by 10 minutes
-            key = 100 * relativedelta(
-                datetime.utcnow(), user.last_online).minutes % 10
-        else:
-            # online users come first
-            key = 100_000_000
-        key -= 1000 * abs(current_user_dob - user.date_of_birth).days
-        return key
-
 
 @dataclass
 class UserPool:
@@ -359,11 +335,10 @@ class UserPool:
 
 
 class FetchUserService:
-    def __init__(self, user_service: UserService = Depends(),
+    def __init__(self,
                  redis_fetch: RedisUserFetchService = Depends(),
                  redis_online: RedisOnlineUserService = Depends(),
                  redis_blacklist: RedisBlacklistService = Depends()):
-        self.user_service = user_service
         self.redis_fetch = redis_fetch
         self.redis_online = redis_online
         self.redis_blacklist = redis_blacklist
@@ -452,6 +427,14 @@ class FetchUserService:
         await self.redis_fetch.add_to_response_cache(
             fetch_cache_params, result)
         return result
+
+    async def get_user_card_previews(self, user_ids: Iterable[str]) \
+            -> list[UserCardPreviewOut]:
+        users_data = await self.redis_online.get_user_card_previews(user_ids)
+        return [
+            UserCardPreviewOut.parse_raw(user_data)
+            for user_data in users_data
+        ]
 
 
 class PopularUserService:
