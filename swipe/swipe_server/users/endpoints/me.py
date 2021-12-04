@@ -76,19 +76,23 @@ async def patch_user(
     previous_location: Location = current_user.location
     current_user: User = user_service.update_user(current_user, user_body)
 
-    if user_body.location:
+    # they are sending this patch on each login
+    if previous_location and not\
+        (previous_location.city == user_body.location.city and
+         previous_location.country == user_body.location.country):
         await redis_location.add_cities(
             user_body.location.country, [user_body.location.city])
 
-        if previous_location:
-            logger.info("Removing user from old online request caches")
-            try:
-                await redis_online.update_user_location(
-                    current_user, previous_location)
-            except:
-                logger.exception(f"Unable to update caches for {user_id}"
-                                 f"after location update")
-        # TODO I should update popular lists for his country, new country and global
+        try:
+            await redis_online.update_user_location(
+                current_user, previous_location)
+        except:
+            logger.exception(f"Unable to update caches for {user_id}"
+                             f"after location update")
+    elif not previous_location:
+        await redis_location.add_cities(
+            user_body.location.country, [user_body.location.city])
+    # TODO I should update popular lists for his country, new country and global
         # await redis_popular.update_user_location(
         #     current_user, previous_location)
 
