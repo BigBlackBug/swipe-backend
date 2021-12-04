@@ -37,9 +37,13 @@ async def fetch_list_of_popular_users(
     there are no more users and further requests make no sense
     """
     logger.info(f"Fetching popular users with {filter_params}")
-    # TODO maybe store whole users?
     popular_users: list[str] = \
         await redis_popular.get_popular_user_ids(filter_params)
+    try:
+        # we don't need to see ourselves in the list
+        popular_users.remove(str(current_user_id))
+    except ValueError:
+        pass
 
     logger.info(f"Got {len(popular_users)} popular users for {filter_params}")
     collected_users = \
