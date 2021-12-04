@@ -166,8 +166,8 @@ class RedisPopularService:
             try:
                 json_data = UserCardPreviewOut.patched_from_orm(user).json()
             except:
-                logger.error(f"{user.id} won't be added to popular list "
-                             f"because the model is broken")
+                logger.exception(f"{user.id} won't be added to popular list "
+                                 f"because the model is broken")
             else:
                 # TODO man, I need a separate connection without decoding
                 # but I don't wanna do that atm
