@@ -14,6 +14,8 @@ class ChatMessagePayload(BaseModel):
     sender_id: UUID
     recipient_id: UUID
     timestamp: datetime.datetime
+    is_liked: Optional[bool] = False
+
     text: Optional[str] = None
     image_id: Optional[str] = None
     image_url: Optional[str] = None

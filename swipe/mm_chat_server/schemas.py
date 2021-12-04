@@ -1,11 +1,20 @@
 from __future__ import annotations
 
-import datetime
 from enum import Enum
-from typing import Union, Type, Any, Optional
+from typing import Union, Type, Any
 
 import dateutil.parser
 from pydantic import BaseModel, Field, validator
+
+
+class MMTextMessageModel(BaseModel):
+    message_id: str
+    sender_id: str
+    recipient_id: str
+    timestamp: str
+    text: str
+
+    is_liked: bool = False
 
 
 class MMTextChatAction(str, Enum):
@@ -21,12 +30,8 @@ class MMTextChatPayload(BaseModel):
 class MMTextMessagePayload(BaseModel):
     type_: str = Field('message', alias='type', const=True)
     message_id: str
-    sender_id: str
-    recipient_id: str
     timestamp: str
     text: str
-
-    is_liked: Optional[bool] = None
 
     @validator('timestamp', pre=True)
     def validate_timestamp(cls, value):

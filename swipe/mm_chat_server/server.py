@@ -13,7 +13,7 @@ from swipe.chat_server.services import ConnectedUser, WSConnectionManager
 from swipe.matchmaking.schemas import MMRoundData
 from swipe.mm_chat_server.schemas import MMTextBasePayload, \
     MMTextMessagePayload, MMTextChatPayload, MMTextMessageLikePayload, \
-    MMTextChatAction
+    MMTextChatAction, MMTextMessageModel
 from swipe.settings import settings
 from swipe.swipe_server.chats.models import ChatSource
 from swipe.swipe_server.misc.errors import SwipeError
@@ -30,7 +30,7 @@ ChatTuple = namedtuple('ChatTuple', ['the_other_person_id', 'chat_id'])
 # user -> chat_id
 current_clients: dict[str, ChatTuple] = dict()
 # chat_id -> messages
-current_chats: dict[str, list[MMTextMessagePayload]] = dict()
+current_chats: dict[str, list[MMTextMessageModel]] = dict()
 
 
 # host starts
@@ -64,11 +64,11 @@ async def matchmaker_endpoint(
         # sending connected to both
         await connection_manager.send(
             current_clients[user_id].the_other_person_id, {
-                'status': 'connected'
+                'status': 'partner_connected'
             })
         await connection_manager.send(
             user_id, {
-                'status': 'connected'
+                'status': 'partner_connected'
             })
 
     while True:
@@ -115,7 +115,13 @@ async def _process_payload(base_payload: MMTextBasePayload, chat_id: str):
     logger.info(f"Got payload {payload}")
 
     if isinstance(payload, MMTextMessagePayload):
-        current_messages.append(payload)
+        current_messages.append(MMTextMessageModel(
+            sender_id=sender_id,
+            recipient_id=recipient_id,
+            message_id=payload.message_id,
+            timestamp=payload.timestamp,
+            text=payload.text
+        ))
     elif isinstance(payload, MMTextMessageLikePayload):
         message: MMTextMessagePayload
         for message in current_messages:
@@ -138,8 +144,7 @@ async def _process_payload(base_payload: MMTextBasePayload, chat_id: str):
                     'source': ChatSource.TEXT_LOBBY.value,
                     'chat_id': chat_id,
                     'messages': [
-                        message.dict(by_alias=True, exclude_none=True)
-                        for message in current_messages
+                        message.dict() for message in current_messages
                     ]
                 }
             }

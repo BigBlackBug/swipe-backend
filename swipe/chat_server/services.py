@@ -98,7 +98,8 @@ class ChatServerRequestProcessor:
                         recipient_id=data.recipient_id,
                         message=data.text,
                         image_id=data.image_id,
-                        timestamp=data.timestamp
+                        timestamp=data.timestamp,
+                        is_liked=data.is_liked
                     )
             except:
                 # TODO this should not be possible in the first place
