@@ -80,9 +80,10 @@ async def patch_user(
         await redis_location.add_cities(
             user_body.location.country, [user_body.location.city])
 
-        logger.info("Removing user from old online request caches")
-        await redis_online.update_user_location(
-            current_user, previous_location)
+        if previous_location:
+            logger.info("Removing user from old online request caches")
+            await redis_online.update_user_location(
+                current_user, previous_location)
         # TODO I should update popular lists for his country, new country and global
         # await redis_popular.update_user_location(
         #     current_user, previous_location)

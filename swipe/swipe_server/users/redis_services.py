@@ -166,7 +166,7 @@ class RedisPopularService:
             try:
                 json_data = UserCardPreviewOut.patched_from_orm(user).json()
             except:
-                logger.error(f"{user.id} won't be added to popular list"
+                logger.error(f"{user.id} won't be added to popular list "
                              f"because the model is broken")
             else:
                 # TODO man, I need a separate connection without decoding
@@ -182,8 +182,8 @@ class RedisPopularService:
         ])
 
     async def clear_popular_users(self):
+        logger.info(f"Clearing cached popular users")
         if keys := await self.redis.keys(f'{self.POPULAR_USER_KEY}:*'):
-            logger.info(f"Clearing {len(keys)} cached popular users")
             await self.redis.delete(*keys)
 
 

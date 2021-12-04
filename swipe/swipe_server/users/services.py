@@ -132,7 +132,7 @@ class UserService:
             self,
             user_object: User,
             user_update: schemas.UserUpdate) -> User:
-        for k, v in user_update.dict(exclude_unset=True).items():
+        for k, v in user_update.dict(exclude_defaults=True).items():
             if k == 'location':
                 user_object.set_location(v)
             else:
@@ -466,7 +466,7 @@ class PopularUserService:
         logger.info(
             f"Got {len(users)} popular users from db for: "
             f"country:{country or 'ALL'}, city:{city or 'ALL'}, "
-            f"gender: {gender or 'ALL'}")
+            f"gender:{gender or 'ALL'}")
         await self.redis_popular.save_popular_users(
             country=country, city=city, gender=gender, users=users)
 
