@@ -122,11 +122,18 @@ class UserService:
         return self.db.execute(
             select(User.id, User.name, User.avatar_id).where(clause)).all()
 
-    def get_user_date_of_birth(self, user_id: UUID):
+    def get_user_date_of_birth(self, user_id: UUID) -> Optional[User]:
         query = self.db.query(User).where(User.id == user_id).options(
             Load(User).load_only("date_of_birth"),
         )
         return query.one_or_none()
+
+    def get_avatar_url(self, user_id: UUID) -> str:
+        query = self.db.query(User.avatar_id).where(User.id == user_id)
+        row = query.one_or_none()
+        if row:
+            return storage_client.get_image_url(row.avatar_id)
+        return None
 
     def update_user(
             self,
@@ -440,6 +447,13 @@ class FetchUserService:
             UserCardPreviewOut.parse_raw(user_data)
             for user_data in users_data
         ]
+
+    async def get_online_card_preview_one(
+            self, user_id: str) -> Optional[UserCardPreviewOut]:
+        user_data = await self.redis_online.get_user_card_preview_one(user_id)
+        if not user_data:
+            return None
+        return UserCardPreviewOut.parse_raw(user_data)
 
     async def get_popular_card_previews(self, user_ids: Iterable[str]) \
             -> list[UserCardPreviewOut]:

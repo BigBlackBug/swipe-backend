@@ -514,3 +514,19 @@ async def test_user_fetch_with_blacklist(
     resp_data = response.json()
     assert {user['id'] for user in resp_data} == {str(user_4.id),
                                                   str(user_5.id)}
+
+
+@pytest.mark.anyio
+async def test_user_fetch_single(
+        client: AsyncClient,
+        default_user: User,
+        randomizer: RandomEntityGenerator,
+        session: Session,
+        default_user_auth_headers: dict[str, str]):
+    response: Response = await client.get(
+        f"{settings.API_V1_PREFIX}/users/{default_user.id}",
+        headers=default_user_auth_headers
+    )
+    assert response.json()['avatar_url'] == \
+           f'{settings.SWIPE_REST_SERVER_HOST}/users/' \
+           f'{default_user.id}/avatar'

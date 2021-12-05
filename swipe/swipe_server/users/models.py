@@ -10,7 +10,7 @@ from sqlalchemy import Column, String, Boolean, Integer, Enum, ARRAY, \
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, object_session
 
-from swipe.settings import constants
+from swipe.settings import constants, settings
 from swipe.swipe_server.misc.database import ModelBase
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.enums import UserInterests, Gender, \
@@ -98,6 +98,16 @@ class User(ModelBase):
     def age(self):
         return relativedelta(datetime.datetime.utcnow().date(),
                              self.date_of_birth).years
+
+    @property
+    def avatar_url(self):
+        if self.avatar_id:
+            avatar_url = f'{settings.SWIPE_REST_SERVER_HOST}' \
+                         f'/users/{self.id}/avatar'
+        else:
+            # TODO default
+            avatar_url = ''
+        return avatar_url
 
     def set_location(self, location: dict[str, str]):
         # location rows are unique with regards to city/country

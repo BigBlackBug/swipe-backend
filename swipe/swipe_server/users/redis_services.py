@@ -311,6 +311,9 @@ class RedisOnlineUserService:
             f'{self.ONLINE_USER_KEY}:{user_id}' for user_id in user_ids
         ])
 
+    async def get_user_card_preview_one(self, user_id: str) -> Optional[str]:
+        return await self.redis.get(f'{self.ONLINE_USER_KEY}:{user_id}')
+
 
 class RedisUserFetchService:
     def __init__(self,

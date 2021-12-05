@@ -4,9 +4,10 @@ from uuid import UUID
 
 from fastapi import Depends, Body, APIRouter, HTTPException
 from starlette import status
-from starlette.responses import Response
+from starlette.responses import Response, RedirectResponse
 
 from swipe.swipe_server.misc import security
+from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.redis_services import RedisPopularService
 from swipe.swipe_server.users.schemas import UserCardPreviewOut, \
@@ -188,6 +189,23 @@ async def decline_card_offer(
     return {
         'swipes': new_swipes
     }
+
+
+@router.get(
+    '/{user_id}/avatar',
+    name='Get a single users avatar')
+async def avatar_redirect(
+        user_id: UUID,
+        user_service: UserService = Depends(),
+        fetch_service: FetchUserService = Depends(),
+        # current_user_id: UUID = Depends(security.auth_user_id),
+):
+    card_preview = await fetch_service.get_online_card_preview_one(str(user_id))
+    if card_preview:
+        url = storage_client.get_image_url(card_preview.avatar_id)
+    else:
+        url = user_service.get_avatar_url(user_id)
+    return RedirectResponse(url)
 
 
 @router.get(

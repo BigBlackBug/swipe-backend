@@ -29,6 +29,7 @@ class Constants(BaseSettings):
 
 class Settings(BaseSettings):
     API_V1_PREFIX: str = "/v1"
+    SWIPE_REST_SERVER_HOST: str
     SWIPE_SECRET_KEY: str
 
     SWIPE_PORT: Optional[int] = None

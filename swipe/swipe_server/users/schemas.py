@@ -9,6 +9,7 @@ from dateutil.relativedelta import relativedelta
 from pydantic import BaseModel, Field, root_validator
 from sqlalchemy.engine import Row
 
+from swipe.settings import settings
 from swipe.swipe_server.misc.storage import storage_client
 from .enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
     RecurrenceRate, NotificationTypes
@@ -71,6 +72,8 @@ class UserCardPreviewOut(BaseModel):
     photos: Optional[list[str]] = []
     photo_urls: Optional[list[str]] = []
 
+    avatar_id: Optional[str] = None
+
     instagram_profile: Optional[str] = None
     tiktok_profile: Optional[str] = None
     snapchat_profile: Optional[str] = None
@@ -78,7 +81,8 @@ class UserCardPreviewOut(BaseModel):
     last_online: Optional[datetime.datetime] = None
 
     @classmethod
-    def patched_from_orm(cls: UserOut, obj: Any) -> UserOut:
+    def patched_from_orm(
+            cls: UserCardPreviewOut, obj: Any) -> UserCardPreviewOut:
         schema_obj = cls.from_orm(obj)
         patched_photos = []
         for photo_id in schema_obj.photos:
@@ -127,9 +131,6 @@ class UserOut(UserBase):
             patched_photos.append(storage_client.get_image_url(photo_id))
         schema_obj.photo_urls = patched_photos
 
-        if schema_obj.avatar_id:
-            schema_obj.avatar_url = \
-                storage_client.get_image_url(schema_obj.avatar_id)
         return schema_obj
 
     class Config:
@@ -215,8 +216,12 @@ class UserOutGlobalChatPreviewORM(BaseModel):
         orm_schema = UserOutGlobalChatPreviewORM.from_orm(obj)
         schema_obj = cls.parse_obj(orm_schema)
         if schema_obj.avatar_id:
-            schema_obj.avatar_url = \
-                storage_client.get_image_url(schema_obj.avatar_id)
+            avatar_url = f'{settings.SWIPE_REST_SERVER_HOST}' \
+                         f'/users/{schema_obj.id}/avatar'
+        else:
+            # TODO default
+            avatar_url = ''
+        schema_obj.avatar_url = avatar_url
         return schema_obj
 
     class Config:

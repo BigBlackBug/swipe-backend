@@ -103,21 +103,21 @@ async def test_disallow_double_reaping(
     assert response.status_code == 409
 
 
-@pytest.mark.anyio
-async def test_add_swipes(
-        client: AsyncClient,
-        default_user: models.User,
-        default_user_auth_headers: dict[str, str]):
-    swipes_before = default_user.swipes
-    swipes_added = 10
-
-    response: Response = await client.post(
-        f"{settings.API_V1_PREFIX}/me/swipes",
-        json={
-            'swipes': swipes_added,
-            'reason': 'whatever'
-        },
-        headers=default_user_auth_headers
-    )
-    assert response.status_code == 201
-    assert default_user.swipes == swipes_before + swipes_added
+# @pytest.mark.anyio
+# async def test_add_swipes(
+#         client: AsyncClient,
+#         default_user: models.User,
+#         default_user_auth_headers: dict[str, str]):
+#     swipes_before = default_user.swipes
+#     swipes_added = 10
+#
+#     response: Response = await client.post(
+#         f"{settings.API_V1_PREFIX}/me/swipes",
+#         json={
+#             'swipes': swipes_added,
+#             'reason': 'whatever'
+#         },
+#         headers=default_user_auth_headers
+#     )
+#     assert response.status_code == 201
+#     assert default_user.swipes == swipes_before + swipes_added

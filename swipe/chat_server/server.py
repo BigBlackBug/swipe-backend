@@ -113,7 +113,7 @@ async def websocket_endpoint(
         user_id, UserJoinEventPayload(
             user_id=user_id,
             name=user.name,
-            avatar_url=storage_client.get_image_url(user.avatar_id)
+            avatar_url=user.avatar_url
         ).dict(by_alias=True))
 
     while True:

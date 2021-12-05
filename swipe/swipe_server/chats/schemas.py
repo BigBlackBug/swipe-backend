@@ -52,8 +52,8 @@ class GlobalChatOut(BaseModel):
             result['messages'].append(
                 ChatMessageORMSchema.patched_from_orm(message))
         for user in users:
-            user_schema = UserOutGlobalChatPreviewORM.patched_from_orm(user)
-            result['users'][user.id] = user_schema
+            result['users'][user.id] = \
+                UserOutGlobalChatPreviewORM.patched_from_orm(user)
         return cls.parse_obj(result)
 
 

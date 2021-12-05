@@ -1,5 +1,6 @@
 import datetime
 import uuid
+from unittest.mock import MagicMock
 
 import pytest
 from fakeredis import aioredis
@@ -361,6 +362,9 @@ async def test_decline_chat(
         default_user_auth_headers: dict[str, str]):
     requests_mock = \
         mocker.patch('swipe.swipe_server.users.services.requests')
+    mock_storage: MagicMock = \
+        mocker.patch('swipe.swipe_server.chats.models.storage_client')
+
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
     initiator = randomizer.generate_random_user()
@@ -400,6 +404,7 @@ async def test_decline_chat(
     })
     await mp.process(json_data)
 
+    mock_storage.delete_chat_image.assert_called_with('345345.png')
     chat: Chat = chat_service.fetch_chat(chat_id)
     assert not chat
 
