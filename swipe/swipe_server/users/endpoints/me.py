@@ -77,24 +77,27 @@ async def patch_user(
     current_user: User = user_service.update_user(current_user, user_body)
 
     # they are sending this patch on each login
-    if previous_location and not\
-        (previous_location.city == user_body.location.city and
-         previous_location.country == user_body.location.country):
-        await redis_location.add_cities(
-            user_body.location.country, [user_body.location.city])
+    if user_body.location:
+        if previous_location and not \
+                (previous_location.city == user_body.location.city and
+                 previous_location.country == user_body.location.country):
+            await redis_location.add_cities(
+                user_body.location.country, [user_body.location.city])
 
-        try:
-            await redis_online.update_user_location(
-                current_user, previous_location)
-        except:
-            logger.exception(f"Unable to update caches for {user_id}"
-                             f"after location update")
-    elif not previous_location:
-        await redis_location.add_cities(
-            user_body.location.country, [user_body.location.city])
+            try:
+                await redis_online.remove_from_online_caches(
+                    current_user, previous_location)
+                # putting him back to caches with correct location
+                await redis_online.add_to_online_caches(current_user)
+            except:
+                logger.exception(f"Unable to update caches for {user_id}"
+                                 f"after location update")
+        elif not previous_location:
+            await redis_location.add_cities(
+                user_body.location.country, [user_body.location.city])
     # TODO I should update popular lists for his country, new country and global
-        # await redis_popular.update_user_location(
-        #     current_user, previous_location)
+    # await redis_popular.update_user_location(
+    #     current_user, previous_location)
 
     return current_user
 

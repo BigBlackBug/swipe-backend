@@ -248,33 +248,18 @@ class RedisOnlineUserService:
 
         await self.redis.set(f'{self.ONLINE_USER_KEY}:{user.id}', json_data)
 
-    async def remove_from_online_caches(self, user: User):
+    async def remove_from_online_caches(
+            self, user: User, location: Optional[Location] = None):
+        country = location.country if location else user.location.country
+        city = location.city if location else user.location.city
         cache_params = OnlineUserCacheParams(
-            age=user.age,
-            country=user.location.country,
-            city=user.location.city,
-            gender=user.gender
-        )
+            age=user.age, country=country, city=city, gender=user.gender)
         # removing this user from all online caches
         user_id = str(user.id)
         for key in cache_params.online_keys():
             await self.redis.srem(key, user_id)
+
         await self.redis.delete(f'{self.ONLINE_USER_KEY}:{user.id}')
-
-    async def update_user_location(
-            self, user: User, previous_location: Location):
-        cache_params = OnlineUserCacheParams(
-            age=user.age,
-            country=previous_location.country,
-            city=previous_location.city,
-            gender=user.gender
-        )
-        # removing this user from all online caches
-        for key in cache_params.online_keys():
-            await self.redis.srem(key, str(user.id))
-
-        # putting him back to caches with correct location
-        await self.add_to_online_caches(user)
 
     async def invalidate_online_user_cache(self):
         for key in await self.redis.keys('online:*'):
@@ -316,9 +301,7 @@ class RedisOnlineUserService:
 
         # update last_online field here so that we could sort these entities
         # without touching the cache again
-        cached_user = await self.redis.get(
-            f'{self.ONLINE_USER_KEY}:{user.id}'
-        )
+        cached_user = await self.redis.get(f'{self.ONLINE_USER_KEY}:{user.id}')
         cached_user = json.loads(cached_user)
         cached_user['last_online'] = last_online.isoformat()
         await self.redis.set(f'{self.ONLINE_USER_KEY}:{user.id}',
