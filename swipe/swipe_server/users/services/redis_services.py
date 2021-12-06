@@ -156,10 +156,12 @@ class RedisBlacklistService:
 
     @enable_blacklist()
     async def populate_blacklist(self, user_id: str, blacklist: set[str]):
+        logger.info(f"Populating blacklist cache for {user_id}")
         await self.redis.sadd(f'{self.BLACKLIST_KEY}:{user_id}', *blacklist)
 
     @enable_blacklist()
     async def drop_blacklist_cache(self, user_id: str):
+        logger.info(f"Dropping blacklist cache for {user_id}")
         await self.redis.delete(f'{self.BLACKLIST_KEY}:{user_id}')
 
 

@@ -257,6 +257,7 @@ async def _send_payload(payload: BasePayload):
             # that's a stupid hack, better use orjson
             out_payload = payload.json(by_alias=True, exclude_unset=True)
             out_payload = json.loads(out_payload)
+            logger.info(f"Sending firebase message payload {out_payload}")
             firebase.send(firebase.Message(
                 data=out_payload, token=firebase_token))
 

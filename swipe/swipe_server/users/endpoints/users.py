@@ -211,8 +211,7 @@ async def decline_card_offer(
 async def avatar_redirect(
         user_id: UUID,
         user_service: UserService = Depends(),
-        redis_online: RedisOnlineUserService = Depends(),
-        current_user_id: UUID = Depends(security.auth_user_id)):
+        redis_online: RedisOnlineUserService = Depends()):
     user_data = await redis_online.get_user_card_preview_one(str(user_id))
     if not user_data:
         url = user_service.get_avatar_url(user_id)
