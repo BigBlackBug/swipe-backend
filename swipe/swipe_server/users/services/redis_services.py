@@ -266,6 +266,7 @@ class RedisUserFetchService:
 
 class RedisFirebaseService:
     FIREBASE_KEY = 'firebase_tokens'
+    FIREBASE_COOLDOWN_KEY = 'firebase_cooldown'
 
     def __init__(self,
                  redis: aioredis.Redis = Depends(dependencies.redis)):
@@ -281,3 +282,13 @@ class RedisFirebaseService:
         if not token:
             return
         await self.redis.hset(self.FIREBASE_KEY, user_id, token)
+
+    async def is_on_cooldown(self, sender_id: str, recipient_id: str) -> bool:
+        return await self.redis.get(
+            f'{self.FIREBASE_COOLDOWN_KEY}:{sender_id}:{recipient_id}')
+
+    async def set_cooldown_token(self,  sender_id: str, recipient_id: str):
+        await self.redis.setex(
+            f'{self.FIREBASE_COOLDOWN_KEY}:{sender_id}:{recipient_id}',
+            time=constants.FIREBASE_NOTIFICATION_COOLDOWN_SEC,
+            value='1')

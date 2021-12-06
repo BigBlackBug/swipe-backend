@@ -128,6 +128,8 @@ async def websocket_endpoint(
             logger.info(f"{user_id} disconnected with code {e.code}")
             await connection_manager.disconnect(user_id)
             # setting last_online field
+            logger.info(f"Updating last_online on {user_id} "
+                        f"and saving firebase cache")
             with dependencies.db_context(expire_on_commit=False) as session:
                 session.add(user)
                 # going offline, gotta save the token to cache
@@ -145,10 +147,12 @@ async def websocket_endpoint(
             # removing blacklist cache
             await redis_blacklist.drop_blacklist_cache(user_id)
             # sending leave payloads to everyone
+            payload__dict = BasePayload(
+                sender_id=UUID(hex=user_id),
+                payload=UserLeaveEventPayload()).dict(by_alias=True)
+            logger.info(f"Leave payload {payload__dict}")
             await connection_manager.broadcast(
-                user_id, BasePayload(
-                    sender_id=UUID(hex=user_id),
-                    payload=UserLeaveEventPayload()).dict(by_alias=True))
+                user_id, payload__dict)
             return
 
         try:
