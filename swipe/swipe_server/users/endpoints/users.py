@@ -219,7 +219,11 @@ async def avatar_redirect(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     else:
         card_preview = UserCardPreviewOut.parse_raw(user_data)
-        url = storage_client.get_image_url(card_preview.avatar_id)
+        if card_preview.avatar_id:
+            url = storage_client.get_image_url(card_preview.avatar_id)
+        else:
+            logger.error(f"avatar_id missing in cache for {user_id}")
+            url = user_service.get_avatar_url(user_id)
 
     return RedirectResponse(url)
 
