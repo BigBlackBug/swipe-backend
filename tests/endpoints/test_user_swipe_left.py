@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 from swipe.settings import settings
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.redis_services import RedisBlacklistService
-from swipe.swipe_server.users.services import UserService
+from swipe.swipe_server.users.services.redis_services import RedisBlacklistService
+from swipe.swipe_server.users.services.services import UserService
 
 
 @pytest.mark.anyio
@@ -21,7 +21,7 @@ async def test_swipe_left_enough_swipes(
         redis_blacklist: RedisBlacklistService,
         default_user_auth_headers: dict[str, str]):
     requests_mock = \
-        mocker.patch('swipe.swipe_server.users.services.requests')
+        mocker.patch('swipe.swipe_server.users.services.services.requests')
     other_user = randomizer.generate_random_user()
     session.commit()
 
@@ -63,7 +63,7 @@ async def test_swipe_left_not_enough_swipes(
         redis_blacklist: RedisBlacklistService,
         default_user_auth_headers: dict[str, str]):
     requests_mock = \
-        mocker.patch('swipe.swipe_server.users.services.requests')
+        mocker.patch('swipe.swipe_server.users.services.services.requests')
 
     other_user = randomizer.generate_random_user()
     default_user.swipes = 0

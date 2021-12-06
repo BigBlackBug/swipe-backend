@@ -183,7 +183,7 @@ class PopularFilterBody(BaseModel):
 
 
 class OnlineFilterBody(BaseModel):
-    session_id: str
+    session_id: Optional[str] = ''
 
     country: Optional[str] = None
     city: Optional[str] = None

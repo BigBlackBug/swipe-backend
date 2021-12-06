@@ -1,13 +1,11 @@
 import logging
 import time
 import uuid
-from dataclasses import dataclass
-from typing import Optional, Iterable
+from typing import Optional
 from uuid import UUID
 
 import aioredis
 import requests
-from aioredis import Redis
 from dateutil.relativedelta import relativedelta
 from fastapi import Depends
 from jose import jwt
@@ -26,12 +24,11 @@ from swipe.swipe_server.users import schemas
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import IDList, User, AuthInfo, Location, \
     blacklist_table
-from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
-    RedisBlacklistService, OnlineUserCacheParams, \
-    FetchUserCacheKey, RedisPopularService, RedisLocationService, \
-    RedisUserFetchService
-from swipe.swipe_server.users.schemas import OnlineFilterBody, CallFeedback, \
-    RatingUpdateReason, UserCardPreviewOut
+from swipe.swipe_server.users.schemas import CallFeedback, \
+    RatingUpdateReason
+from swipe.swipe_server.users.services.redis_services import \
+    RedisBlacklistService, \
+    RedisPopularService, RedisLocationService
 from swipe.swipe_server.utils import enable_blacklist
 
 logger = logging.getLogger(__name__)
@@ -128,7 +125,7 @@ class UserService:
         )
         return query.one_or_none()
 
-    def get_avatar_url(self, user_id: UUID) -> str:
+    def get_avatar_url(self, user_id: UUID) -> Optional[str]:
         query = self.db.query(User.avatar_id).where(User.id == user_id)
         row = query.one_or_none()
         if row:
@@ -341,130 +338,6 @@ class UserService:
             .scalar_one_or_none()
 
 
-@dataclass
-class UserPool:
-    online_users: list[str]
-    head: int = 0
-
-
-class FetchUserService:
-    def __init__(self,
-                 redis: Redis = Depends(dependencies.redis)):
-        self.redis_fetch = RedisUserFetchService(redis)
-        self.redis_popular = RedisPopularService(redis)
-        self.redis_online = RedisOnlineUserService(redis)
-        self.redis_blacklist = RedisBlacklistService(redis)
-
-    async def collect(self, user_id: str, user_age: int,
-                      filter_params: OnlineFilterBody) -> set[str]:
-        fetch_cache_params = FetchUserCacheKey(
-            session_id=filter_params.session_id,
-            user_id=user_id
-        )
-
-        await self.redis_fetch.drop_obsolete_caches(fetch_cache_params)
-        cached_user_ids: set[str] = \
-            await self.redis_fetch.get_response_cache(fetch_cache_params)
-
-        age_difference = settings.ONLINE_USER_DEFAULT_AGE_DIFF
-
-        logger.info(f"Got filter params {filter_params}, "
-                    f"previous cache {cached_user_ids}")
-
-        # premium filtered by gender
-        # premium filtered by location(whole country/my city)
-        blacklist: set[str] = \
-            await self.redis_blacklist.get_blacklist(user_id)
-        # Russia, SPB, 25+-2,3,4, ALL
-
-        # age->(index,user_list)
-        online_users_pool = {}
-
-        result = set()
-        while len(result) < filter_params.limit \
-                and age_difference <= settings.ONLINE_USER_MAX_AGE_DIFF:
-            shift = -1
-            # we're going age+0,-1,1,-2,2 etc
-            sorted_age_range = [user_age]
-            logger.info(f"Current age {user_age}, diff {age_difference}")
-            while len(sorted_age_range) < age_difference * 2 + 1:
-                sorted_age_range.append(user_age + shift)
-                sorted_age_range.append(user_age - shift)
-                shift = - (abs(shift) + 1)
-            logger.info(f"Checking age range {sorted_age_range}")
-
-            # filling current user pool
-            for current_age in sorted_age_range:
-                cache_params = OnlineUserCacheParams(
-                    age=current_age, country=filter_params.country,
-                    city=filter_params.city, gender=filter_params.gender)
-
-                if current_age not in online_users_pool:
-                    user_cache = \
-                        await self.redis_online.get_online_users(cache_params)
-                    user_cache = list(user_cache)
-                    online_users_pool[current_age] = UserPool(user_cache)
-                    logger.info(f"Got {len(user_cache)} online users "
-                                f"for age={current_age}")
-
-            for current_age in sorted_age_range:
-                current_pool: UserPool = online_users_pool[current_age]
-                # getting one user per age pool
-                if current_pool.head < len(current_pool.online_users):
-                    candidate = current_pool.online_users[current_pool.head]
-                    current_pool.head += 1
-                    if candidate not in cached_user_ids \
-                            and candidate not in blacklist \
-                            and candidate != user_id:
-                        logger.info(
-                            f"Found {candidate} in user pool "
-                            f"for age={current_age}")
-                        result.add(candidate)
-
-                if len(result) == filter_params.limit:
-                    # got enough users
-                    break
-            else:
-                # online users depleted, extend age_diff and try again
-                age_difference += settings.ONLINE_USER_AGE_DIFF_STEP
-                logger.info(
-                    f"Online users depleted for range {sorted_age_range}, "
-                    f"increasing age_difference to {age_difference}")
-                continue
-
-        # got enough users or max age diff reached
-        logger.info(f"Adding {result} to user request cache "
-                    f"for {fetch_cache_params.cache_key()}")
-        # adding currently returned users to cache
-        await self.redis_fetch.add_to_response_cache(
-            fetch_cache_params, result)
-        return result
-
-    async def get_online_card_previews(self, user_ids: Iterable[str]) \
-            -> list[UserCardPreviewOut]:
-        users_data = await self.redis_online.get_user_card_previews(user_ids)
-        return [
-            UserCardPreviewOut.parse_raw(user_data)
-            for user_data in users_data
-        ]
-
-    async def get_online_card_preview_one(
-            self, user_id: str) -> Optional[UserCardPreviewOut]:
-        user_data = await self.redis_online.get_user_card_preview_one(user_id)
-        if not user_data:
-            return None
-        return UserCardPreviewOut.parse_raw(user_data)
-
-    async def get_popular_card_previews(self, user_ids: Iterable[str]) \
-            -> list[UserCardPreviewOut]:
-        users_data: list[str] = \
-            await self.redis_popular.get_user_card_previews(user_ids)
-        return [
-            UserCardPreviewOut.parse_raw(user_data)
-            for user_data in users_data if user_data is not None
-        ]
-
-
 class PopularUserService:
     def __init__(self, db: Session = Depends(dependencies.db),
                  redis: aioredis.Redis = Depends(dependencies.redis)):
@@ -560,33 +433,3 @@ class BlacklistService:
                 'blocked_by_id': blocked_by_id,
                 'blocked_user_id': blocked_user_id
             })
-
-
-class RedisFirebaseService:
-    FIREBASE_KEY = 'firebase_tokens'
-    FIREBASE_COOLDOWN_KEY = 'firebase_cooldown'
-
-    def __init__(self,
-                 redis: aioredis.Redis = Depends(dependencies.redis)):
-        self.redis = redis
-
-    async def get_firebase_token(self, user_id: str):
-        return await self.redis.hget(self.FIREBASE_KEY, user_id)
-
-    async def remove_token_from_cache(self, user_id: str):
-        await self.redis.hdel(self.FIREBASE_KEY, user_id)
-
-    async def add_token_to_cache(self, user_id: str, token: str):
-        if not token:
-            return
-        await self.redis.hset(self.FIREBASE_KEY, user_id, token)
-
-    async def is_on_cooldown(self, sender_id: str, recipient_id: str) -> bool:
-        return await self.redis.get(
-            f'{self.FIREBASE_COOLDOWN_KEY}:{sender_id}:{recipient_id}')
-
-    async def set_cooldown_token(self,  sender_id: str, recipient_id: str):
-        await self.redis.setex(
-            f'{self.FIREBASE_COOLDOWN_KEY}:{sender_id}:{recipient_id}',
-            time=constants.FIREBASE_NOTIFICATION_COOLDOWN_SEC,
-            value='1')

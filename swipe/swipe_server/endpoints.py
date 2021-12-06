@@ -11,8 +11,9 @@ from swipe.swipe_server.chats.schemas import ChatORMSchema
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import schemas as user_schemas
-from swipe.swipe_server.users.redis_services import RedisSwipeReaperService
-from swipe.swipe_server.users.services import UserService
+from swipe.swipe_server.users.services.redis_services import \
+    RedisSwipeReaperService
+from swipe.swipe_server.users.services.services import UserService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

@@ -1,13 +1,12 @@
 import pytest
 from httpx import AsyncClient
-from pytest_mock import MockerFixture
 from sqlalchemy.orm import Session
 
 from swipe.settings import settings
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.redis_services import RedisBlacklistService
-from swipe.swipe_server.users.services import UserService
+from swipe.swipe_server.users.services.redis_services import RedisBlacklistService
+from swipe.swipe_server.users.services.services import UserService
 
 
 @pytest.mark.anyio

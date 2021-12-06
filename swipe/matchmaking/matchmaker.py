@@ -6,9 +6,7 @@ from typing import Optional, Iterator, Tuple
 import requests
 
 from swipe.matchmaking.schemas import Match, MMSettings, MMRoundData
-from swipe.matchmaking.services import MMUserService
 from swipe.settings import settings
-from swipe.swipe_server.misc.database import SessionLocal
 from swipe.swipe_server.users.enums import Gender
 
 logger = logging.getLogger('matchmaker')
@@ -74,9 +72,7 @@ class HeapItem:
 
 
 class Matchmaker:
-    def __init__(self, user_service: MMUserService):
-        self._user_service = user_service
-
+    def __init__(self):
         # users that got no candidates this round
         # for them I'm fetching new candidates from DB with increased age diff
         self._empty_candidates: set[str] = set()
@@ -328,8 +324,9 @@ class Matchmaker:
         logger.info(f"Graphs merged, current graph\n"
                     f"{self._connection_graph.values()}")
 
-    def _process_empty_candidates(self):
-        while self._empty_candidates:
+    def _process_empty_candidates(self, max_candidates=10):
+        while self._empty_candidates and max_candidates > 0:
+            max_candidates -= 1
             user_id: str = self._empty_candidates.pop()
             vertex = self._connection_graph.get(user_id, None)
             if not vertex:
@@ -339,14 +336,20 @@ class Matchmaker:
                 # users from the empty candidates set before that
                 logger.info(f"{user_id} is not in the graph anymore, skipping")
                 continue
-
-            connections: list[str] = \
-                self._user_service.find_user_ids(
-                    user_id,
-                    age=vertex.mm_settings.age,
-                    online_users=self._connection_graph.keys(),
-                    age_difference=vertex.mm_settings.age_diff,
-                    gender=vertex.mm_settings.gender)
+            try:
+                response = requests.get(
+                    f'{settings.MATCHMAKING_SERVER_HOST}/fetch_candidates',
+                    params={
+                        'user_id': user_id,
+                        'user_age': vertex.mm_settings.age,
+                        'gender_filter': vertex.mm_settings.gender_filter,
+                        'session_id': vertex.mm_settings.session_id
+                    }, timeout=0.25)
+                json_data = response.json()
+                connections = json_data['connections']
+            except:
+                logger.exception(f"Error getting candidates for user {user_id}")
+                connections = []
 
             logger.info(f"New connections for {user_id}: {connections}")
             for connection_user_id in connections:
@@ -371,7 +374,7 @@ class Matchmaker:
 def start_matchmaker(round_length_secs: int = 5):
     logger.info("Starting matchmaker")
     bar = "-" * 100
-    matchmaker = Matchmaker(MMUserService(SessionLocal()))
+    matchmaker = Matchmaker()
     while True:
         cycle_start = time.time()
 
@@ -399,8 +402,8 @@ def start_matchmaker(round_length_secs: int = 5):
             logger.exception("Error during a matchmaking round")
 
         time_taken = time.time() - cycle_start
-        sleep_time = round_length_secs - time_taken
+        sleep_time = max(0.0, round_length_secs - time_taken)
         logger.info(
             f"Round took {time_taken}s, "
             f"time till the next cycle: {sleep_time}")
-        time.sleep(max(0.0, sleep_time))
+        time.sleep(sleep_time)

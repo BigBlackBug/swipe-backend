@@ -9,8 +9,8 @@ from pytest_mock import MockerFixture
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from swipe.swipe_server.chats.models import Chat, ChatStatus, GlobalChatMessage, \
-    ChatMessage, \
+from swipe.swipe_server.chats.models import Chat, ChatStatus, \
+    GlobalChatMessage, ChatMessage, \
     MessageStatus, ChatSource
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.errors import SwipeError

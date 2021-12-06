@@ -20,7 +20,7 @@ from swipe.swipe_server.chats.models import MessageStatus, ChatSource, \
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.users.enums import Gender
-from swipe.swipe_server.users.services import UserService, BlacklistService
+from swipe.swipe_server.users.services.services import UserService, BlacklistService
 
 logger = logging.getLogger(__name__)
 

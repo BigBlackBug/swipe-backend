@@ -1,71 +1,22 @@
-import json
 import logging
-import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional, Tuple, AsyncGenerator, Iterable
 from uuid import UUID
 
+import aioredis
 from aioredis import Redis
 from fastapi import Depends
 
 from swipe.settings import settings, constants
 from swipe.swipe_server.misc import dependencies
-from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.users.enums import Gender
-from swipe.swipe_server.users.models import User, Location
+from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.schemas import PopularFilterBody, \
     UserCardPreviewOut
 from swipe.swipe_server.utils import enable_blacklist
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class OnlineUserCacheParams:
-    age: int
-    country: Optional[str] = None
-    city: Optional[str] = None
-    gender: Optional[Gender] = None
-
-    def cache_key(self) -> str:
-        gender = self.gender or 'ALL'
-        city = self.city or 'ALL'
-        country = self.country or 'ALL'
-        return f'online:{country}:{city}:{self.age}:{gender}'
-
-    def online_keys(self):
-        if not self.city or not self.gender or not self.country:
-            raise SwipeError("country, city and gender must be set")
-
-        result = [
-            f'online:{self.country}:{self.city}:{self.age}:ALL',
-            f'online:{self.country}:ALL:{self.age}:ALL',
-            f'online:ALL:ALL:{self.age}:ALL',
-        ]
-        if self.gender != Gender.ATTACK_HELICOPTER:
-            # attack helicopters go only to ALL gender cache
-            result.extend([
-                f'online:ALL:ALL:{self.age}:{self.gender}',
-                f'online:{self.country}:ALL:{self.age}:{self.gender}',
-                f'online:{self.country}:{self.city}:{self.age}:{self.gender}'
-            ])
-        return result
-
-
-FETCH_REQUEST_KEY = 'fetch_request'
-
-
-@dataclass
-class FetchUserCacheKey:
-    user_id: str
-    session_id: str
-
-    def cache_key(self):
-        return f'{FETCH_REQUEST_KEY}:{self.user_id}:{self.session_id}'
-
-    def key_user_wildcard(self):
-        return f'{FETCH_REQUEST_KEY}:{self.user_id}:*'
 
 
 class RedisSwipeReaperService:
@@ -212,116 +163,64 @@ class RedisBlacklistService:
         await self.redis.delete(f'{self.BLACKLIST_KEY}:{user_id}')
 
 
-class RedisOnlineUserService:
-    RECENTLY_ONLINE_KEY = 'recently_online_user'
-    ONLINE_USER_KEY = 'online_user'
+class RedisChatCacheService:
+    """
+    Chat cache keeps user's chats for the purpose of speeding up
+    matchmaker queries. We shouldn't offer users who already have chats
+    with each other
+    """
+    CHAT_CACHE_KEY = 'chat_cache'
 
     def __init__(self,
                  redis: Redis = Depends(dependencies.redis)):
         self.redis = redis
 
-    async def get_online_users(self, cache_params: OnlineUserCacheParams) \
-            -> set[str]:
-        return await self.redis.smembers(cache_params.cache_key())
+    async def drop_chat_partner_cache(self, user_id: str):
+        logger.info(f"Dropping chat cache of {user_id}")
+        await self.redis.delete(f'{self.CHAT_CACHE_KEY}:{user_id}')
 
-    async def add_to_online_caches(self, user: User):
-        # add to all online sets
-        cache_params = OnlineUserCacheParams(
-            age=user.age,
-            country=user.location.country,
-            city=user.location.city,
-            gender=user.gender
-        )
-        user_id = str(user.id)
-        for key in cache_params.online_keys():
-            await self.redis.sadd(key, user_id)
+    async def add_chat_partner(self, creator_id: str, target_id: str):
+        logger.info(f"Adding chat partner {creator_id} to {target_id} cache")
+        await self.redis.sadd(f'{self.CHAT_CACHE_KEY}:{target_id}', creator_id)
 
-        json_data = UserCardPreviewOut.patched_from_orm(user).json()
-        # TODO man, I need a separate connection without decoding
-        # but I don't wanna do that atm
-        # json_data = zlib.compress(json_data.encode('utf-8'))
+    async def save_chat_partner_cache(self, user_id: str,
+                                      partner_ids: list[str]):
+        await self.redis.delete(f'{self.CHAT_CACHE_KEY}:{user_id}')
+        if partner_ids:
+            logger.info(f"Saving chat partners of {user_id}, {partner_ids}")
+            await self.redis.sadd(
+                f'{self.CHAT_CACHE_KEY}:{user_id}', *partner_ids)
 
-        await self.redis.set(f'{self.ONLINE_USER_KEY}:{user.id}', json_data)
+    async def get_chat_partners(self, user_id) -> set[str]:
+        return await self.redis.smembers(f'{self.CHAT_CACHE_KEY}:{user_id}')
 
-    async def remove_from_online_caches(
-            self, user: User, location: Optional[Location] = None):
-        country = location.country if location else user.location.country
-        city = location.city if location else user.location.city
-        cache_params = OnlineUserCacheParams(
-            age=user.age, country=country, city=city, gender=user.gender)
-        # removing this user from all online caches
-        user_id = str(user.id)
-        for key in cache_params.online_keys():
-            await self.redis.srem(key, user_id)
 
-        await self.redis.delete(f'{self.ONLINE_USER_KEY}:{user.id}')
+FETCH_REQUEST_KEY = 'fetch_request'
 
-    async def invalidate_online_user_cache(self):
-        for key in await self.redis.keys('online:*'):
-            await self.redis.delete(key)
 
-    async def update_recently_online_cache(
-            self, recently_online_ttl=constants.RECENTLY_ONLINE_TTL_SEC):
-        for key in await self.redis.keys(f'{self.RECENTLY_ONLINE_KEY}:*'):
-            user_data = await self.redis.get(key)
-            user_data = json.loads(user_data)
-            # dude's been gone for too long
-            online_time_diff = (int(time.time()) - user_data['last_online'])
-            if online_time_diff > recently_online_ttl:
-                # removing this dude from the recently_online list
-                await self.redis.delete(key)
+@dataclass
+class UserFetchCacheKey:
+    user_id: str
+    session_id: str
 
-                cache_params = OnlineUserCacheParams(
-                    age=user_data['age'], country=user_data['country'],
-                    city=user_data['city'], gender=user_data['gender'])
-                user_id = str(key).split(":")[1]
+    def cache_key(self):
+        return f'{FETCH_REQUEST_KEY}:{self.user_id}:{self.session_id}'
 
-                # removing this dude from all online caches
-                for online_key in cache_params.online_keys():
-                    await self.redis.srem(online_key, user_id)
-
-    async def add_to_recently_online_cache(self, user: User):
-        last_online = datetime.utcnow()
-        user_data = {
-            # I'm intentionally not using field value from user object
-            'last_online': int(last_online.timestamp()),
-            'age': user.age,
-            'country': user.location.country,
-            'city': user.location.city,
-            'gender': user.gender.value
-        }
-        # user_data = zlib.compress(json.dumps(user_data).encode('utf-8'))
-        await self.redis.set(
-            f'{self.RECENTLY_ONLINE_KEY}:{user.id}', json.dumps(user_data))
-
-        # update last_online field here so that we could sort these entities
-        # without touching the cache again
-        cached_user = await self.redis.get(f'{self.ONLINE_USER_KEY}:{user.id}')
-        cached_user = json.loads(cached_user)
-        cached_user['last_online'] = last_online.isoformat()
-        await self.redis.set(f'{self.ONLINE_USER_KEY}:{user.id}',
-                             json.dumps(cached_user))
-
-    async def remove_from_recently_online(self, user_id: str):
-        await self.redis.delete(f'{self.RECENTLY_ONLINE_KEY}:{user_id}')
-
-    async def get_user_card_previews(self, user_ids: Iterable[str]) \
-            -> Iterable[str]:
-        return await self.redis.mget([
-            f'{self.ONLINE_USER_KEY}:{user_id}' for user_id in user_ids
-        ])
-
-    async def get_user_card_preview_one(self, user_id: str) -> Optional[str]:
-        return await self.redis.get(f'{self.ONLINE_USER_KEY}:{user_id}')
+    def key_user_wildcard(self):
+        return f'{FETCH_REQUEST_KEY}:{self.user_id}:*'
 
 
 class RedisUserFetchService:
+    """
+    Caches responses for /fetch endpoint for each user
+    """
+
     def __init__(self,
                  redis: Redis = Depends(dependencies.redis)):
         self.redis = redis
 
     async def get_response_cache(
-            self, cache_settings: FetchUserCacheKey) \
+            self, cache_settings: UserFetchCacheKey) \
             -> set[str]:
         if await self.redis.exists(cache_settings.cache_key()):
             return await self.redis.smembers(cache_settings.cache_key())
@@ -329,7 +228,7 @@ class RedisUserFetchService:
         return set()
 
     async def drop_obsolete_caches(
-            self, cache_settings: FetchUserCacheKey):
+            self, cache_settings: UserFetchCacheKey):
         if not await self.redis.exists(cache_settings.cache_key()):
             # no key with current session
             # but there is an older one
@@ -340,7 +239,7 @@ class RedisUserFetchService:
                 await self.drop_response_cache(cache_settings.user_id)
 
     async def add_to_response_cache(
-            self, cache_settings: FetchUserCacheKey,
+            self, cache_settings: UserFetchCacheKey,
             current_user_ids: set[str]):
         if not current_user_ids:
             return
@@ -363,3 +262,22 @@ class RedisUserFetchService:
 
         for key in await self.redis.keys(f'{FETCH_REQUEST_KEY}:{user_id}:*'):
             await self.redis.delete(key)
+
+
+class RedisFirebaseService:
+    FIREBASE_KEY = 'firebase_tokens'
+
+    def __init__(self,
+                 redis: aioredis.Redis = Depends(dependencies.redis)):
+        self.redis = redis
+
+    async def get_firebase_token(self, user_id: str):
+        return await self.redis.hget(self.FIREBASE_KEY, user_id)
+
+    async def remove_token_from_cache(self, user_id: str):
+        await self.redis.hdel(self.FIREBASE_KEY, user_id)
+
+    async def add_token_to_cache(self, user_id: str, token: str):
+        if not token:
+            return
+        await self.redis.hset(self.FIREBASE_KEY, user_id, token)

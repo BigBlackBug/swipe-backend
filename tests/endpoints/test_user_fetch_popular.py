@@ -9,8 +9,9 @@ from swipe.settings import settings
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.redis_services import RedisOnlineUserService
-from swipe.swipe_server.users.services import UserService, \
+from swipe.swipe_server.users.services.online_cache import \
+    RedisOnlineUserService
+from swipe.swipe_server.users.services.services import UserService, \
     PopularUserService, CountryCacheService
 
 
@@ -88,7 +89,7 @@ async def test_user_fetch_popular(
     assert response.status_code == 200
     resp_data = response.json()
     assert [user['id'] for user in resp_data] == \
-           [str(user_1.id), str(user_2.id), str(user_3.id)]
+           [str(user_1.id), str(user_2.id),str(user_3.id)]
 
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch_popular",

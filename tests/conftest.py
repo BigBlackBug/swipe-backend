@@ -22,11 +22,13 @@ from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.database import ModelBase
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
-from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
-    RedisLocationService, RedisBlacklistService, RedisPopularService, \
+from swipe.swipe_server.users.services.redis_services import RedisLocationService, RedisBlacklistService, RedisPopularService, \
     RedisSwipeReaperService, RedisUserFetchService
+from swipe.swipe_server.users.services.online_cache import \
+    RedisOnlineUserService
 from swipe.swipe_server.users.schemas import AuthenticationIn
-from swipe.swipe_server.users.services import UserService, BlacklistService
+from swipe.swipe_server.users.services.services import UserService, \
+    BlacklistService
 
 config.configure_logging()
 logger = logging.getLogger(__name__)

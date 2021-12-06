@@ -16,8 +16,8 @@ from swipe.swipe_server.chats.models import GlobalChatMessage, Chat, \
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
-from swipe.swipe_server.users.redis_services import RedisBlacklistService
-from swipe.swipe_server.users.services import UserService
+from swipe.swipe_server.users.services.redis_services import RedisBlacklistService
+from swipe.swipe_server.users.services.services import UserService
 
 NOW = datetime.datetime.now()
 
@@ -361,7 +361,7 @@ async def test_decline_chat(
         redis_blacklist: RedisBlacklistService,
         default_user_auth_headers: dict[str, str]):
     requests_mock = \
-        mocker.patch('swipe.swipe_server.users.services.requests')
+        mocker.patch('swipe.swipe_server.users.services.services.requests')
     mock_storage: MagicMock = \
         mocker.patch('swipe.swipe_server.chats.models.storage_client')
 

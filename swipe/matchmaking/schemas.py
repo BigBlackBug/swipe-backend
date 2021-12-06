@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 from swipe.settings import settings
 from swipe.swipe_server.chats.models import ChatSource
 from swipe.swipe_server.users.enums import Gender
-from swipe.swipe_server.users.models import IDList
 
 Match = Tuple[str, str]
 
@@ -94,6 +93,9 @@ class MMSettings(BaseModel):
     gender: Gender
     gender_filter: Optional[Gender] = None
 
+    # for empty user requests
+    session_id: str
+
     def increase_age_diff(self):
         self.age_diff = \
             min(self.age_diff + settings.MATCHMAKING_AGE_DIFF_STEP,
@@ -145,12 +147,11 @@ class MMRoundData(BaseModel):
         self.decline_pairs.append((user_a_id, user_b_id))
 
     def connect(self, user_id: str, mm_settings: MMSettings,
-                connections: list[str]):
+                connections: set[str]):
         self.online_users.add(user_id)
 
         new_vertex = VertexData(user_id=user_id, mm_settings=mm_settings)
-        for connection in connections:
-            new_vertex.edges.add(connection)
+        new_vertex.edges = connections
         self.new_users[user_id] = new_vertex
 
     def repr_matchmaking(self):

@@ -14,10 +14,14 @@ from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc import security
 from swipe.swipe_server.users import schemas, swipe_bg_tasks
 from swipe.swipe_server.users.models import User, Location
-from swipe.swipe_server.users.redis_services import RedisLocationService, \
-    RedisOnlineUserService, RedisBlacklistService
 from swipe.swipe_server.users.schemas import RatingUpdateReason
-from swipe.swipe_server.users.services import UserService, PopularUserService
+from swipe.swipe_server.users.services.online_cache import \
+    RedisOnlineUserService
+from swipe.swipe_server.users.services.redis_services import \
+    RedisLocationService, \
+    RedisBlacklistService
+from swipe.swipe_server.users.services.services import UserService, \
+    PopularUserService
 
 IMAGE_CONTENT_TYPE_REGEXP = 'image/(png|jpe?g)'
 
@@ -117,7 +121,11 @@ async def delete_user(
         # not relying on cascades because we need to delete images manually
         chat_service.delete_chat(chat.id)
 
-    await redis_online.remove_from_online_caches(current_user)
+    # somebody might want to delete user before the location is set
+    # e.g. during the registration
+    if current_user.location:
+        await redis_online.remove_from_online_caches(current_user)
+
     await redis_blacklist.drop_blacklist_cache(str(current_user.id))
 
     # yes I know that's an overkill, but I don't want to think too much

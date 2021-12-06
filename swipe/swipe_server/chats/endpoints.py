@@ -13,8 +13,7 @@ from swipe.swipe_server.chats.schemas import ChatOut, MultipleChatsOut, \
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc import security
 from swipe.swipe_server.misc.storage import storage_client
-from swipe.swipe_server.users.redis_services import RedisOnlineUserService
-from swipe.swipe_server.users.services import UserService
+from swipe.swipe_server.users.services.services import UserService
 
 router = APIRouter()
 

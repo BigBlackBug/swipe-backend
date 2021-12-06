@@ -5,10 +5,11 @@ from sqlalchemy.orm import Session
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
 from swipe.swipe_server.users.enums import Gender
-from swipe.swipe_server.users.redis_services import RedisPopularService
 from swipe.swipe_server.users.schemas import PopularFilterBody, UserUpdate, \
     LocationSchema
-from swipe.swipe_server.users.services import UserService, CountryCacheService, \
+from swipe.swipe_server.users.services.redis_services import RedisPopularService
+from swipe.swipe_server.users.services.services import UserService, \
+    CountryCacheService, \
     PopularUserService
 
 

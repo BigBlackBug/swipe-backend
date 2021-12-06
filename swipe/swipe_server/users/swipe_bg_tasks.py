@@ -2,9 +2,11 @@ import logging
 
 from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.users.models import User, Location
-from swipe.swipe_server.users.redis_services import RedisLocationService, \
+from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
-from swipe.swipe_server.users.services import PopularUserService
+from swipe.swipe_server.users.services.redis_services import \
+    RedisLocationService
+from swipe.swipe_server.users.services.services import PopularUserService
 
 logger = logging.getLogger(__name__)
 

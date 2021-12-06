@@ -1,6 +1,5 @@
 import datetime
 import io
-import uuid
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -15,10 +14,11 @@ from sqlalchemy.orm import Session
 from swipe.settings import settings
 from swipe.swipe_server.users.enums import ZodiacSign, Gender
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
-    OnlineUserCacheParams, RedisLocationService, RedisPopularService
-from swipe.swipe_server.users.schemas import PopularFilterBody
-from swipe.swipe_server.users.services import UserService, PopularUserService
+from swipe.swipe_server.users.services.online_cache import \
+    RedisOnlineUserService
+from swipe.swipe_server.users.services.redis_services import \
+    RedisLocationService, RedisPopularService
+from swipe.swipe_server.users.services.services import UserService
 
 
 @pytest.mark.anyio
@@ -52,36 +52,13 @@ async def test_user_update_location(
         redis_online: RedisOnlineUserService,
         redis_location: RedisLocationService,
         redis_popular: RedisPopularService,
+        mocker: MockerFixture,
         default_user_auth_headers: dict[str, str]):
     default_user.gender = Gender.MALE
     session.commit()
 
-    await redis_online.add_to_online_caches(default_user)
-
-    popular_service = PopularUserService(session, fake_redis)
-    await popular_service.populate_popular_cache()
-
-    # assuming some other users are in the cache for Hello
-    cached_user_id = str(uuid.uuid4())
-    cache_settings_full = OnlineUserCacheParams(
-        age=default_user.age,
-        country='What Country',
-        city='Hello',
-        gender=default_user.gender
-    )
-    for key in cache_settings_full.online_keys():
-        await redis_online.redis.sadd(key, cached_user_id)
-
-    previous_location = default_user.location
-    # old dude is in cache of his previous location
-    old_location_cache_settings = OnlineUserCacheParams(
-        age=default_user.age,
-        country=previous_location.country,
-        city=previous_location.city,
-        gender=default_user.gender
-    )
-    for key in old_location_cache_settings.online_keys():
-        await redis_online.redis.sadd(key, str(default_user.id))
+    from swipe.swipe_server.users import swipe_bg_tasks
+    mocker.patch.object(swipe_bg_tasks, "update_location_caches")
 
     response: Response = await client.patch(
         f"{settings.API_V1_PREFIX}/me",
@@ -93,130 +70,11 @@ async def test_user_update_location(
                 'flag': 'f'
             }
         })
+    assert swipe_bg_tasks.update_location_caches.called
+
     session.refresh(default_user)
     assert default_user.location.city == 'Hello'
     assert default_user.location.country == 'What Country'
-
-    # assert country is saved to cache
-    country_keys = await redis_location.redis.keys("country:*")
-    assert 'country:What Country' in country_keys
-    cities = await redis_location.redis.smembers('country:What Country')
-    assert 'Hello' in cities
-
-    # user is added to current caches
-    assert await redis_online.get_online_users(cache_settings_full) == {
-        str(default_user.id), cached_user_id}
-    cache_settings_country = OnlineUserCacheParams(
-        age=default_user.age,
-        country='What Country',
-        gender=default_user.gender
-    )
-    assert await redis_online.get_online_users(cache_settings_country) == {
-        str(default_user.id), cached_user_id}
-
-    assert await redis_popular.get_popular_user_ids(PopularFilterBody(
-        gender=default_user.gender,
-        city='Hello',
-        country='What Country'
-    )) == [str(default_user.id)]
-
-    assert await redis_popular.get_popular_user_ids(PopularFilterBody(
-        gender=default_user.gender,
-        country='What Country'
-    )) == [str(default_user.id)]
-
-    assert await redis_popular.get_popular_user_ids(PopularFilterBody(
-        gender=default_user.gender
-    )) == [str(default_user.id)]
-
-    assert await redis_popular.get_popular_user_ids(PopularFilterBody()) \
-           == [str(default_user.id)]
-
-    # user is removed from old cache
-    assert await redis_online.get_online_users(old_location_cache_settings) \
-           == set()
-
-    assert await redis_popular.get_popular_user_ids(PopularFilterBody(
-        gender=default_user.gender,
-        city=previous_location.city,
-        country=previous_location.country
-    )) == []
-
-    assert await redis_popular.get_popular_user_ids(PopularFilterBody(
-        gender=default_user.gender,
-        country=previous_location.country
-    )) == []
-
-
-@pytest.mark.anyio
-async def test_user_update_location_heli(
-        client: AsyncClient,
-        default_user: User,
-        user_service: UserService,
-        session: Session,
-        redis_online: RedisOnlineUserService,
-        redis_location: RedisLocationService,
-        default_user_auth_headers: dict[str, str]):
-    default_user.gender = Gender.ATTACK_HELICOPTER
-    session.commit()
-
-    await redis_online.add_to_online_caches(default_user)
-
-    # assuming some other users are in the cache for Hello male and All
-    cached_user_id = str(uuid.uuid4())
-    cache_settings_full = OnlineUserCacheParams(
-        age=default_user.age,
-        country='What Country',
-        city='Hello',
-        gender=Gender.MALE
-    )
-    for key in cache_settings_full.online_keys():
-        await redis_online.redis.sadd(key, cached_user_id)
-
-    # old dude is in cache of his previous location as heli
-    old_location_cache_settings = OnlineUserCacheParams(
-        age=default_user.age,
-        country=default_user.location.country,
-        city=default_user.location.city,
-        gender=default_user.gender
-    )
-    for key in old_location_cache_settings.online_keys():
-        await redis_online.redis.sadd(key, str(default_user.id))
-
-    response: Response = await client.patch(
-        f"{settings.API_V1_PREFIX}/me",
-        headers=default_user_auth_headers,
-        json={
-            'location': {
-                'city': 'Hello',
-                'country': 'What Country',
-                'flag': 'f'
-            }
-        })
-    session.refresh(default_user)
-    assert default_user.location.city == 'Hello'
-    assert default_user.location.country == 'What Country'
-
-    # assert country is saved to cache
-    country_keys = await redis_location.redis.keys("country:*")
-    assert 'country:What Country' in country_keys
-    cities = await redis_location.redis.smembers('country:What Country')
-    assert 'Hello' in cities
-
-    # user is NOT added to male cache
-    assert await redis_online.get_online_users(cache_settings_full) == \
-           {cached_user_id, }
-    # but is added to country All cache
-    cache_settings_country = OnlineUserCacheParams(
-        age=default_user.age,
-        country='What Country'
-    )
-    assert await redis_online.get_online_users(cache_settings_country) == {
-        str(default_user.id), cached_user_id}
-
-    # user is removed from old cache
-    assert await redis_online.get_online_users(old_location_cache_settings) \
-           == set()
 
 
 @pytest.mark.anyio
@@ -232,9 +90,11 @@ async def test_user_update_photo_list(
 
     old_avatar_id = default_user.avatar_id
     mock_storage: MagicMock = \
-        mocker.patch('swipe.swipe_server.users.services.storage_client')
+        mocker.patch('swipe.swipe_server.users.services.'
+                     'services.storage_client')
     update_avatar_mock = MagicMock()
-    mocker.patch('swipe.swipe_server.users.services.UserService._update_avatar',
+    mocker.patch('swipe.swipe_server.users.services.services.'
+                 'UserService._update_avatar',
                  update_avatar_mock)
     # patch
     response: Response = await client.patch(
@@ -261,10 +121,12 @@ async def test_user_add_first_photo(
     session.commit()
 
     update_avatar_mock = MagicMock()
-    mocker.patch('swipe.swipe_server.users.services.UserService._update_avatar',
+    mocker.patch('swipe.swipe_server.users.services.services.'
+                 'UserService._update_avatar',
                  update_avatar_mock)
     mock_storage: MagicMock = \
-        mocker.patch('swipe.swipe_server.users.services.storage_client')
+        mocker.patch(
+            'swipe.swipe_server.users.services.services.storage_client')
 
     image_data = io.BytesIO()
     random_image.save(image_data, format='png')
@@ -295,10 +157,11 @@ async def test_user_delete_photo(
     session.commit()
 
     update_avatar_mock = MagicMock()
-    mocker.patch('swipe.swipe_server.users.services.UserService._update_avatar',
+    mocker.patch('swipe.swipe_server.users.services.services.'
+                 'UserService._update_avatar',
                  update_avatar_mock)
     mock_storage: MagicMock = mocker.patch(
-        'swipe.swipe_server.users.services.storage_client')
+        'swipe.swipe_server.users.services.services.storage_client')
 
     image_data = io.BytesIO()
     random_image.save(image_data, format='png')

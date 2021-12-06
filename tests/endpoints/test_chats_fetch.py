@@ -10,7 +10,8 @@ from swipe.swipe_server.chats.models import Chat, ChatStatus, ChatMessage, \
     ChatSource
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
-from swipe.swipe_server.users.redis_services import RedisOnlineUserService
+from swipe.swipe_server.users.services.online_cache import \
+    RedisOnlineUserService
 
 
 @pytest.mark.anyio

@@ -3,14 +3,14 @@ import time
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import Depends, Body, HTTPException, APIRouter
+from fastapi import Depends, HTTPException, APIRouter
 from starlette import status
-from starlette.responses import Response
 
 from swipe.settings import constants
 from swipe.swipe_server.misc import security
-from swipe.swipe_server.users.redis_services import RedisSwipeReaperService
-from swipe.swipe_server.users.services import UserService
+from swipe.swipe_server.users.services.redis_services import \
+    RedisSwipeReaperService
+from swipe.swipe_server.users.services.services import UserService
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ async def get_free_swipe_status(
     })
 async def get_free_swipes(
         user_id: UUID = Depends(security.auth_user_id),
-        user_service: UserService = Depends(UserService),
+        user_service: UserService = Depends(),
         redis_swipe: RedisSwipeReaperService = Depends()):
     reap_timestamp: datetime = \
         await redis_swipe.get_swipe_reap_timestamp(user_id)

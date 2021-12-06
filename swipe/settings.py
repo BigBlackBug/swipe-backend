@@ -24,17 +24,19 @@ class Constants(BaseSettings):
 
     FIREBASE_NOTIFICATION_COOLDOWN_SEC = 60
 
+    MATCHMAKING_FETCH_LIMIT = 150
     BASE_DIR: Path = Path('.')
 
 
 class Settings(BaseSettings):
     API_V1_PREFIX: str = "/v1"
-    SWIPE_REST_SERVER_HOST: str
     SWIPE_SECRET_KEY: str
 
     SWIPE_PORT: Optional[int] = None
     DATABASE_URL: Optional[PostgresDsn] = None
     REDIS_URL: Optional[RedisDsn] = None
+
+    SWIPE_REST_SERVER_HOST: str
 
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
 

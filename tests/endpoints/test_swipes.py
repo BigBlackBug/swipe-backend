@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from swipe.settings import settings, constants
 from swipe.swipe_server.users import models
-from swipe.swipe_server.users.redis_services import RedisSwipeReaperService
+from swipe.swipe_server.users.services.redis_services import RedisSwipeReaperService
 
 
 @pytest.mark.anyio

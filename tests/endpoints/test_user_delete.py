@@ -17,9 +17,13 @@ from swipe.swipe_server.chats.models import ChatMessage, MessageStatus, Chat, \
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import AuthInfo, User
-from swipe.swipe_server.users.redis_services import RedisBlacklistService, \
-    RedisOnlineUserService, RedisPopularService, OnlineUserCacheParams
-from swipe.swipe_server.users.services import UserService, BlacklistService, \
+from swipe.swipe_server.users.schemas import OnlineFilterBody
+from swipe.swipe_server.users.services.online_cache import \
+    RedisOnlineUserService
+from swipe.swipe_server.users.services.redis_services import \
+    RedisBlacklistService
+from swipe.swipe_server.users.services.services import UserService, \
+    BlacklistService, \
     PopularUserService, CountryCacheService
 
 
@@ -80,33 +84,33 @@ async def test_user_delete(
         select(AuthInfo).where(AuthInfo.id == auth_info_id)). \
         scalars().one_or_none()
 
-    all_settings = OnlineUserCacheParams(
-        age=default_user.age,
+    all_settings = OnlineFilterBody(
         country=default_user.location.country,
         city=default_user.location.city,
         gender=default_user.gender
     )
-    assert user_id not in await redis_online.get_online_users(all_settings)
+    assert user_id not in await redis_online.get_online_users(
+        default_user.age, all_settings)
 
-    all_settings = OnlineUserCacheParams(
-        age=default_user.age,
+    all_settings = OnlineFilterBody(
         country=default_user.location.country,
         gender=default_user.gender
     )
-    assert user_id not in await redis_online.get_online_users(all_settings)
+    assert user_id not in await redis_online.get_online_users(
+        default_user.age, all_settings)
 
-    all_settings = OnlineUserCacheParams(
-        age=default_user.age,
+    all_settings = OnlineFilterBody(
         country=default_user.location.country,
         city=default_user.location.city,
     )
-    assert user_id not in await redis_online.get_online_users(all_settings)
+    assert user_id not in await redis_online.get_online_users(
+        default_user.age, all_settings)
 
-    all_settings = OnlineUserCacheParams(
-        age=default_user.age,
+    all_settings = OnlineFilterBody(
         country=default_user.location.country,
     )
-    assert user_id not in await redis_online.get_online_users(all_settings)
+    assert user_id not in await redis_online.get_online_users(
+        default_user.age, all_settings)
 
     assert await redis_blacklist.get_blacklist(user_id) == set()
 
@@ -172,7 +176,7 @@ async def test_user_delete_with_chats(
     url = f'{settings.CHAT_SERVER_HOST}/events/user_deleted'
     mock_requests.post.assert_called_with(url, json={
         'user_id': str(default_user.id),
-        'recipients': [str(other_user.id),]
+        'recipients': [str(other_user.id), ]
     })
 
     assert not user_service.get_user(default_user.id)

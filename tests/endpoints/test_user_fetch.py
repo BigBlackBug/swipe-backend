@@ -10,10 +10,11 @@ from swipe.settings import settings
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
-    RedisBlacklistService, RedisUserFetchService, OnlineUserCacheParams
-from swipe.swipe_server.users.services import UserService, \
-    FetchUserCacheKey, BlacklistService
+from swipe.swipe_server.users.services.redis_services import \
+    RedisBlacklistService, RedisUserFetchService, UserFetchCacheKey
+from swipe.swipe_server.users.services.online_cache import \
+    OnlineUserCacheParams, RedisOnlineUserService
+from swipe.swipe_server.users.services.services import UserService, BlacklistService
 
 
 @pytest.mark.anyio
@@ -341,7 +342,7 @@ async def test_user_fetch_online_city_cached_requests_all_countries(
                                                   str(user_44.id)}
 
     cached_response = await redis_fetch.get_response_cache(
-        FetchUserCacheKey(session_id=session_id,
+        UserFetchCacheKey(session_id=session_id,
                           user_id=str(default_user.id)))
     assert cached_response == {str(user_3.id), str(user_4.id), str(user_44.id)}
 
@@ -364,7 +365,7 @@ async def test_user_fetch_online_city_cached_requests_all_countries(
 
     # cache now contains all four
     cached_response = await redis_fetch.get_response_cache(
-        FetchUserCacheKey(session_id=session_id,
+        UserFetchCacheKey(session_id=session_id,
                           user_id=str(default_user.id)))
     assert cached_response == \
            {str(user_3.id), str(user_4.id), str(user_44.id), str(user_5.id)}
@@ -388,13 +389,13 @@ async def test_user_fetch_online_city_cached_requests_all_countries(
 
     # old cache is dead
     old_cached_response = await redis_fetch.get_response_cache(
-        FetchUserCacheKey(session_id=session_id,
+        UserFetchCacheKey(session_id=session_id,
                           user_id=str(default_user.id)))
     assert old_cached_response == set()
 
     # new cache contains only peeps from moscow
     cached_response = await redis_fetch.get_response_cache(
-        FetchUserCacheKey(session_id=new_session_id,
+        UserFetchCacheKey(session_id=new_session_id,
                           user_id=str(default_user.id)))
     assert cached_response == {str(user_2.id)}
 
@@ -420,13 +421,13 @@ async def test_user_fetch_online_city_cached_requests_all_countries(
 
     # old cache is dead
     old_cached_response = await redis_fetch.get_response_cache(
-        FetchUserCacheKey(session_id=previous_session_id,
+        UserFetchCacheKey(session_id=previous_session_id,
                           user_id=str(default_user.id)))
     assert old_cached_response == set()
 
     # new cache contains everyone
     cached_response = await redis_fetch.get_response_cache(
-        FetchUserCacheKey(session_id=new_session_id,
+        UserFetchCacheKey(session_id=new_session_id,
                           user_id=str(default_user.id)))
     assert cached_response == {
         str(user_3.id), str(user_4.id), str(user_44.id),

@@ -2,17 +2,21 @@ import functools
 import logging
 from uuid import UUID
 
+from aioredis import Redis
 from fastapi import Depends, Body, APIRouter, HTTPException
 from starlette import status
 from starlette.responses import Response, RedirectResponse
 
-from swipe.swipe_server.misc import security
+from swipe.swipe_server.misc import security, dependencies
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.redis_services import RedisPopularService
 from swipe.swipe_server.users.schemas import UserCardPreviewOut, \
     OnlineFilterBody, UserOut, PopularFilterBody, CallFeedback
-from swipe.swipe_server.users.services import UserService, FetchUserService, \
+from swipe.swipe_server.users.services.fetch_service import FetchUserService
+from swipe.swipe_server.users.services.online_cache import \
+    RedisOnlineUserService
+from swipe.swipe_server.users.services.redis_services import RedisPopularService
+from swipe.swipe_server.users.services.services import UserService, \
     BlacklistService
 
 logger = logging.getLogger(__name__)
@@ -30,7 +34,6 @@ router = APIRouter()
     response_model=list[UserCardPreviewOut])
 async def fetch_list_of_popular_users(
         filter_params: PopularFilterBody = Body(...),
-        fetch_service: FetchUserService = Depends(),
         redis_popular: RedisPopularService = Depends(),
         current_user_id: UUID = Depends(security.auth_user_id)):
     """
@@ -46,13 +49,19 @@ async def fetch_list_of_popular_users(
     except ValueError:
         pass
 
+    # TODO I might benefit from a heap insertion
     logger.info(f"Got {len(popular_users)} popular users for {filter_params}")
-    collected_users = \
-        await fetch_service.get_popular_card_previews(user_ids=popular_users)
+    users_data: list[str] = \
+        await redis_popular.get_user_card_previews(popular_users)
+    collected_users = [
+        UserCardPreviewOut.parse_raw(user_data)
+        for user_data in users_data if user_data is not None
+    ]
 
     logger.info(f"Got {len(collected_users)} popular users card "
                 f"previews for {filter_params}")
-    # TODO don't need to sort that?
+    # TODO don't need to sort that? check why the fuck popular users
+    # are not inserted to the cache in the correct order in the first place
     collected_users = sorted(collected_users,
                              key=lambda user: user.rating, reverse=True)
 
@@ -72,13 +81,15 @@ async def fetch_list_of_popular_users(
     response_model=list[UserCardPreviewOut])
 async def fetch_list_of_online_users(
         filter_params: OnlineFilterBody = Body(...),
-        fetch_service: FetchUserService = Depends(),
+        redis_online: RedisOnlineUserService = Depends(),
         user_service: UserService = Depends(),
+        redis: Redis = Depends(dependencies.redis),
         current_user_id: UUID = Depends(security.auth_user_id)):
     """
     If the size of the returned list is smaller than limit, it means
     there are no more users and further requests make no sense
     """
+    fetch_service = FetchUserService(RedisOnlineUserService(redis), redis)
     current_user: User = user_service.get_user_date_of_birth(current_user_id)
     collected_user_ids = \
         await fetch_service.collect(str(current_user_id),
@@ -88,9 +99,12 @@ async def fetch_list_of_online_users(
     if not collected_user_ids:
         return []
 
-    collected_users: list[UserCardPreviewOut] \
-        = await fetch_service.get_online_card_previews(collected_user_ids)
-
+    # TODO I might benefit from a heap insertion
+    users_data = await redis_online.get_user_card_previews(collected_user_ids)
+    collected_users = [
+        UserCardPreviewOut.parse_raw(user_data)
+        for user_data in users_data
+    ]
     collected_users.sort(
         key=functools.partial(UserCardPreviewOut.sort_key,
                               current_user_dob=current_user.date_of_birth),
@@ -197,14 +211,17 @@ async def decline_card_offer(
 async def avatar_redirect(
         user_id: UUID,
         user_service: UserService = Depends(),
-        fetch_service: FetchUserService = Depends(),
-        # current_user_id: UUID = Depends(security.auth_user_id),
-):
-    card_preview = await fetch_service.get_online_card_preview_one(str(user_id))
-    if card_preview:
-        url = storage_client.get_image_url(card_preview.avatar_id)
-    else:
+        redis_online: RedisOnlineUserService = Depends(),
+        current_user_id: UUID = Depends(security.auth_user_id)):
+    user_data = await redis_online.get_user_card_preview_one(str(user_id))
+    if not user_data:
         url = user_service.get_avatar_url(user_id)
+        if not url:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    else:
+        card_preview = UserCardPreviewOut.parse_raw(user_data)
+        url = storage_client.get_image_url(card_preview.avatar_id)
+
     return RedirectResponse(url)
 
 

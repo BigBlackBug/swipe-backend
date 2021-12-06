@@ -15,11 +15,12 @@ import logging
 import alembic.command
 import alembic.config
 from fastapi_utils.tasks import repeat_every
+from swipe.swipe_server.users.services.services import CountryCacheService, \
+    PopularUserService
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
-    RedisUserFetchService
-from swipe.swipe_server.users.services import PopularUserService, \
-    CountryCacheService
+from swipe.swipe_server.users.services.redis_services import RedisUserFetchService
+from swipe.swipe_server.users.services.online_cache import \
+    RedisOnlineUserService
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.misc import dependencies
 from swipe.settings import settings, constants

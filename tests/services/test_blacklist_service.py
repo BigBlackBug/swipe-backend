@@ -1,12 +1,11 @@
 import aioredis
 import pytest
-from httpx import AsyncClient
 from sqlalchemy.orm import Session
 
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
-from swipe.swipe_server.users.redis_services import RedisBlacklistService
-from swipe.swipe_server.users.services import UserService, BlacklistService
+from swipe.swipe_server.users.services.redis_services import RedisBlacklistService
+from swipe.swipe_server.users.services.services import UserService, BlacklistService
 
 
 @pytest.mark.anyio

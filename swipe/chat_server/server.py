@@ -25,9 +25,12 @@ from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
-    RedisBlacklistService, RedisUserFetchService
-from swipe.swipe_server.users.services import UserService, RedisFirebaseService
+from swipe.swipe_server.users.services.online_cache import \
+    RedisOnlineUserService
+from swipe.swipe_server.users.services.redis_services import \
+    RedisBlacklistService, RedisUserFetchService, RedisChatCacheService, \
+    RedisFirebaseService
+from swipe.swipe_server.users.services.services import UserService
 
 logger = logging.getLogger(__name__)
 
@@ -91,12 +94,13 @@ async def websocket_endpoint(
     await firebase_service.remove_token_from_cache(user_id)
 
     redis_online = RedisOnlineUserService(redis)
+    redis_chats = RedisChatCacheService(redis)
     redis_blacklist = RedisBlacklistService(redis)
     redis_fetch = RedisUserFetchService(redis)
 
     # gender, dob, location, name, firebase_token, avatar_id + avatar_url
     await redis_online.add_to_online_caches(user)
-    # we may have returned before the cache is dropped
+    # they may have returned before the cache is dropped
     await redis_online.remove_from_recently_online(user_id)
 
     await connection_manager.connect(
@@ -153,6 +157,17 @@ async def websocket_endpoint(
             with dependencies.db_context() as session:
                 request_processor = ChatServerRequestProcessor(session, redis)
                 await request_processor.process(payload)
+
+            if isinstance(payload.payload, CreateChatPayload):
+                # we need to have a chat cache to speed up matchmaking queries
+                # because we should not offer users who already got a chat
+                # with the current user
+
+                # only sender_id is added to recipient_id's chat cache
+                # because recipient_id might be in the lobby
+                # but sender_id is definitely NOT in the lobby
+                await redis_chats.add_chat_partner(
+                    str(payload.sender_id), str(payload.recipient_id))
 
             if isinstance(payload.payload, GlobalMessagePayload):
                 await connection_manager.broadcast(

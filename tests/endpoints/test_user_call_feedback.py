@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from swipe.settings import settings
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users.models import User
-from swipe.swipe_server.users.services import UserService
+from swipe.swipe_server.users.services.services import UserService
 
 
 @pytest.mark.anyio
