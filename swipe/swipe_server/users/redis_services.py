@@ -181,11 +181,6 @@ class RedisPopularService:
             f'{self.POPULAR_USER_KEY}:{user_id}' for user_id in user_ids
         ])
 
-    async def clear_popular_users(self):
-        logger.info(f"Clearing cached popular users")
-        if keys := await self.redis.keys(f'{self.POPULAR_USER_KEY}:*'):
-            await self.redis.delete(*keys)
-
 
 class RedisBlacklistService:
     BLACKLIST_KEY = 'blacklist'

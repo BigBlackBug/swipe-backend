@@ -4,6 +4,7 @@ import uuid
 from unittest import mock
 from unittest.mock import MagicMock
 
+import aioredis
 import dateutil.parser
 import pytest
 from PIL import Image
@@ -15,8 +16,9 @@ from swipe.settings import settings
 from swipe.swipe_server.users.enums import ZodiacSign, Gender
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.redis_services import RedisOnlineUserService, \
-    OnlineUserCacheParams, RedisLocationService
-from swipe.swipe_server.users.services import UserService
+    OnlineUserCacheParams, RedisLocationService, RedisPopularService
+from swipe.swipe_server.users.schemas import PopularFilterBody
+from swipe.swipe_server.users.services import UserService, PopularUserService
 
 
 @pytest.mark.anyio
@@ -46,13 +48,18 @@ async def test_user_update_location(
         default_user: User,
         user_service: UserService,
         session: Session,
+        fake_redis: aioredis.Redis,
         redis_online: RedisOnlineUserService,
         redis_location: RedisLocationService,
+        redis_popular: RedisPopularService,
         default_user_auth_headers: dict[str, str]):
     default_user.gender = Gender.MALE
     session.commit()
 
     await redis_online.add_to_online_caches(default_user)
+
+    popular_service = PopularUserService(session, fake_redis)
+    await popular_service.populate_popular_cache()
 
     # assuming some other users are in the cache for Hello
     cached_user_id = str(uuid.uuid4())
@@ -65,11 +72,12 @@ async def test_user_update_location(
     for key in cache_settings_full.online_keys():
         await redis_online.redis.sadd(key, cached_user_id)
 
+    previous_location = default_user.location
     # old dude is in cache of his previous location
     old_location_cache_settings = OnlineUserCacheParams(
         age=default_user.age,
-        country=default_user.location.country,
-        city=default_user.location.city,
+        country=previous_location.country,
+        city=previous_location.city,
         gender=default_user.gender
     )
     for key in old_location_cache_settings.online_keys():
@@ -106,9 +114,38 @@ async def test_user_update_location(
     assert await redis_online.get_online_users(cache_settings_country) == {
         str(default_user.id), cached_user_id}
 
+    assert await redis_popular.get_popular_user_ids(PopularFilterBody(
+        gender=default_user.gender,
+        city='Hello',
+        country='What Country'
+    )) == [str(default_user.id)]
+
+    assert await redis_popular.get_popular_user_ids(PopularFilterBody(
+        gender=default_user.gender,
+        country='What Country'
+    )) == [str(default_user.id)]
+
+    assert await redis_popular.get_popular_user_ids(PopularFilterBody(
+        gender=default_user.gender
+    )) == [str(default_user.id)]
+
+    assert await redis_popular.get_popular_user_ids(PopularFilterBody()) \
+           == [str(default_user.id)]
+
     # user is removed from old cache
     assert await redis_online.get_online_users(old_location_cache_settings) \
            == set()
+
+    assert await redis_popular.get_popular_user_ids(PopularFilterBody(
+        gender=default_user.gender,
+        city=previous_location.city,
+        country=previous_location.country
+    )) == []
+
+    assert await redis_popular.get_popular_user_ids(PopularFilterBody(
+        gender=default_user.gender,
+        country=previous_location.country
+    )) == []
 
 
 @pytest.mark.anyio

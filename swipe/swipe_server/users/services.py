@@ -458,9 +458,9 @@ class PopularUserService:
         self.redis_popular = RedisPopularService(redis)
         self.redis_locations = RedisLocationService(redis)
 
-    async def _fill_cache(self, country: Optional[str] = None,
-                          city: Optional[str] = None,
-                          gender: Optional[Gender] = None):
+    async def populate_cache(self, country: Optional[str] = None,
+                             city: Optional[str] = None,
+                             gender: Optional[Gender] = None):
         users: list[User] = self.user_service.fetch_popular(
             country=country, city=city, gender=gender)
         logger.info(
@@ -474,27 +474,26 @@ class PopularUserService:
         logger.info("Populating popular cache")
         locations = self.redis_locations.fetch_locations()
 
-        await self.redis_popular.clear_popular_users()
         # global popular cache
         logger.info("Populating global cache")
-        await self._fill_cache(gender=Gender.MALE)
-        await self._fill_cache(gender=Gender.FEMALE)
-        await self._fill_cache()
+        await self.populate_cache(gender=Gender.MALE)
+        await self.populate_cache(gender=Gender.FEMALE)
+        await self.populate_cache()
 
         async for country, cities in locations:
             logger.info(f"Populating cache for country: '{country}'")
-            await self._fill_cache(country=country, gender=Gender.MALE)
-            await self._fill_cache(country=country, gender=Gender.FEMALE)
-            await self._fill_cache(country=country)
+            await self.populate_cache(country=country, gender=Gender.MALE)
+            await self.populate_cache(country=country, gender=Gender.FEMALE)
+            await self.populate_cache(country=country)
 
             logger.info(f"Populating cities cache for '{country}', "
                         f"cities: '{cities}'")
             for city in cities:
-                await self._fill_cache(
+                await self.populate_cache(
                     country=country, city=city, gender=Gender.MALE)
-                await self._fill_cache(
+                await self.populate_cache(
                     country=country, city=city, gender=Gender.FEMALE)
-                await self._fill_cache(country=country, city=city)
+                await self.populate_cache(country=country, city=city)
 
 
 class CountryCacheService:

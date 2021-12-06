@@ -5,13 +5,14 @@ from uuid import UUID
 import requests
 from fastapi import Depends, Body, HTTPException, UploadFile, File, APIRouter
 from starlette import status
+from starlette.background import BackgroundTasks
 from starlette.responses import Response
 
 from swipe.settings import settings
 from swipe.swipe_server.chats.models import Chat
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc import security
-from swipe.swipe_server.users import schemas
+from swipe.swipe_server.users import schemas, swipe_bg_tasks
 from swipe.swipe_server.users.models import User, Location
 from swipe.swipe_server.users.redis_services import RedisLocationService, \
     RedisOnlineUserService, RedisBlacklistService
@@ -66,11 +67,10 @@ async def add_rating(
     response_model=schemas.UserOut,
     response_model_exclude={'photo_urls', })
 async def patch_user(
+        background_tasks: BackgroundTasks,
         user_body: schemas.UserUpdate = Body(...),
         user_service: UserService = Depends(),
         redis_location: RedisLocationService = Depends(),
-        redis_online: RedisOnlineUserService = Depends(),
-        # redis_popular: RedisPopularService = Depends(),
         user_id: UUID = Depends(security.auth_user_id)):
     current_user = user_service.get_user(user_id)
     previous_location: Location = current_user.location
@@ -78,26 +78,17 @@ async def patch_user(
 
     # they are sending this patch on each login
     if user_body.location:
+        # it's a location update
+        # so we have to repopulate respective online/popular caches
         if previous_location and not \
                 (previous_location.city == user_body.location.city and
                  previous_location.country == user_body.location.country):
-            await redis_location.add_cities(
-                user_body.location.country, [user_body.location.city])
-
-            try:
-                await redis_online.remove_from_online_caches(
-                    current_user, previous_location)
-                # putting him back to caches with correct location
-                await redis_online.add_to_online_caches(current_user)
-            except:
-                logger.exception(f"Unable to update caches for {user_id}"
-                                 f"after location update")
+            background_tasks.add_task(
+                swipe_bg_tasks.update_location_caches, current_user,
+                previous_location)
         elif not previous_location:
             await redis_location.add_cities(
                 user_body.location.country, [user_body.location.city])
-    # TODO I should update popular lists for his country, new country and global
-    # await redis_popular.update_user_location(
-    #     current_user, previous_location)
 
     return current_user
 
