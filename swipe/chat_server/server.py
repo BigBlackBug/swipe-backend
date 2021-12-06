@@ -16,14 +16,13 @@ from uvicorn import Server, Config
 
 from swipe import error_handlers
 from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
-    MessagePayload, CreateChatPayload, BlacklistEventPayload, \
-    UserJoinEventPayload, UserLeaveEventPayload, UserDeletedEventPayload
+    MessagePayload, CreateChatPayload, \
+    UserJoinEventPayload, GenericEventPayload, UserEventType
 from swipe.chat_server.services import ChatServerRequestProcessor, \
     WSConnectionManager, ConnectedUser
 from swipe.settings import settings
 from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.misc.errors import SwipeError
-from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
@@ -147,12 +146,11 @@ async def websocket_endpoint(
             # removing blacklist cache
             await redis_blacklist.drop_blacklist_cache(user_id)
             # sending leave payloads to everyone
-            payload__dict = BasePayload(
+            payload = BasePayload(
                 sender_id=UUID(hex=user_id),
-                payload=UserLeaveEventPayload()).dict(by_alias=True)
-            logger.info(f"Leave payload {payload__dict}")
+                payload=GenericEventPayload(type=UserEventType.USER_LEFT))
             await connection_manager.broadcast(
-                user_id, payload__dict)
+                user_id, payload.dict(by_alias=True))
             return
 
         try:
@@ -208,10 +206,11 @@ async def create_chat_from_matchmaking(
 @app.post("/events/blacklist")
 async def send_blacklist_event(blocked_by_id: str = Body(..., embed=True),
                                blocked_user_id: str = Body(..., embed=True)):
-    logger.info(f"Sending blocked event "
+    logger.info(f"Sending blacklist event "
                 f"from {blocked_by_id} to {blocked_user_id}")
     payload = BasePayload(
-        sender_id=UUID(hex=blocked_by_id), payload=BlacklistEventPayload())
+        sender_id=UUID(hex=blocked_by_id),
+        payload=GenericEventPayload(type=UserEventType.USER_BLACKLISTED))
     await connection_manager.send(blocked_user_id, payload.dict(by_alias=True))
 
 
@@ -221,7 +220,9 @@ async def send_user_deleted_event(
         recipients: list[str] = Body(..., embed=True)):
     logger.info(f"Sending user_deleted event for {user_id} to {recipients}")
     payload = BasePayload(
-        sender_id=UUID(hex=user_id), payload=UserDeletedEventPayload())
+        sender_id=UUID(hex=user_id), payload=GenericEventPayload(
+            type=UserEventType.USER_DELETED
+        ))
     for recipient in recipients:
         await connection_manager.send(recipient, payload.dict(by_alias=True))
 

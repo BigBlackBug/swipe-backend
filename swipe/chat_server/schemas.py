@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import enum
 from typing import Optional, Union, Any, Type
 from uuid import UUID
 
@@ -79,16 +80,14 @@ class UserJoinEventPayload(BaseModel):
     avatar_url: str
 
 
-class UserLeaveEventPayload(BaseModel):
-    type_: str = Field('leave', alias='type', const=True)
+class UserEventType(str, enum.Enum):
+    USER_LEFT = 'leave'
+    USER_BLACKLISTED = 'blacklisted'
+    USER_DELETED = 'user_deleted'
 
 
-class BlacklistEventPayload(BaseModel):
-    type_: str = Field('blacklisted', alias='type', const=True)
-
-
-class UserDeletedEventPayload(BaseModel):
-    type_: str = Field('user_deleted', alias='type', const=True)
+class GenericEventPayload(BaseModel):
+    type_: UserEventType = Field(..., alias='type')
 
 
 class BasePayload(BaseModel):
@@ -100,8 +99,7 @@ class BasePayload(BaseModel):
         DeclineChatPayload, AcceptChatPayload, CreateChatPayload,
         OpenChatPayload,
 
-        UserDeletedEventPayload, BlacklistEventPayload,
-        UserJoinEventPayload, UserLeaveEventPayload,
+        UserJoinEventPayload, GenericEventPayload
     ]
 
     @classmethod
