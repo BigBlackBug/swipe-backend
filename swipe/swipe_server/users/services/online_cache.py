@@ -159,6 +159,14 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
             city=filter_params.city, gender=filter_params.gender)
         return await self.redis.smembers(cache_params.cache_key())
 
+    async def update_cached_user(self, user: User):
+        json_data = UserCardPreviewOut.patched_from_orm(user).json()
+        # TODO man, I need a separate connection without decoding
+        # but I don't wanna do that atm
+        # json_data = zlib.compress(json_data.encode('utf-8'))
+
+        await self.redis.set(f'{self.ONLINE_USER_KEY}:{user.id}', json_data)
+
     async def add_to_online_caches(self, user: User):
         logger.info(f"Adding {user.id} to online cache sets")
         # add to all online sets
@@ -172,12 +180,7 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
         for key in cache_params.online_keys():
             await self.redis.sadd(key, user_id)
 
-        json_data = UserCardPreviewOut.patched_from_orm(user).json()
-        # TODO man, I need a separate connection without decoding
-        # but I don't wanna do that atm
-        # json_data = zlib.compress(json_data.encode('utf-8'))
-
-        await self.redis.set(f'{self.ONLINE_USER_KEY}:{user.id}', json_data)
+        await self.update_cached_user(user)
 
     async def remove_from_online_caches(
             self, user: User, location: Optional[Location] = None):

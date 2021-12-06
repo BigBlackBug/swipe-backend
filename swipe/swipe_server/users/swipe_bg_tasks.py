@@ -52,3 +52,13 @@ async def update_location_caches(user: User, old_location: Location):
             gender=user.gender,
             country=user.location.country,
             city=user.location.city)
+
+
+async def update_user_cache(user: User):
+    redis_online = RedisOnlineUserService(dependencies.redis())
+    try:
+        await redis_online.remove_from_online_caches(user)
+        # putting him back to caches with correct location
+        await redis_online.add_to_online_caches(user)
+    except:
+        logger.exception(f"Unable to update user {user.id} in cache")

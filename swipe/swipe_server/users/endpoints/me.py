@@ -81,7 +81,6 @@ async def patch_user(
     current_user: User = user_service.update_user(current_user, user_body)
 
     # they are sending this patch on each login
-    # TODO update avatar and photos in cache
     if user_body.location:
         # it's a location update
         # so we have to repopulate respective online/popular caches
@@ -94,6 +93,10 @@ async def patch_user(
         elif not previous_location:
             await redis_location.add_cities(
                 user_body.location.country, [user_body.location.city])
+    else:
+        # a regular update
+        background_tasks.add_task(
+            swipe_bg_tasks.update_user_cache, current_user)
 
     return current_user
 
