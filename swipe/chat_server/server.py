@@ -209,6 +209,7 @@ async def send_user_deleted_event(
 
 async def _send_payload(payload: BasePayload):
     recipient_id = payload.recipient_id
+    sender_id = payload.sender_id
     # sending message/create_chat to offline users
     if not connection_manager.is_connected(str(recipient_id)):
         if isinstance(payload.payload, MessagePayload) \
@@ -217,8 +218,14 @@ async def _send_payload(payload: BasePayload):
                 f"{recipient_id} is offline, sending push "
                 f"notification for '{payload.payload.type_}' payload")
 
-            # TODO limit notifications to one message per 3 mins per user
             firebase_service = RedisFirebaseService(dependencies.redis())
+            on_cooldown = await firebase_service.is_on_cooldown(
+                str(sender_id), str(recipient_id))
+            if on_cooldown:
+                logger.info(f"Notifications are in cooldown "
+                            f"for {sender_id}->{recipient_id}")
+                return
+
             firebase_token = \
                 await firebase_service.get_firebase_token(str(recipient_id))
             if not firebase_token:
@@ -232,6 +239,9 @@ async def _send_payload(payload: BasePayload):
             out_payload = json.loads(out_payload)
             firebase.send(firebase.Message(
                 data=out_payload, token=firebase_token))
+
+            await firebase_service.set_cooldown_token(
+                str(sender_id), str(recipient_id))
     else:
         out_payload = payload.dict(by_alias=True, exclude_unset=True)
         await connection_manager.send(str(recipient_id), out_payload)
