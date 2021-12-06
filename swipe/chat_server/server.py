@@ -209,8 +209,6 @@ async def send_user_deleted_event(
 
 async def _send_payload(payload: BasePayload):
     recipient_id = payload.recipient_id
-    out_payload = payload.dict(by_alias=True, exclude_unset=True)
-
     # sending message/create_chat to offline users
     if not connection_manager.is_connected(str(recipient_id)):
         if isinstance(payload.payload, MessagePayload) \
@@ -229,9 +227,13 @@ async def _send_payload(payload: BasePayload):
                     f"which is weird")
                 return
 
+            # that's a stupid hack, better use orjson
+            out_payload = payload.json(by_alias=True, exclude_unset=True)
+            out_payload = json.loads(out_payload)
             firebase.send(firebase.Message(
                 data=out_payload, token=firebase_token))
     else:
+        out_payload = payload.dict(by_alias=True, exclude_unset=True)
         await connection_manager.send(str(recipient_id), out_payload)
 
 
