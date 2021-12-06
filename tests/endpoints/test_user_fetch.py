@@ -529,5 +529,5 @@ async def test_user_fetch_single(
         headers=default_user_auth_headers
     )
     assert response.json()['avatar_url'] == \
-           f'{settings.SWIPE_REST_SERVER_HOST}/users/' \
+           f'{settings.SWIPE_REST_SERVER_HOST}/v1/users/' \
            f'{default_user.id}/avatar'

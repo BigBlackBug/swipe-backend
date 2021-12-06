@@ -217,7 +217,7 @@ class UserOutGlobalChatPreviewORM(BaseModel):
         schema_obj = cls.parse_obj(orm_schema)
         if schema_obj.avatar_id:
             avatar_url = f'{settings.SWIPE_REST_SERVER_HOST}' \
-                         f'/users/{schema_obj.id}/avatar'
+                         f'/v1/users/{schema_obj.id}/avatar'
         else:
             # TODO default
             avatar_url = ''

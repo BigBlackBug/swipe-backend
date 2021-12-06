@@ -103,7 +103,7 @@ class User(ModelBase):
     def avatar_url(self):
         if self.avatar_id:
             avatar_url = f'{settings.SWIPE_REST_SERVER_HOST}' \
-                         f'/users/{self.id}/avatar'
+                         f'/v1/users/{self.id}/avatar'
         else:
             # TODO default
             avatar_url = ''
