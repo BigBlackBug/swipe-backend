@@ -69,15 +69,17 @@ async def matchmaker_endpoint(
         gender: Gender = Query(None)):
     redis_online = RedisMatchmakingOnlineUserService(dependencies.redis())
     user: User
-    with dependencies.db_context() as session:
+    with dependencies.db_context(expire_on_commit=False) as session:
         # loading only age and gender
         user_service = MMUserService(session)
         if (user := user_service.get_matchmaking_preview(user_id)) is None:
             logger.info(f"User {user_id} not found")
             await websocket.close(1003)
             return
-        await redis_online.add_to_online_caches(user)
 
+        partner_ids: list[str] = user_service.get_user_chat_partners(user_id)
+
+    await redis_online.add_to_online_caches(user)
     logger.info(f"{user_id}, rounded age: {user.age} "
                 f"connected with filter: {gender}")
 
@@ -86,7 +88,6 @@ async def matchmaker_endpoint(
         data=MMUserData(age=user.age, gender_filter=gender, gender=user.gender))
     await connection_manager.connect(connected_user)
 
-    partner_ids: list[str] = user_service.get_user_chat_partners(user_id)
     logger.info(f"Chat partners of {user_id}: {partner_ids}")
     redis_chats = RedisChatCacheService(dependencies.redis())
     await redis_chats.save_chat_partner_cache(user_id, partner_ids)

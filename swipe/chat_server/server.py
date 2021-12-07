@@ -87,6 +87,7 @@ async def websocket_endpoint(
             logger.info(f"User {user_id} not found")
             await websocket.close(1003)
             return
+        blacklist: set[str] = await user_service.fetch_blacklist(user_id)
 
     firebase_service = RedisFirebaseService(redis)
     # we're online so we don't need a token in cache
@@ -108,7 +109,6 @@ async def websocket_endpoint(
         ConnectedUser(user_id=user_id, connection=websocket, data=user_data))
 
     # populating blacklist cache only for online users
-    blacklist: set[str] = await user_service.fetch_blacklist(user_id)
     await redis_blacklist.populate_blacklist(user_id, blacklist)
 
     # sending join event to all connected users

@@ -16,11 +16,13 @@ class MMUserService:
         self.db = db
 
     def get_matchmaking_preview(self, user_id: str) -> User:
+        logger.info(f"Fetching chat matchmaking preview of {user_id}")
         return self.db.query(User).where(User.id == user_id). \
             options(load_only(User.gender, User.date_of_birth)) \
             .one_or_none()
 
     def get_user_chat_partners(self, user_id: str) -> list[str]:
+        logger.info(f"Fetching chat partners of {user_id}")
         a_to_b = select(cast(Chat.the_other_person_id, String)).where(
             Chat.initiator_id == user_id
         )
