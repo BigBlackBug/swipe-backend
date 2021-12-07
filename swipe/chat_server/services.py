@@ -20,7 +20,8 @@ from swipe.swipe_server.chats.models import MessageStatus, ChatSource, \
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.users.enums import Gender
-from swipe.swipe_server.users.services.services import UserService, BlacklistService
+from swipe.swipe_server.users.services.services import UserService, \
+    BlacklistService
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +138,7 @@ class PayloadEncoder(json.JSONEncoder):
 
 @dataclass
 class ChatUserData:
+    user_id: str
     name: str
     avatar_url: str
 
@@ -158,6 +160,11 @@ class ConnectedUser:
 
 class WSConnectionManager:
     active_connections: dict[str, ConnectedUser] = {}
+
+    def get_user_data(self, user_id: str) \
+            -> Optional[ChatUserData | MMUserData]:
+        return self.active_connections[user_id].data \
+            if user_id in self.active_connections else None
 
     async def connect(self, user: ConnectedUser):
         await user.connection.accept()

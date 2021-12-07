@@ -19,7 +19,7 @@ from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
     MessagePayload, CreateChatPayload, \
     UserJoinEventPayload, GenericEventPayload, UserEventType
 from swipe.chat_server.services import ChatServerRequestProcessor, \
-    WSConnectionManager, ConnectedUser
+    WSConnectionManager, ConnectedUser, ChatUserData
 from swipe.settings import settings
 from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.misc.errors import SwipeError
@@ -102,8 +102,10 @@ async def websocket_endpoint(
     # they may have returned before the cache is dropped
     await redis_online.remove_from_recently_online(user_id)
 
+    user_data = ChatUserData(
+        user_id=user_id, avatar_url=user.avatar_url, name=user.name)
     await connection_manager.connect(
-        ConnectedUser(user_id=user_id, connection=websocket))
+        ConnectedUser(user_id=user_id, connection=websocket, data=user_data))
 
     # populating blacklist cache only for online users
     blacklist: set[str] = await user_service.fetch_blacklist(user_id)
@@ -115,8 +117,8 @@ async def websocket_endpoint(
     await connection_manager.broadcast(
         user_id, UserJoinEventPayload(
             user_id=user_id,
-            name=user.name,
-            avatar_url=user.avatar_url
+            name=user_data.name,
+            avatar_url=user_data.avatar_url
         ).dict(by_alias=True))
 
     while True:
@@ -227,45 +229,50 @@ async def send_user_deleted_event(
         await connection_manager.send(recipient, payload.dict(by_alias=True))
 
 
-async def _send_payload(payload: BasePayload):
-    recipient_id = payload.recipient_id
-    sender_id = payload.sender_id
+async def _send_payload(base_payload: BasePayload):
+    recipient_id = str(base_payload.recipient_id)
+    sender_id = str(base_payload.sender_id)
+    payload = base_payload.payload
     # sending message/create_chat to offline users
-    if not connection_manager.is_connected(str(recipient_id)):
-        if isinstance(payload.payload, MessagePayload) \
-                or isinstance(payload.payload, CreateChatPayload):
+    if not connection_manager.is_connected(recipient_id):
+
+        if isinstance(payload, MessagePayload) \
+                or isinstance(payload, CreateChatPayload):
             logger.info(
                 f"{recipient_id} is offline, sending push "
-                f"notification for '{payload.payload.type_}' payload")
+                f"notification for '{payload.type_}' payload")
 
             firebase_service = RedisFirebaseService(dependencies.redis())
+
             on_cooldown = await firebase_service.is_on_cooldown(
-                str(sender_id), str(recipient_id))
+                sender_id, recipient_id)
             if on_cooldown:
                 logger.info(f"Notifications are in cooldown "
                             f"for {sender_id}->{recipient_id}")
                 return
 
             firebase_token = \
-                await firebase_service.get_firebase_token(str(recipient_id))
+                await firebase_service.get_firebase_token(recipient_id)
             if not firebase_token:
                 logger.error(
                     f"User {recipient_id} does not have a firebase token "
                     f"which is weird")
                 return
 
-            # that's a stupid hack, better use orjson
-            out_payload = payload.json(by_alias=True, exclude_unset=True)
-            out_payload = json.loads(out_payload)
+            sender_name = connection_manager.get_user_data(sender_id).name
+            out_payload = {
+                'sender_id': sender_id,
+                'sender_name': sender_name,
+                'type': payload.type_
+            }
             logger.info(f"Sending firebase message payload {out_payload}")
             firebase.send(firebase.Message(
                 data=out_payload, token=firebase_token))
 
-            await firebase_service.set_cooldown_token(
-                str(sender_id), str(recipient_id))
+            await firebase_service.set_cooldown_token(sender_id, recipient_id)
     else:
-        out_payload = payload.dict(by_alias=True, exclude_unset=True)
-        await connection_manager.send(str(recipient_id), out_payload)
+        out_payload = base_payload.dict(by_alias=True, exclude_unset=True)
+        await connection_manager.send(recipient_id, out_payload)
 
 
 def start_server():
