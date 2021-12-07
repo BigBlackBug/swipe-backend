@@ -1,0 +1,108 @@
+version: '3.7'
+
+volumes:
+  letsencrypt:
+    external:
+      name: letsencrypt_keys
+
+services:
+
+  nginx:
+    image: nginx:1.18
+    restart: always
+    volumes:
+      - letsencrypt:/etc/letsencrypt:ro
+      - ./config-nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config-nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./landing:/home/landing:ro
+    ports:
+      - '443:443'
+    depends_on:
+      - swipe_server
+      - chat_server
+      - video_matchmaking_server
+      - audio_matchmaking_server
+      - text_matchmaking_server
+      - text_matchmaking_chat_server
+
+  swipe_server:
+    image: ${SWIPE_IMAGE:?unset}
+    env_file:
+      - swipe.env
+    environment:
+      - CHAT_SERVER_HOST=http://chat_server:80
+    entrypoint: python bin/swipe_server.py
+
+  chat_server:
+    image: ${SWIPE_IMAGE:?unset}
+    env_file:
+      - swipe.env
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/etc/swipe/google-credentials.json
+    volumes:
+      - './google-credentials.json:/etc/swipe/google-credentials.json:ro'
+    entrypoint: python bin/chat_server.py
+    depends_on:
+      - swipe_server
+
+  video_matchmaking_server:
+    image: ${SWIPE_IMAGE:?unset}
+    env_file:
+      - swipe.env
+    environment:
+      - CHAT_SERVER_HOST=http://chat_server:80
+    entrypoint: python bin/matchmaking_server.py
+
+  video_matchmaker:
+    image: ${SWIPE_IMAGE:?unset}
+    env_file:
+      - swipe.env
+    environment:
+      - MATCHMAKING_SERVER_HOST=http://video_matchmaking_server:80
+    entrypoint: python bin/matchmaker.py
+    depends_on:
+      - video_matchmaking_server
+
+  audio_matchmaking_server:
+    image: ${SWIPE_IMAGE:?unset}
+    env_file:
+      - swipe.env
+    environment:
+      - CHAT_SERVER_HOST=http://chat_server:80
+    entrypoint: python bin/matchmaking_server.py
+
+  audio_matchmaker:
+    image: ${SWIPE_IMAGE:?unset}
+    env_file:
+      - swipe.env
+    environment:
+      - MATCHMAKING_SERVER_HOST=http://audio_matchmaking_server:80
+    entrypoint: python bin/matchmaker.py
+    depends_on:
+      - audio_matchmaking_server
+
+  text_matchmaking_server:
+    image: ${SWIPE_IMAGE:?unset}
+    env_file:
+      - swipe.env
+    environment:
+      - CHAT_SERVER_HOST=http://chat_server:80
+    entrypoint: python bin/matchmaking_server.py
+
+  text_matchmaker:
+    image: ${SWIPE_IMAGE:?unset}
+    env_file:
+      - swipe.env
+    environment:
+      - MATCHMAKING_SERVER_HOST=http://text_matchmaking_server:80
+    entrypoint: python bin/matchmaker.py
+    depends_on:
+      - text_matchmaking_server
+
+  text_matchmaking_chat_server:
+    image: ${SWIPE_IMAGE:?unset}
+    env_file:
+      - swipe.env
+    environment:
+      - CHAT_SERVER_HOST=http://chat_server:80
+    entrypoint: python bin/matchmaking_chat_server.py

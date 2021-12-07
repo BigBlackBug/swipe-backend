@@ -348,7 +348,6 @@ async def fetch_user_ids_for_matchmaking(
 def start_server():
     app.add_middleware(CorrelationIdMiddleware)
     server_config = Config(app=app, host='0.0.0.0',
-                           port=settings.MATCHMAKING_SERVER_PORT,
-                           workers=1, loop='asyncio')
+                           port=80, workers=1, loop='asyncio')
     server = Server(server_config)
     loop.run_until_complete(server.serve())

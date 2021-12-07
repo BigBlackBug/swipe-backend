@@ -6,7 +6,7 @@ from collections import namedtuple
 from dataclasses import dataclass, field
 
 import requests
-from fastapi import FastAPI, Query
+from fastapi import FastAPI
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 from uvicorn import Config, Server
@@ -47,9 +47,8 @@ current_chats: dict[str, TemporaryChat] = dict()
 
 @app.websocket("/connect/{user_id}")
 async def matchmaker_endpoint(
-        user_id: str,
-        websocket: WebSocket,
-        the_other_person_id: str = Query(None)):
+        user_id: str, the_other_person_id: str,
+        websocket: WebSocket):
     logger.info(f"{user_id} connected, "
                 f"the_other_person_id: {the_other_person_id}")
 
@@ -196,7 +195,7 @@ async def _process_payload(base_payload: MMTextBasePayload, chat_id: str):
 def start_server():
     app.add_middleware(CorrelationIdMiddleware)
     server_config = Config(app=app, host='0.0.0.0',
-                           port=settings.MATCHMAKING_TEXT_CHAT_SERVER_PORT,
+                           port=80,
                            workers=1, loop='asyncio')
     server = Server(server_config)
     loop.run_until_complete(server.serve())

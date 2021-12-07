@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'dev'
+      - '!feature-nginx'
 env:
   SWIPE_LOCAL_IMAGE: swipe/swipe-backend:latest
   SWIPE_IMAGE: registry.digitalocean.com/swipe-dev/swipe/swipe-backend:latest

@@ -364,7 +364,7 @@ def start_server():
     app.add_exception_handler(Exception, error_handlers.global_error_handler)
     app.add_middleware(CorrelationIdMiddleware)
     server_config = Config(app=app, host='0.0.0.0',
-                           port=settings.CHAT_SERVER_PORT,
+                           port=80,
                            reload=settings.ENABLE_WEB_SERVER_AUTORELOAD,
                            workers=1, loop='asyncio')
     server = Server(server_config)
