@@ -186,8 +186,11 @@ class WSConnectionManager:
 
         logger.info(f"Sending '{payload_type}' payload to {user_id}")
         # TODO use orjson instead of that dumb shit
-        await self.active_connections[user_id].connection.send_text(
-            json.dumps(payload, cls=PayloadEncoder))
+        try:
+            await self.active_connections[user_id].connection.send_text(
+                json.dumps(payload, cls=PayloadEncoder))
+        except:
+            logger.exception(f"Unable to send '{payload_type}' to {user_id}")
 
     async def broadcast(self, sender_id: str, payload: dict):
         # TODO stupid workaround
@@ -203,8 +206,12 @@ class WSConnectionManager:
                 continue
 
             logger.info(f"Sending '{payload_type}' payload to {user_id}")
-            await user.connection.send_text(
-                json.dumps(payload, cls=PayloadEncoder))
+            try:
+                await user.connection.send_text(
+                    json.dumps(payload, cls=PayloadEncoder))
+            except:
+                logger.exception(
+                    f"Unable to send '{payload_type}' to {user_id}")
 
     def is_connected(self, user_id: str):
         return user_id in self.active_connections
