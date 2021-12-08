@@ -293,6 +293,9 @@ class RedisFirebaseService:
             f'{self.FIREBASE_COOLDOWN_KEY}:{sender_id}:{recipient_id}')
 
     async def set_cooldown_token(self,  sender_id: str, recipient_id: str):
+        logger.info(
+            f"Setting firebase cooldown "
+            f"token for {sender_id}:{recipient_id}")
         await self.redis.setex(
             f'{self.FIREBASE_COOLDOWN_KEY}:{sender_id}:{recipient_id}',
             time=constants.FIREBASE_NOTIFICATION_COOLDOWN_SEC,

@@ -280,9 +280,17 @@ async def _send_payload(base_payload: BasePayload):
                 'sender_name': sender_name,
                 'type': payload.type_
             }
-            logger.info(f"Sending firebase message payload {out_payload}")
+            logger.info(
+                f"Sending firebase message payload {out_payload}"
+                f"to {recipient_id}")
+            # firebase.send(firebase.Message(
+            #     data=out_payload, token=firebase_token))
             firebase.send(firebase.Message(
-                data=out_payload, token=firebase_token))
+                notification=firebase.Notification(
+                    title=f'{sender_name} считает, что всё хуйня',
+                    body='Давай по новой!'),
+                token=firebase_token
+            ))
 
             await firebase_service.set_cooldown_token(sender_id, recipient_id)
     else:
