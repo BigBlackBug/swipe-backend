@@ -17,7 +17,8 @@ from uvicorn import Server, Config
 from swipe import error_handlers
 from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
     MessagePayload, CreateChatPayload, \
-    UserJoinEventPayload, GenericEventPayload, UserEventType, DeclineChatPayload
+    UserJoinEventPayload, GenericEventPayload, UserEventType, \
+    DeclineChatPayload, MessageLikePayload
 from swipe.chat_server.services import ChatServerRequestProcessor, \
     WSConnectionManager, ConnectedUser, ChatUserData
 from swipe.settings import settings
@@ -198,22 +199,23 @@ async def websocket_endpoint(
             logger.exception(f"Error processing message: {raw_data}")
 
 
-@app.post("/matchmaking/create_chat")
-async def create_chat_from_matchmaking(
+@app.post("/matchmaking/chat")
+async def matchmaking_chat_handler(
         payload: BasePayload = Body(...),
         db: Session = Depends(dependencies.db),
         redis: aioredis.Redis = Depends(dependencies.redis)):
     request_processor = ChatServerRequestProcessor(db, redis)
-    if not isinstance(payload.payload, CreateChatPayload):
-        # TODO refactor
-        raise SwipeError("Unsupported payload")
+    if not type(payload.payload) in [
+        CreateChatPayload, MessagePayload, MessageLikePayload
+    ]:
+        raise SwipeError(f"Unsupported payload {payload.payload.type_}")
 
-    logger.info(f"Creating chat from matchmaking: {payload}")
     await request_processor.process(payload)
 
     out_payload = payload.dict(by_alias=True, exclude_unset=True)
     logger.info(f"Sending data to {payload.recipient_id}")
     await connection_manager.send(str(payload.recipient_id), out_payload)
+
     logger.info(f"Sending data to {payload.sender_id}")
     await connection_manager.send(str(payload.sender_id), out_payload)
 

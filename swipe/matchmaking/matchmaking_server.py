@@ -233,7 +233,7 @@ async def _process_payload(base_payload: MMBasePayload,
             logger.info(
                 f"{sender_id} has accepted chat request from {recipient_id}, "
                 f"sending request to chat server")
-            url = f'{settings.CHAT_SERVER_HOST}/matchmaking/create_chat'
+            url = f'{settings.CHAT_SERVER_HOST}/matchmaking/chat'
             # yeah they are reversed
             output_payload = {
                 'sender_id': base_payload.recipient_id,

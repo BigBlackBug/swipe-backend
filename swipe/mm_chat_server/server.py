@@ -2,6 +2,7 @@ import asyncio
 import logging
 import uuid
 from collections import namedtuple
+from dataclasses import dataclass, field
 
 import requests
 from fastapi import FastAPI, Query
@@ -27,14 +28,21 @@ matchmaking_data = MMRoundData()
 connection_manager = WSConnectionManager()
 
 ChatTuple = namedtuple('ChatTuple', ['the_other_person_id', 'chat_id'])
+CHAT_SERVER_URL = f'{settings.CHAT_SERVER_HOST}/matchmaking/chat'
+
+
+@dataclass
+class TemporaryChat:
+    saved: bool = False
+    messages: list[MMTextMessageModel] = field(default_factory=list)
+
+
 # user -> chat_id
 current_clients: dict[str, ChatTuple] = dict()
 # chat_id -> messages
-current_chats: dict[str, list[MMTextMessageModel]] = dict()
+current_chats: dict[str, TemporaryChat] = dict()
 
 
-# host starts
-# the other dude joins
 @app.websocket("/connect/{user_id}")
 async def matchmaker_endpoint(
         user_id: str,
@@ -55,7 +63,7 @@ async def matchmaker_endpoint(
             the_other_person_id=the_other_person_id, chat_id=chat_id)
         current_clients[the_other_person_id] = ChatTuple(
             the_other_person_id=user_id, chat_id=chat_id)
-        current_chats[chat_id] = []
+        current_chats[chat_id] = TemporaryChat()
     else:
         # the other dude joins
         chat_id = current_clients[user_id].chat_id
@@ -86,7 +94,7 @@ async def matchmaker_endpoint(
 
             logger.info(
                 f"Deleting clients {user_id} and {the_other_person_id} and "
-                f"their new chat")
+                f"their new chat {chat_id}")
             current_clients.pop(user_id, None)
             current_clients.pop(the_other_person_id, None)
             current_chats.pop(chat_id, None)
@@ -108,33 +116,67 @@ async def _process_payload(base_payload: MMTextBasePayload, chat_id: str):
     sender_id = base_payload.sender_id
     recipient_id = base_payload.recipient_id
 
-    if (current_messages := current_chats.get(chat_id)) is None:
+    if (chat := current_chats.get(chat_id)) is None:
         raise SwipeError(
             f"No chat exists between {sender_id} and {recipient_id}")
 
-    logger.info(f"Got payload {payload}")
+    logger.info(f"Got payload {payload} from {sender_id}")
 
     if isinstance(payload, MMTextMessagePayload):
-        current_messages.append(MMTextMessageModel(
-            sender_id=sender_id,
-            recipient_id=recipient_id,
-            message_id=payload.message_id,
-            timestamp=payload.timestamp,
-            text=payload.text
-        ))
+        if chat.saved:
+            logger.info(f"Chat {chat_id} is already saved to db, "
+                        f"sending {payload} payload to chat server")
+            # yeah they are reversed
+            output_payload = {
+                'sender_id': base_payload.recipient_id,
+                'recipient_id': base_payload.sender_id,
+                'payload': {
+                    'type': 'message',
+                    'message_id': payload.message_id,
+                    'timestamp': payload.timestamp,
+                    'text': payload.text
+                }
+            }
+            # TODO use aiohttp?
+            requests.post(CHAT_SERVER_URL, json=output_payload)
+        else:
+            chat.messages.append(MMTextMessageModel(
+                sender_id=sender_id,
+                recipient_id=recipient_id,
+                message_id=payload.message_id,
+                timestamp=payload.timestamp,
+                text=payload.text
+            ))
     elif isinstance(payload, MMTextMessageLikePayload):
-        message: MMTextMessagePayload
-        for message in current_messages:
-            if message.message_id == payload.message_id:
-                logger.info(f"Setting like:{payload.like} "
-                            f"on {payload.message_id}")
-                message.is_liked = payload.like
+        if chat.saved:
+            logger.info(f"Chat {chat_id} is already saved to db, "
+                        f"sending {payload} payload to chat server")
+            # yeah they are reversed
+            output_payload = {
+                'sender_id': base_payload.recipient_id,
+                'recipient_id': base_payload.sender_id,
+                'payload': {
+                    'type': 'like',
+                    'like': payload.like,
+                    'message_id': payload.message_id,
+                }
+            }
+            # TODO use aiohttp?
+            requests.post(CHAT_SERVER_URL, json=output_payload)
+        else:
+            message: MMTextMessagePayload
+            for message in chat.messages:
+                if message.message_id == payload.message_id:
+                    logger.info(f"Setting like:{payload.like} "
+                                f"on {payload.message_id}")
+                    message.is_liked = payload.like
     elif isinstance(payload, MMTextChatPayload):
         if payload.action == MMTextChatAction.ACCEPT:
+            chat.saved = True
+
             logger.info(
                 f"{sender_id} has accepted chat request from {recipient_id}, "
                 f"sending request to chat server")
-            url = f'{settings.CHAT_SERVER_HOST}/matchmaking/create_chat'
             # yeah they are reversed
             output_payload = {
                 'sender_id': base_payload.recipient_id,
@@ -144,12 +186,12 @@ async def _process_payload(base_payload: MMTextBasePayload, chat_id: str):
                     'source': ChatSource.TEXT_LOBBY.value,
                     'chat_id': chat_id,
                     'messages': [
-                        message.dict() for message in current_messages
+                        message.dict() for message in chat.messages
                     ]
                 }
             }
             # TODO use aiohttp?
-            requests.post(url, json=output_payload)
+            requests.post(CHAT_SERVER_URL, json=output_payload)
 
 
 def start_server():
