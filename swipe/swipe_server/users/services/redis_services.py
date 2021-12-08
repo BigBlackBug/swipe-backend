@@ -147,16 +147,17 @@ class RedisBlacklistService:
     @enable_blacklist()
     async def add_to_blacklist_cache(
             self, blocked_user_id: str, blocked_by_id: str):
-        logger.info(f"Adding both {blocked_user_id} and {blocked_by_id}"
-                    f"to each others blacklist cache")
-        await self.redis.sadd(f'{self.BLACKLIST_KEY}:{blocked_user_id}',
-                              blocked_by_id)
+        logger.info(f"Adding {blocked_user_id} to {blocked_by_id} blacklist")
         await self.redis.sadd(f'{self.BLACKLIST_KEY}:{blocked_by_id}',
                               blocked_user_id)
 
+        logger.info(f"Adding {blocked_by_id} to {blocked_user_id} blacklist")
+        await self.redis.sadd(
+            f'{self.BLACKLIST_KEY}:{blocked_user_id}', blocked_by_id)
+
     @enable_blacklist()
     async def populate_blacklist(self, user_id: str, blacklist: set[str]):
-        logger.info(f"Populating blacklist cache for {user_id}")
+        logger.info(f"Populating blacklist cache for {user_id}: {blacklist}")
         if not blacklist:
             return
         await self.redis.sadd(f'{self.BLACKLIST_KEY}:{user_id}', *blacklist)

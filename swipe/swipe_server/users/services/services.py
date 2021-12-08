@@ -280,6 +280,7 @@ class UserService:
 
     @enable_blacklist(return_value_class=set)
     async def fetch_blacklist(self, user_id: str) -> set[str]:
+        logger.info(f"Fetching blacklist of {user_id}")
         blocked_by_me = select(
             cast(blacklist_table.columns.blocked_user_id, String)) \
             .where(blacklist_table.columns.blocked_by_id == user_id)
@@ -412,8 +413,7 @@ class BlacklistService:
     async def update_blacklist(
             self, blocked_by_id: str, blocked_user_id: str,
             send_blacklist_event: bool = False):
-        logger.info(f"Adding both {blocked_by_id} and {blocked_user_id}"
-                    f"to each others blacklist")
+        logger.info(f"{blocked_by_id} blocked {blocked_user_id}, updating db")
         try:
             self.db.execute(insert(blacklist_table).values(
                 blocked_user_id=blocked_user_id,
@@ -427,6 +427,8 @@ class BlacklistService:
             blocked_by_id, blocked_user_id)
 
         if send_blacklist_event:
+            logger.info(f"Sending blacklisted event: {blocked_by_id} "
+                        f"blocked {blocked_user_id}")
             # sending 'add to blacklist' event to blocked_user_id
             url = f'{settings.CHAT_SERVER_HOST}/events/blacklist'
             requests.post(url, json={
