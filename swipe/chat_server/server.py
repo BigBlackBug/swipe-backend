@@ -182,6 +182,7 @@ async def websocket_endpoint(
                     f"to {blocked_user_id}")
                 decline_payload = BasePayload(
                     sender_id=UUID(hex=blocked_by_id),
+                    recipient_id=UUID(hex=blocked_user_id),
                     payload=GenericEventPayload(
                         type=UserEventType.USER_BLACKLISTED))
                 await connection_manager.send(
@@ -226,6 +227,7 @@ async def send_blacklist_event(blocked_by_id: str = Body(..., embed=True),
                 f"from {blocked_by_id} to {blocked_user_id}")
     payload = BasePayload(
         sender_id=UUID(hex=blocked_by_id),
+        recipient_id=UUID(hex=blocked_user_id),
         payload=GenericEventPayload(type=UserEventType.USER_BLACKLISTED))
     await connection_manager.send(blocked_user_id, payload.dict(by_alias=True))
 

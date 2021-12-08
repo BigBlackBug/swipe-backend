@@ -32,6 +32,7 @@ class FetchUserService:
     async def collect(self, user_id: str, user_age: int,
                       filter_params: OnlineFilterBody,
                       disallowed_users: set[str] = None) -> set[str]:
+        logger.info(f"Collecting users for {user_id}, params: {filter_params}")
         # TODO save current age diff with session ID
         # so that we don't go through all previous age ranges
         # every time
@@ -59,6 +60,7 @@ class FetchUserService:
         # premium filtered by location(whole country/my city)
         blacklist: set[str] = \
             await self.redis_blacklist.get_blacklist(user_id)
+        logger.info(f"Blacklist for {user_id}: {blacklist}")
         # Russia, SPB, 25+-2,3,4, ALL
 
         # age->(index,user_list)
