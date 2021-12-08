@@ -120,8 +120,7 @@ class ChatServerRequestProcessor:
             logger.info(f"Chat {payload.chat_id} was declined")
 
             await self.blacklist_service.update_blacklist(
-                str(data.sender_id), str(data.recipient_id),
-                send_blacklist_event=True)
+                str(data.sender_id), str(data.recipient_id))
 
 
 class PayloadEncoder(json.JSONEncoder):

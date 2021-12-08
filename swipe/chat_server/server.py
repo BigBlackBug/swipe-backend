@@ -17,7 +17,7 @@ from uvicorn import Server, Config
 from swipe import error_handlers
 from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
     MessagePayload, CreateChatPayload, \
-    UserJoinEventPayload, GenericEventPayload, UserEventType
+    UserJoinEventPayload, GenericEventPayload, UserEventType, DeclineChatPayload
 from swipe.chat_server.services import ChatServerRequestProcessor, \
     WSConnectionManager, ConnectedUser, ChatUserData
 from swipe.settings import settings
@@ -173,6 +173,20 @@ async def websocket_endpoint(
                 await redis_chats.add_chat_partner(
                     str(payload.sender_id), str(payload.recipient_id))
 
+            if isinstance(payload.payload, DeclineChatPayload):
+                blocked_by_id = str(payload.sender_id)
+                blocked_user_id = str(payload.recipient_id)
+
+                logger.info(
+                    f"Sending blacklist event from {blocked_by_id} "
+                    f"to {blocked_user_id}")
+                decline_payload = BasePayload(
+                    sender_id=UUID(hex=blocked_by_id),
+                    payload=GenericEventPayload(
+                        type=UserEventType.USER_BLACKLISTED))
+                await connection_manager.send(
+                    blocked_user_id, decline_payload.dict(by_alias=True))
+
             if isinstance(payload.payload, GlobalMessagePayload):
                 await connection_manager.broadcast(
                     str(payload.sender_id), payload.dict(
@@ -235,7 +249,6 @@ async def _send_payload(base_payload: BasePayload):
     payload = base_payload.payload
     # sending message/create_chat to offline users
     if not connection_manager.is_connected(recipient_id):
-
         if isinstance(payload, MessagePayload) \
                 or isinstance(payload, CreateChatPayload):
             logger.info(

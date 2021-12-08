@@ -435,3 +435,4 @@ class BlacklistService:
                 'blocked_by_id': blocked_by_id,
                 'blocked_user_id': blocked_user_id
             })
+            logger.info("Blacklist event sent")
