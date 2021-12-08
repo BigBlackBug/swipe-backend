@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import io
+import logging
 from typing import Type
 
 from PIL import Image
@@ -9,6 +10,7 @@ from PIL import Image
 from swipe.settings import settings
 from swipe.swipe_server.misc.errors import SwipeError
 
+logger = logging.getLogger(__name__)
 AVATAR_SIZE = (60, 60)
 
 
@@ -40,6 +42,8 @@ def enable_blacklist(
             if enable:
                 return await func(self, *args, **kwargs)
             elif return_value_class:
+                logger.info(f"Blacklist disabled {func} not executed. "
+                            f"returning {return_value_class()}")
                 return return_value_class()
             else:
                 return None
