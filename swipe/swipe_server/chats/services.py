@@ -174,6 +174,7 @@ class ChatService:
 
     def fetch_global_chat(self, last_message_id: Optional[UUID] = None) \
             -> list[GlobalChatMessage]:
+        logger.info(f"Fetching global chat starting from {last_message_id}")
         if last_message_id:
             last_message = self.fetch_global_message(last_message_id)
             query = select(GlobalChatMessage). \
@@ -195,7 +196,7 @@ class ChatService:
             select(ChatMessage).where(ChatMessage.id == message_id)). \
             scalar_one_or_none()
 
-    def fetch_global_message(self, message_id: UUID):
+    def fetch_global_message(self, message_id: UUID) -> GlobalChatMessage:
         return self.db.execute(
             select(GlobalChatMessage). \
                 where(GlobalChatMessage.id == message_id)). \
