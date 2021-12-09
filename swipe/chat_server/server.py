@@ -5,6 +5,7 @@ import logging
 from uuid import UUID
 
 import aioredis
+import pymorphy2
 from fastapi import FastAPI, Depends, Body
 from fastapi import WebSocket
 from firebase_admin import messaging as firebase
@@ -35,6 +36,7 @@ from swipe.swipe_server.users.services.services import UserService
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+morph_analyzer = pymorphy2.MorphAnalyzer()
 
 _supported_payloads = []
 for cls in BaseModel.__subclasses__():
@@ -253,48 +255,49 @@ async def _send_payload(base_payload: BasePayload):
     payload = base_payload.payload
     # sending message/create_chat to offline users
     if not connection_manager.is_connected(recipient_id):
-        if isinstance(payload, MessagePayload) \
-                or isinstance(payload, CreateChatPayload):
-            logger.info(
-                f"{recipient_id} is offline, sending push "
-                f"notification for '{payload.type_}' payload")
+        if not type(payload) in {MessagePayload, CreateChatPayload}:
+            return
 
-            firebase_service = RedisFirebaseService(dependencies.redis())
+        logger.info(
+            f"{recipient_id} is offline, sending push "
+            f"notification for '{payload.type_}' payload")
 
-            on_cooldown = await firebase_service.is_on_cooldown(
-                sender_id, recipient_id)
-            if on_cooldown:
-                logger.info(f"Notifications are in cooldown "
-                            f"for {sender_id}->{recipient_id}")
-                return
+        firebase_service = RedisFirebaseService(dependencies.redis())
 
-            firebase_token = \
-                await firebase_service.get_firebase_token(recipient_id)
-            if not firebase_token:
-                logger.error(
-                    f"User {recipient_id} does not have a firebase token "
-                    f"which is weird")
-                return
+        on_cooldown = await firebase_service.is_on_cooldown(
+            sender_id, recipient_id)
+        if on_cooldown:
+            logger.info(f"Notifications are in cooldown "
+                        f"for {sender_id}->{recipient_id}")
+            return
 
-            sender_name = connection_manager.get_user_data(sender_id).name
-            out_payload = {
-                'sender_id': sender_id,
-                'sender_name': sender_name,
-                'type': payload.type_
-            }
-            logger.info(
-                f"Sending firebase message payload {out_payload}"
-                f"to {recipient_id}")
-            # firebase.send(firebase.Message(
-            #     data=out_payload, token=firebase_token))
-            firebase.send(firebase.Message(
-                notification=firebase.Notification(
-                    title=f'{sender_name} считает, что всё хуйня',
-                    body='Давай по новой!'),
-                token=firebase_token
-            ))
+        firebase_token = \
+            await firebase_service.get_firebase_token(recipient_id)
+        if not firebase_token:
+            logger.error(
+                f"User {recipient_id} does not have a firebase token "
+                f"which is weird")
+            return
 
-            await firebase_service.set_cooldown_token(sender_id, recipient_id)
+        sender_name = connection_manager.get_user_data(sender_id).name
+        name_tag = morph_analyzer.parse(sender_name)[0].tag
+        ending = 'а' if 'femn' in name_tag else ''
+        if isinstance(payload, MessagePayload):
+            notification = firebase.Notification(
+                title=f'{sender_name} наконец-то ответил{ending} ☺️',
+                body='Переходи в приложение, чтобы продолжить диалог')
+        elif isinstance(payload, CreateChatPayload):
+            notification = firebase.Notification(
+                title=f'{sender_name} хочет с тобой пообщаться ☺️',
+                body='Переходи в приложение, чтобы начать диалог')
+
+        logger.info(
+            f"Sending firebase notification {payload.type_}"
+            f"to {recipient_id}")
+        firebase.send(firebase.Message(
+            notification=notification, token=firebase_token))
+
+        await firebase_service.set_cooldown_token(sender_id, recipient_id)
     else:
         out_payload = base_payload.dict(by_alias=True, exclude_unset=True)
         await connection_manager.send(recipient_id, out_payload)
