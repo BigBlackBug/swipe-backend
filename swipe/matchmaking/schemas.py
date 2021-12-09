@@ -112,6 +112,7 @@ class VertexData(BaseModel):
     user_id: str
     mm_settings: MMSettings
     edges: set[str] = set()
+    disallowed_users: set[str] = set()
 
 
 @dataclass
@@ -147,10 +148,11 @@ class MMRoundData(BaseModel):
         self.decline_pairs.append((user_a_id, user_b_id))
 
     def connect(self, user_id: str, mm_settings: MMSettings,
-                connections: set[str]):
+                connections: set[str], disallowed_users: set[str]):
         self.online_users.add(user_id)
 
-        new_vertex = VertexData(user_id=user_id, mm_settings=mm_settings)
+        new_vertex = VertexData(user_id=user_id, mm_settings=mm_settings,
+                                disallowed_users=disallowed_users)
         new_vertex.edges = connections
         self.new_users[user_id] = new_vertex
 

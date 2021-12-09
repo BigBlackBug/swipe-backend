@@ -26,7 +26,7 @@ from swipe.swipe_server.users.services.fetch_service import FetchUserService
 from swipe.swipe_server.users.services.online_cache import \
     RedisMatchmakingOnlineUserService
 from swipe.swipe_server.users.services.redis_services import \
-    RedisChatCacheService
+    RedisChatCacheService, RedisBlacklistService
 from swipe.swipe_server.users.services.services import BlacklistService
 
 logger = logging.getLogger(__name__)
@@ -211,12 +211,19 @@ async def _process_payload(base_payload: MMBasePayload,
             logger.info(f"Current online users {matchmaking_data.online_users}")
 
             redis_chats = RedisChatCacheService(dependencies.redis())
-            chat_partners = await redis_chats.get_chat_partners(sender_id)
-
+            chat_partners: set[str] = \
+                await redis_chats.get_chat_partners(sender_id)
             logger.info(f"Chat partners for {sender_id}: {chat_partners}")
+
+            redis_blacklist = RedisBlacklistService(dependencies.redis())
+            blacklist: set[str] = \
+                await redis_blacklist.get_blacklist(sender_id)
+            logger.info(f"Blacklist for {sender_id}: {blacklist}")
+
             fetch_service = FetchUserService(
                 RedisMatchmakingOnlineUserService(dependencies.redis()),
                 dependencies.redis())
+            disallowed_users = chat_partners.union(blacklist)
             connections = await fetch_service.collect(
                 sender_id,
                 user_age=mm_settings.age,
@@ -225,10 +232,12 @@ async def _process_payload(base_payload: MMBasePayload,
                     gender=mm_settings.gender_filter,
                     limit=constants.MATCHMAKING_FETCH_LIMIT
                 ),
-                disallowed_users=chat_partners)
-            logger.info(f"Got connections for {sender_id}: {connections}")
+                disallowed_users=disallowed_users)
+            logger.info(f"Got connections for {sender_id}: {connections}, "
+                        f"disallowed_user: {disallowed_users}")
             matchmaking_data.connect(
-                sender_id, mm_settings, connections)
+                sender_id, mm_settings, connections,
+                disallowed_users=disallowed_users)
         elif data_payload.action == MMLobbyAction.RECONNECT:
             logger.info(f"Reconnecting {sender_id} to matchmaking")
             matchmaking_data.reconnect(sender_id)
@@ -295,12 +304,20 @@ async def fetch_user_ids_for_matchmaking(
         user_age: int = Query(None),
         gender_filter: Gender = Query(None),
         session_id: str = Query(None),
-        redis_chats: RedisChatCacheService = Depends()):
+        redis_chats: RedisChatCacheService = Depends(),
+        redis_blacklist: RedisBlacklistService = Depends()):
     chat_partners = await redis_chats.get_chat_partners(user_id)
     logger.info(f"Chat partners of {user_id}: {chat_partners}")
+
+    blacklist: set[str] = \
+        await redis_blacklist.get_blacklist(user_id)
+    logger.info(f"Blacklist for {user_id}: {blacklist}")
+
     fetch_service = FetchUserService(
         RedisMatchmakingOnlineUserService(dependencies.redis()),
         dependencies.redis())
+
+    disallowed_users = chat_partners.union(blacklist)
     connections = await fetch_service.collect(
         user_id,
         user_age=user_age,
@@ -309,9 +326,10 @@ async def fetch_user_ids_for_matchmaking(
             gender=gender_filter,
             limit=100
         ),
-        disallowed_users=chat_partners)
+        disallowed_users=disallowed_users)
 
-    logger.info(f"Got possible connections for {user_id}: {connections}")
+    logger.info(f"Got possible connections for {user_id}: {connections}, "
+                f"disallowed: {disallowed_users}")
     return {
         'connections': connections
     }

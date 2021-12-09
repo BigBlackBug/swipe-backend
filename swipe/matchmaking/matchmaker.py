@@ -13,7 +13,8 @@ logger = logging.getLogger('matchmaker')
 
 
 class Vertex:
-    def __init__(self, user_id: str, mm_settings: MMSettings):
+    def __init__(self, user_id: str, mm_settings: MMSettings,
+                 disallowed_users: set[str]):
         # current settings
         self.mm_settings = mm_settings
         self.user_id = user_id
@@ -27,6 +28,9 @@ class Vertex:
         # user_id -> bidirectional T|F
         self.edges: dict[str, bool] = {}
 
+        # temporary blacklist
+        self.disallowed_users = disallowed_users
+
     def connect(self, user_id: str, bidirectional: bool = False):
         self.edges[user_id] = bidirectional
 
@@ -36,6 +40,9 @@ class Vertex:
     def disconnect(self, user_id: str):
         self.edges.pop(user_id, None)
 
+    def disallow(self, user_id: str):
+        self.disallowed_users.add(user_id)
+
     def can_connect_to(self, other: 'Vertex'):
         """
         True if the other vertex matches the filtering criteria
@@ -43,6 +50,11 @@ class Vertex:
         :param other:
         :return:
         """
+        if other.user_id in self.disallowed_users:
+            logger.info(
+                f"{other.user_id} connection to {self.user_id} is not allowed")
+            return False
+
         min_age = self.mm_settings.age - self.mm_settings.age_diff
         max_age = self.mm_settings.age + self.mm_settings.age_diff
         return min_age <= other.mm_settings.age <= max_age \
@@ -52,6 +64,7 @@ class Vertex:
 
     def __repr__(self):
         return f'[{self.user_id}, {self.edges}, ' \
+               f'disallowed:{self.disallowed_users} ' \
                f'matched: {self.matched}, waiting: {self.waiting}]\n'
 
 
@@ -242,6 +255,9 @@ class Matchmaker:
                 logger.info(f"{vertex_2.user_id} "
                             f"can connect to {vertex_1.user_id}")
                 vertex_2.connect(vertex_1.user_id, False)
+            else:
+                logger.info(f"{vertex_2.user_id} and {vertex_1.user_id}"
+                            f"can not connect to each other")
 
     def _process_disconnected_users(self, incoming_data: MMRoundData):
         for user_id in incoming_data.disconnected_users:
@@ -273,11 +289,15 @@ class Matchmaker:
 
     def _process_decline_pairs(self, incoming_data: MMRoundData):
         for user_a_id, user_b_id in incoming_data.decline_pairs:
-            logger.info(f"Processing {user_a_id}, {user_b_id}")
+            logger.info(f"Processing pair: ['{user_a_id}', '{user_b_id}']")
             if settings.ENABLE_MATCHMAKING_BLACKLIST:
                 # disconnect vertices
                 self._connection_graph[user_a_id].disconnect(user_b_id)
                 self._connection_graph[user_b_id].disconnect(user_a_id)
+                # add to temporary blacklist so that if a user reconnects again
+                # he won't be offered
+                self._connection_graph[user_a_id].disallow(user_b_id)
+                self._connection_graph[user_b_id].disallow(user_a_id)
 
             # enable edges
             self._connection_graph[user_a_id].matched = False
@@ -312,7 +332,8 @@ class Matchmaker:
                         f"{incoming_vertex.edges}")
             incoming_vertex = Vertex(
                 user_id=incoming_vertex.user_id,
-                mm_settings=incoming_vertex.mm_settings)
+                mm_settings=incoming_vertex.mm_settings,
+                disallowed_users=incoming_vertex.disallowed_users)
             # add to graph
             for user_id, graph_vertex in self._connection_graph.items():
                 logger.info(f"Connecting {incoming_user_id} to {user_id}")

@@ -39,9 +39,11 @@ class FetchUserService:
         disallowed_users = disallowed_users or set()
         disallowed_users.add(user_id)
 
+        # checking against currently online users
         allowed_users = await self.redis_online.allowed_users()
         logger.info(f"Allowed users: {allowed_users}")
         logger.info(f"Disallowed users: {disallowed_users}")
+
         fetch_cache_params = UserFetchCacheKey(
             session_id=filter_params.session_id,
             user_id=user_id
@@ -58,9 +60,6 @@ class FetchUserService:
 
         # premium filtered by gender
         # premium filtered by location(whole country/my city)
-        blacklist: set[str] = \
-            await self.redis_blacklist.get_blacklist(user_id)
-        logger.info(f"Blacklist for {user_id}: {blacklist}")
         # Russia, SPB, 25+-2,3,4, ALL
 
         # age->(index,user_list)
@@ -98,7 +97,6 @@ class FetchUserService:
                     current_pool.head += 1
                     logger.info(f"Testing candidate {candidate} for {user_id}")
                     if candidate not in cached_user_ids \
-                            and candidate not in blacklist \
                             and candidate not in disallowed_users:
                         if allowed_users is None or \
                                 allowed_users and candidate in allowed_users:
