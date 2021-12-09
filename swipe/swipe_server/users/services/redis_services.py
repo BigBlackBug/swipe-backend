@@ -148,8 +148,8 @@ class RedisBlacklistService:
     async def add_to_blacklist_cache(
             self, blocked_user_id: str, blocked_by_id: str):
         logger.info(f"Adding {blocked_user_id} to {blocked_by_id} blacklist")
-        await self.redis.sadd(f'{self.BLACKLIST_KEY}:{blocked_by_id}',
-                              blocked_user_id)
+        await self.redis.sadd(
+            f'{self.BLACKLIST_KEY}:{blocked_by_id}', blocked_user_id)
 
         logger.info(f"Adding {blocked_by_id} to {blocked_user_id} blacklist")
         await self.redis.sadd(
@@ -292,7 +292,7 @@ class RedisFirebaseService:
         return await self.redis.get(
             f'{self.FIREBASE_COOLDOWN_KEY}:{sender_id}:{recipient_id}')
 
-    async def set_cooldown_token(self,  sender_id: str, recipient_id: str):
+    async def set_cooldown_token(self, sender_id: str, recipient_id: str):
         logger.info(
             f"Setting firebase cooldown "
             f"token for {sender_id}:{recipient_id}")

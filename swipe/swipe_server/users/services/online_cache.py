@@ -94,14 +94,14 @@ class OnlineMatchmakingUserCacheParams:
 
 class RedisMatchmakingOnlineUserService(
     OnlineUserCache[OnlineMatchmakingUserCacheParams]):
-    MATCHMAKING_ALL_USES_KEY = 'matchmaking_all'
+    MATCHMAKING_ALL_USERS_KEY = 'matchmaking_all'
 
     def __init__(self,
                  redis: Redis = Depends(dependencies.redis)):
         super().__init__(redis)
 
     async def allowed_users(self) -> Optional[set[str]]:
-        return await self.redis.smembers(f'{self.MATCHMAKING_ALL_USES_KEY}')
+        return await self.redis.smembers(f'{self.MATCHMAKING_ALL_USERS_KEY}')
 
     async def get_online_users(
             self, age: int, filter_params: OnlineFilterBody) -> set[str]:
@@ -120,7 +120,7 @@ class RedisMatchmakingOnlineUserService(
         for key in cache_params.online_keys():
             await self.redis.sadd(key, user_id)
 
-        await self.redis.sadd(f'{self.MATCHMAKING_ALL_USES_KEY}', user_id)
+        await self.redis.sadd(f'{self.MATCHMAKING_ALL_USERS_KEY}', user_id)
 
     async def remove_from_online_caches(self, user: User):
         user_id = str(user.id)
@@ -131,7 +131,7 @@ class RedisMatchmakingOnlineUserService(
         # removing this user from all online caches
         for key in cache_params.online_keys():
             await self.redis.srem(key, user_id)
-        await self.redis.srem(f'{self.MATCHMAKING_ALL_USES_KEY}', user_id)
+        await self.redis.srem(f'{self.MATCHMAKING_ALL_USERS_KEY}', user_id)
 
 
 class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):

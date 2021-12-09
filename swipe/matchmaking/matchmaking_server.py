@@ -191,8 +191,12 @@ async def _process_payload(base_payload: MMBasePayload,
                 with dependencies.db_context() as session:
                     blacklist_service = BlacklistService(
                         session, dependencies.redis())
+                    # even though we remove the graph edges,
+                    # these users still have to be removed
+                    # from each other's online lists
                     await blacklist_service.update_blacklist(
-                        sender_id, recipient_id)
+                        sender_id, recipient_id,
+                        send_blacklist_event=True)
     elif isinstance(data_payload, MMLobbyPayload):
         if data_payload.action == MMLobbyAction.CONNECT:
             # user joined the lobby

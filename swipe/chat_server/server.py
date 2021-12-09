@@ -177,19 +177,9 @@ async def websocket_endpoint(
                     str(payload.sender_id), str(payload.recipient_id))
 
             if isinstance(payload.payload, DeclineChatPayload):
-                blocked_by_id = str(payload.sender_id)
-                blocked_user_id = str(payload.recipient_id)
-
-                logger.info(
-                    f"Sending blacklist event from {blocked_by_id} "
-                    f"to {blocked_user_id}")
-                decline_payload = BasePayload(
-                    sender_id=UUID(hex=blocked_by_id),
-                    recipient_id=UUID(hex=blocked_user_id),
-                    payload=GenericEventPayload(
-                        type=UserEventType.USER_BLACKLISTED))
-                await connection_manager.send(
-                    blocked_user_id, decline_payload.dict(by_alias=True))
+                await _send_blacklist_events(
+                    blocked_user_id=str(payload.recipient_id),
+                    blocked_by_id=str(payload.sender_id))
 
             if isinstance(payload.payload, GlobalMessagePayload):
                 await connection_manager.broadcast(
@@ -227,13 +217,31 @@ async def matchmaking_chat_handler(
 @app.post("/events/blacklist")
 async def send_blacklist_event(blocked_by_id: str = Body(..., embed=True),
                                blocked_user_id: str = Body(..., embed=True)):
-    logger.info(f"Sending blacklist event "
-                f"from {blocked_by_id} to {blocked_user_id}")
-    payload = BasePayload(
+    await _send_blacklist_events(blocked_user_id, blocked_by_id)
+
+
+async def _send_blacklist_events(blocked_user_id: str, blocked_by_id: str):
+    logger.info(
+        f"Sending blacklisted event from {blocked_by_id} "
+        f"to {blocked_user_id}")
+    blacklist_payload = BasePayload(
         sender_id=UUID(hex=blocked_by_id),
         recipient_id=UUID(hex=blocked_user_id),
-        payload=GenericEventPayload(type=UserEventType.USER_BLACKLISTED))
-    await connection_manager.send(blocked_user_id, payload.dict(by_alias=True))
+        payload=GenericEventPayload(
+            type=UserEventType.USER_BLACKLISTED))
+    await connection_manager.send(
+        blocked_user_id, blacklist_payload.dict(by_alias=True))
+
+    logger.info(
+        f"Sending blacklisted event from {blocked_user_id} "
+        f"to {blocked_by_id}")
+    blacklist_payload = BasePayload(
+        sender_id=UUID(hex=blocked_user_id),
+        recipient_id=UUID(hex=blocked_by_id),
+        payload=GenericEventPayload(
+            type=UserEventType.USER_BLACKLISTED))
+    await connection_manager.send(
+        blocked_by_id, blacklist_payload.dict(by_alias=True))
 
 
 @app.post("/events/user_deleted")
