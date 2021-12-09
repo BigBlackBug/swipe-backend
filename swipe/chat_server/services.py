@@ -201,14 +201,17 @@ class WSConnectionManager:
 
         logger.info(f"Broadcasting '{payload_type}' event of {sender_id}")
 
-        for user_id, user in self.active_connections.items():
+        # it's required because another coroutine might change this dict
+        user_ids = list(self.active_connections.keys())
+        for user_id in user_ids:
             if user_id == sender_id:
                 continue
 
             logger.info(f"Sending '{payload_type}' payload to {user_id}")
             try:
-                await user.connection.send_text(
-                    json.dumps(payload, cls=PayloadEncoder))
+                if user := self.active_connections.get(user_id, None):
+                    await user.connection.send_text(
+                        json.dumps(payload, cls=PayloadEncoder))
             except:
                 logger.exception(
                     f"Unable to send '{payload_type}' to {user_id}")
