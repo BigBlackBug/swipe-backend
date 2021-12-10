@@ -3,7 +3,7 @@ version: '3.4'
 services:
   letsencrypt:
     image: certbot/certbot:latest
-    command: sh -c "certbot certonly --standalone -d server.swipe.im -d chats.swipe.im -d matchmaking.swipe.im -d mmchat.swipe.im --text --agree-tos --email bigblackbugg@gmail.com --server https://acme-v02.api.letsencrypt.org/directory --rsa-key-size 4096 --verbose --keep-until-expiring --preferred-challenges=http"
+    command: sh -c "certbot certonly --standalone -d swipe.im -d server.swipe.im -d chats.swipe.im -d matchmaking.swipe.im -d mmchat.swipe.im --text --agree-tos --email bigblackbugg@gmail.com --server https://acme-v02.api.letsencrypt.org/directory --rsa-key-size 4096 --verbose --keep-until-expiring --preferred-challenges=http"
     entrypoint: ""
     volumes:
       - letsencrypt:/etc/letsencrypt
