@@ -123,17 +123,17 @@ class Match:
 
 class MMRoundData(BaseModel):
     new_users: dict[str, VertexData] = {}
-    returning_users: set[str] = set()
+    # key returned, value - his successful chat
+    returning_users: dict[str, Optional[str]] = {}
     disconnected_users: set[str] = set()
     decline_pairs: list[Tuple[str, str]] = []
 
-    # True means on call
     sent_matches: dict[str, Match] = dict()
     online_users: set[str] = set()
 
     def clear(self):
         self.new_users = {}
-        self.returning_users = set()
+        self.returning_users = {}
         self.disconnected_users = set()
         self.decline_pairs = []
 
@@ -142,7 +142,10 @@ class MMRoundData(BaseModel):
         self.online_users.remove(user_id)
 
     def reconnect(self, user_id: str):
-        self.returning_users.add(user_id)
+        self.returning_users[user_id] = None
+
+    def reconnect_after_call(self, user_a: str, user_b: str):
+        self.returning_users[user_a] = user_b
 
     def reconnect_decline(self, user_a_id: str, user_b_id: str):
         self.decline_pairs.append((user_a_id, user_b_id))

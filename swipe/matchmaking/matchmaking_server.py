@@ -240,7 +240,7 @@ async def _process_payload(base_payload: MMBasePayload,
                 disallowed_users=disallowed_users)
         elif data_payload.action == MMLobbyAction.RECONNECT:
             logger.info(f"Reconnecting {sender_id} to matchmaking")
-            matchmaking_data.reconnect(sender_id)
+            matchmaking_data.reconnect_after_call(sender_id, recipient_id)
     elif isinstance(data_payload, MMChatPayload):
         if data_payload.action == MMChatAction.ACCEPT:
             logger.info(

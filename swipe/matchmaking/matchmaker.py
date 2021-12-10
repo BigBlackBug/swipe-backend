@@ -286,6 +286,8 @@ class Matchmaker:
             # enable edges
             logger.info(f"Enabling {user_id}")
             self._connection_graph[user_id].matched = False
+            if partner_id := incoming_data.returning_users.get(user_id):
+                self._connection_graph[user_id].disallowed_users.add(partner_id)
 
     def _process_decline_pairs(self, incoming_data: MMRoundData):
         for user_a_id, user_b_id in incoming_data.decline_pairs:
