@@ -144,6 +144,7 @@ class ChatUserData:
     user_id: str
     name: str
     avatar_url: str
+    gender: Gender
 
 
 @dataclass

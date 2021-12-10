@@ -5,7 +5,6 @@ import logging
 from uuid import UUID
 
 import aioredis
-import pymorphy2
 from fastapi import FastAPI, Depends, Body
 from fastapi import WebSocket
 from firebase_admin import messaging as firebase
@@ -25,6 +24,7 @@ from swipe.chat_server.services import ChatServerRequestProcessor, \
 from swipe.settings import settings
 from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.misc.errors import SwipeError
+from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
@@ -36,7 +36,6 @@ from swipe.swipe_server.users.services.services import UserService
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
-morph_analyzer = pymorphy2.MorphAnalyzer()
 
 _supported_payloads = []
 for cls in BaseModel.__subclasses__():
@@ -107,7 +106,8 @@ async def websocket_endpoint(
     await redis_online.remove_from_recently_online(user_id)
 
     user_data = ChatUserData(
-        user_id=user_id, avatar_url=user.avatar_url, name=user.name)
+        user_id=user_id, avatar_url=user.avatar_url,
+        name=user.name, gender=user.gender)
     await connection_manager.connect(
         ConnectedUser(user_id=user_id, connection=websocket, data=user_data))
 
@@ -303,23 +303,29 @@ async def _send_payload(base_payload: BasePayload):
                 f"which is weird")
             return
 
-        sender_name = connection_manager.get_user_data(sender_id).name
-        name_tag = morph_analyzer.parse(sender_name)[0].tag
-        ending = 'а' if 'femn' in name_tag else ''
+        user_data: ChatUserData = connection_manager.get_user_data(sender_id)
+        if user_data.gender == Gender.MALE:
+            ending = ''
+        elif user_data.gender == Gender.FEMALE:
+            ending = 'а'
+        elif user_data.gender == Gender.ATTACK_HELICOPTER:
+            # sorry not sorry
+            ending = 'о'
+
         if isinstance(payload, MessagePayload):
             notification = firebase.Notification(
-                title=f'{sender_name} наконец-то ответил{ending} ☺️',
+                title=f'{user_data.name} наконец-то ответил{ending} ☺️', # noqa
                 body='Переходи в приложение, чтобы продолжить диалог')
         elif isinstance(payload, CreateChatPayload):
             notification = firebase.Notification(
-                title=f'{sender_name} хочет с тобой пообщаться ☺️',
+                title=f'{user_data.name} хочет с тобой пообщаться ☺️',
                 body='Переходи в приложение, чтобы начать диалог')
 
         logger.info(
-            f"Sending firebase notification {payload.type_}"
+            f"Sending firebase notification '{payload.type_}' "
             f"to {recipient_id}")
         firebase.send(firebase.Message(
-            notification=notification, token=firebase_token))
+            notification=notification, token=firebase_token)) # noqa
 
         await firebase_service.set_cooldown_token(sender_id, recipient_id)
     else:
