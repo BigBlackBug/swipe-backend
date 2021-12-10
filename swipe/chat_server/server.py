@@ -19,7 +19,7 @@ from swipe import error_handlers
 from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
     MessagePayload, CreateChatPayload, \
     UserJoinEventPayload, GenericEventPayload, UserEventType, \
-    DeclineChatPayload, MessageLikePayload
+    DeclineChatPayload, MessageLikePayload, RatingChangedEventPayload
 from swipe.chat_server.services import ChatServerRequestProcessor, \
     WSConnectionManager, ConnectedUser, ChatUserData
 from swipe.settings import settings
@@ -255,6 +255,22 @@ async def send_user_deleted_event(
         ))
     for recipient in recipients:
         await connection_manager.send(recipient, payload.dict(by_alias=True))
+
+
+@app.post("/events/rating_changed")
+async def send_rating_changed_event(
+        user_id: str = Body(..., embed=True),
+        sender_id: str = Body(..., embed=True),
+        rating: int = Body(..., embed=True)):
+    logger.info(f"Sending rating_changed event for {user_id}, "
+                f"new rating: {rating}")
+    payload = BasePayload(
+        sender_id=UUID(hex=sender_id),
+        recipient_id=UUID(hex=user_id),
+        payload=RatingChangedEventPayload(
+            user_id=user_id, rating=rating
+        ))
+    await connection_manager.send(user_id, payload.dict(by_alias=True))
 
 
 async def _send_payload(base_payload: BasePayload):

@@ -80,6 +80,12 @@ class UserJoinEventPayload(BaseModel):
     avatar_url: str
 
 
+class RatingChangedEventPayload(BaseModel):
+    type_: str = Field('rating_changed', alias='type', const=True)
+    user_id: str
+    rating: int
+
+
 class UserEventType(str, enum.Enum):
     USER_LEFT = 'leave'
     USER_BLACKLISTED = 'blacklisted'
@@ -99,7 +105,7 @@ class BasePayload(BaseModel):
         DeclineChatPayload, AcceptChatPayload, CreateChatPayload,
         OpenChatPayload,
 
-        UserJoinEventPayload, GenericEventPayload
+        UserJoinEventPayload, GenericEventPayload, RatingChangedEventPayload
     ]
 
     @classmethod

@@ -2,11 +2,13 @@ import functools
 import logging
 from uuid import UUID
 
+import requests
 from aioredis import Redis
 from fastapi import Depends, Body, APIRouter, HTTPException
 from starlette import status
 from starlette.responses import Response, RedirectResponse
 
+from swipe.settings import settings
 from swipe.swipe_server.misc import security, dependencies
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.models import User
@@ -174,7 +176,17 @@ async def call_feedback(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail='Not found')
 
-    user_service.add_call_feedback(target_user, feedback)
+    new_rating = user_service.add_call_feedback(target_user, feedback)
+
+    logger.info(f"Calling chat server to send rating_changed event"
+                f"user_id: {user_id}")
+
+    url = f'{settings.CHAT_SERVER_HOST}/events/rating_changed'
+    requests.post(url, json={
+        'user_id': str(user_id),
+        'sender_id': str(current_user_id),
+        'rating': new_rating
+    })
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

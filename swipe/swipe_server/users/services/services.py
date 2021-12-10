@@ -292,7 +292,8 @@ class UserService:
             blocked_me.union(blocked_by_me)
         ).scalars())
 
-    def add_call_feedback(self, target_user: User, feedback: CallFeedback):
+    def add_call_feedback(
+            self, target_user: User, feedback: CallFeedback) -> int:
         rating_diff = constants.CALL_FEEDBACK_RATING_DIFF
         if feedback == CallFeedback.THUMBS_DOWN:
             new_rating = max(0, target_user.rating - rating_diff)
@@ -301,6 +302,7 @@ class UserService:
 
         target_user.rating = new_rating
         self.db.commit()
+        return new_rating
 
     def use_swipes(self, target_user: User, number_of_swipes: int = 1) -> int:
         if target_user.swipes < 1:
