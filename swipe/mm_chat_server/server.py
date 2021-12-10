@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import logging
 import uuid
 from collections import namedtuple
@@ -133,7 +134,7 @@ async def _process_payload(base_payload: MMTextBasePayload, chat_id: str):
                 'payload': {
                     'type': 'message',
                     'message_id': payload.message_id,
-                    'timestamp': payload.timestamp,
+                    'timestamp': datetime.datetime.utcnow().isoformat(),
                     'text': payload.text
                 }
             }
@@ -144,7 +145,7 @@ async def _process_payload(base_payload: MMTextBasePayload, chat_id: str):
                 sender_id=sender_id,
                 recipient_id=recipient_id,
                 message_id=payload.message_id,
-                timestamp=payload.timestamp,
+                timestamp=datetime.datetime.utcnow(),
                 text=payload.text
             ))
     elif isinstance(payload, MMTextMessageLikePayload):
