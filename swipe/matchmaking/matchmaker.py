@@ -287,6 +287,8 @@ class Matchmaker:
             logger.info(f"Enabling {user_id}")
             self._connection_graph[user_id].matched = False
             if partner_id := incoming_data.returning_users.get(user_id):
+                # if he's returning after a successful call
+                # we should not offer him again
                 self._connection_graph[user_id].disallowed_users.add(partner_id)
 
     def _process_decline_pairs(self, incoming_data: MMRoundData):

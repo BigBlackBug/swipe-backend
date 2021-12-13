@@ -90,7 +90,7 @@ async def matchmaker_endpoint(
 
     logger.info(f"Chat partners of {user_id}: {partner_ids}")
     redis_chats = RedisChatCacheService(dependencies.redis())
-    await redis_chats.save_chat_partner_cache(user_id, partner_ids)
+    await redis_chats.populate_chat_partner_cache(user_id, partner_ids)
 
     while True:
         try:
