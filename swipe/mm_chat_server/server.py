@@ -125,12 +125,9 @@ async def _process_payload(base_payload: MMTextBasePayload, chat_id: str):
 
     if isinstance(payload, MMTextMessagePayload):
         if chat.saved:
-            logger.info(f"Chat {chat_id} is already saved to db, "
-                        f"sending {payload} payload to chat server")
-            # yeah they are reversed
             output_payload = {
-                'sender_id': base_payload.recipient_id,
-                'recipient_id': base_payload.sender_id,
+                'sender_id': base_payload.sender_id,
+                'recipient_id': base_payload.recipient_id,
                 'payload': {
                     'type': 'message',
                     'message_id': payload.message_id,
@@ -138,6 +135,8 @@ async def _process_payload(base_payload: MMTextBasePayload, chat_id: str):
                     'text': payload.text
                 }
             }
+            logger.info(f"Chat {chat_id} is already saved to db, "
+                        f"sending {output_payload} payload to chat server")
             # TODO use aiohttp?
             requests.post(CHAT_SERVER_URL, json=output_payload)
         else:
@@ -150,18 +149,17 @@ async def _process_payload(base_payload: MMTextBasePayload, chat_id: str):
             ))
     elif isinstance(payload, MMTextMessageLikePayload):
         if chat.saved:
-            logger.info(f"Chat {chat_id} is already saved to db, "
-                        f"sending {payload} payload to chat server")
-            # yeah they are reversed
             output_payload = {
-                'sender_id': base_payload.recipient_id,
-                'recipient_id': base_payload.sender_id,
+                'sender_id': base_payload.sender_id,
+                'recipient_id': base_payload.recipient_id,
                 'payload': {
                     'type': 'like',
                     'like': payload.like,
                     'message_id': payload.message_id,
                 }
             }
+            logger.info(f"Chat {chat_id} is already saved to db, "
+                        f"sending {output_payload} payload to chat server")
             # TODO use aiohttp?
             requests.post(CHAT_SERVER_URL, json=output_payload)
         else:
@@ -177,8 +175,7 @@ async def _process_payload(base_payload: MMTextBasePayload, chat_id: str):
 
             logger.info(
                 f"{sender_id} has accepted chat request from {recipient_id}, "
-                f"sending request to chat server")
-            # yeah they are reversed
+                f"sending create_chat request to chat server")
             output_payload = {
                 'sender_id': base_payload.recipient_id,
                 'recipient_id': base_payload.sender_id,
