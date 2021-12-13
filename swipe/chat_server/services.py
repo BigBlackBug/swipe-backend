@@ -189,7 +189,7 @@ class WSConnectionManager:
         else:
             payload_type = payload.get('type', '???')
 
-        logger.info(f"Sending '{payload_type}' payload to {user_id}")
+        logger.info(f"Sending '{payload}' payload to {user_id}")
         # TODO use orjson instead of that dumb shit
         try:
             await self.active_connections[user_id].connection.send_text(

@@ -145,7 +145,7 @@ async def _process_payload(base_payload: MMTextBasePayload, chat_id: str):
                 sender_id=sender_id,
                 recipient_id=recipient_id,
                 message_id=payload.message_id,
-                timestamp=datetime.datetime.utcnow(),
+                timestamp=datetime.datetime.utcnow().isoformat(),
                 text=payload.text
             ))
     elif isinstance(payload, MMTextMessageLikePayload):

@@ -34,7 +34,7 @@ class Vertex:
     def connect(self, user_id: str, bidirectional: bool = False):
         self.edges[user_id] = bidirectional
 
-    def connects_to(self, user_id: str) -> Optional[bool]:
+    def bi_connects_to(self, user_id: str) -> Optional[bool]:
         return self.edges.get(user_id)
 
     def disconnect(self, user_id: str):
@@ -206,13 +206,11 @@ class Matchmaker:
         current_vertex = self._connection_graph[user_id]
 
         # some of the edges might be gone by now
-        logger.info(f"Filtering connections of {user_id}, \n"
+        logger.info(f"Filtering dead connections of {user_id}, \n"
                     f"before: {current_vertex.edges.items()}")
         potential_edges: list[Tuple[str, bool]] = list(filter(  # noqa
             lambda item: item[0] in self._connection_graph,
             current_vertex.edges.items()))
-        logger.info(f"Filtering connections of {user_id}, \n"
-                    f"after: {potential_edges}")
         # getting candidate with the most weight
         # TODO might be a good idea to maintain a maxheap, instead of sorting
         # on EACH iteration
@@ -222,19 +220,19 @@ class Matchmaker:
             reverse=True)
         current_vertex.edges = dict(potential_edges)
 
-        logger.info(f"Edges of {user_id}: {potential_edges}")
+        logger.info(f"Potential edges of {user_id}: {potential_edges}")
         for potential_match_id, _ in potential_edges:
             logger.info(f"Checking {potential_match_id}")
             vertex_matched = \
                 self._connection_graph[potential_match_id].matched
-            vertex_disallowed = \
+            vertex_blocked = \
                 potential_match_id in current_vertex.disallowed_users
             logger.info(
                 f"{potential_match_id} already matched: {vertex_matched}, "
-                f"match disallowed: {vertex_disallowed}")
+                f"vertex blocked: {vertex_blocked}")
             # if the edge is bidirectional -> we got a match
-            if not vertex_matched and not vertex_disallowed and \
-                    current_vertex.connects_to(potential_match_id):
+            if not vertex_matched and not vertex_blocked and \
+                    current_vertex.bi_connects_to(potential_match_id):
                 return potential_match_id
 
         return None
