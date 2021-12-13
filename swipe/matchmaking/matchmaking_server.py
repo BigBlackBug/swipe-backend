@@ -239,8 +239,18 @@ async def _process_payload(base_payload: MMBasePayload,
                 sender_id, mm_settings, connections,
                 disallowed_users=disallowed_users)
         elif data_payload.action == MMLobbyAction.RECONNECT:
-            logger.info(f"Reconnecting {sender_id} to matchmaking")
-            matchmaking_data.reconnect_after_call(sender_id, recipient_id)
+            # sender_id ended a call (pressed 'next')
+            # if recipient_id is None then this reconnect payload comes
+            # from the other guy
+            # A sends reconnect to server+B
+            # B receives reconnect and sends it back without recipient_id
+            # TODO this is dumb but it's easier to do it this way now
+            if recipient_id:
+                logger.info(f"Reconnecting pair "
+                            f"[{sender_id}, {recipient_id}] after call")
+                matchmaking_data.reconnect_after_call(sender_id, recipient_id)
+                logger.info(f"Resulting returning users"
+                            f"{matchmaking_data.returning_users}")
     elif isinstance(data_payload, MMChatPayload):
         if data_payload.action == MMChatAction.ACCEPT:
             logger.info(

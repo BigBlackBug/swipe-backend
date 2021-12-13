@@ -227,10 +227,13 @@ class Matchmaker:
             logger.info(f"Checking {potential_match_id}")
             vertex_matched = \
                 self._connection_graph[potential_match_id].matched
+            vertex_disallowed = \
+                potential_match_id in current_vertex.disallowed_users
             logger.info(
-                f"{potential_match_id} already matched: {vertex_matched}")
+                f"{potential_match_id} already matched: {vertex_matched}, "
+                f"match disallowed: {vertex_disallowed}")
             # if the edge is bidirectional -> we got a match
-            if not vertex_matched and \
+            if not vertex_matched and not vertex_disallowed and \
                     current_vertex.connects_to(potential_match_id):
                 return potential_match_id
 
@@ -287,6 +290,7 @@ class Matchmaker:
             logger.info(f"Enabling {user_id}")
             self._connection_graph[user_id].matched = False
             if partner_id := incoming_data.returning_users.get(user_id):
+                logger.info(f"Adding {partner_id} to {user_id} disallowed list")
                 # if he's returning after a successful call
                 # we should not offer him again
                 self._connection_graph[user_id].disallowed_users.add(partner_id)

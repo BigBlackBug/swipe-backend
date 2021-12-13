@@ -146,6 +146,7 @@ class MMRoundData(BaseModel):
 
     def reconnect_after_call(self, user_a: str, user_b: str):
         self.returning_users[user_a] = user_b
+        self.returning_users[user_b] = user_a
 
     def reconnect_decline(self, user_a_id: str, user_b_id: str):
         self.decline_pairs.append((user_a_id, user_b_id))
