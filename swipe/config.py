@@ -56,6 +56,12 @@ LOGGING_CONFIG: dict = {
         }
     },
     "loggers": {
+        "botocore": {
+            "handlers": ["default", ],
+            "level": "INFO",
+            "propagate": False,
+            "filters": ['special', ]
+        },
         "uvicorn": {
             "handlers": ["default", ],
             "propagate": False,
@@ -84,7 +90,7 @@ LOGGING_CONFIG: dict = {
 
         "root": {
             "handlers": ["default", ],
-            "level": "INFO",
+            "level": "DEBUG",
         },
     },
 }

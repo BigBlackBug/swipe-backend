@@ -334,6 +334,7 @@ class UserService:
         return new_rating
 
     def check_token(self, user_id: str, token: str):
+        logger.debug(f"Checking for {user_id} token in DB")
         return self.db.execute(
             select(AuthInfo)
                 .where(AuthInfo.user_id == user_id) \

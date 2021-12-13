@@ -10,6 +10,8 @@ from starlette import status
 
 from swipe.settings import settings
 from swipe.swipe_server.users import schemas
+from swipe.swipe_server.users.services.online_cache import \
+    RedisOnlineUserService
 from swipe.swipe_server.users.services.services import UserService
 
 logger = logging.getLogger(__name__)
@@ -30,8 +32,9 @@ def get_auth_token(auth_header: str = Security(auth_header_dep)) -> str:
     return token
 
 
-def auth_user_id(user_service: UserService = Depends(),
-                 token: str = Depends(get_auth_token)) -> UUID:
+async def auth_user_id(user_service: UserService = Depends(),
+                       redis_online: RedisOnlineUserService = Depends(),
+                       token: str = Depends(get_auth_token)) -> UUID:
     try:
         payload = jwt.decode(
             token, settings.SWIPE_SECRET_KEY, algorithms=[ALGORITHMS.HS256, ]
@@ -43,11 +46,21 @@ def auth_user_id(user_service: UserService = Depends(),
             status_code=status.HTTP_403_FORBIDDEN,
             detail='Error validating token',
         )
+    cached_token = \
+        await redis_online.get_online_user_token(token_payload.user_id)
 
-    auth_info = user_service.check_token(token_payload.user_id, token)
-    if not auth_info:
+    if cached_token and cached_token != token:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail='No user found with provided token')
+    elif not cached_token:
+        auth_info = user_service.check_token(token_payload.user_id, token)
+
+        if not auth_info:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail='No user found with provided token')
+
+        await redis_online.save_online_user_token(token_payload.user_id, token)
 
     return UUID(hex=token_payload.user_id)

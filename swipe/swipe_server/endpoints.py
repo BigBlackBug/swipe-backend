@@ -11,6 +11,8 @@ from swipe.swipe_server.chats.schemas import ChatORMSchema
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import schemas as user_schemas
+from swipe.swipe_server.users.services.online_cache import \
+    RedisOnlineUserService
 from swipe.swipe_server.users.services.redis_services import \
     RedisSwipeReaperService
 from swipe.swipe_server.users.services.services import UserService
@@ -101,6 +103,7 @@ async def generate_global_chat(chat_service: ChatService = Depends(),
 async def authenticate_user(auth_payload: user_schemas.AuthenticationIn,
                             response: Response,
                             user_service: UserService = Depends(),
+                            redis_online: RedisOnlineUserService = Depends(),
                             redis_swipe: RedisSwipeReaperService = Depends()):
     """
     Returns a jwt access token either for an existing user
@@ -126,6 +129,7 @@ async def authenticate_user(auth_payload: user_schemas.AuthenticationIn,
 
         response.status_code = status.HTTP_201_CREATED
 
+    await redis_online.save_online_user_token(str(user.id), new_token)
     await redis_swipe.reset_swipe_reap_timestamp(user.id)
     return user_schemas.AuthenticationOut(
         user_id=user.id, access_token=new_token)

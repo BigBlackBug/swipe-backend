@@ -144,6 +144,7 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
 
     RECENTLY_ONLINE_KEY = 'recently_online_user'
     ONLINE_USER_KEY = 'online_user'
+    USER_TOKEN_KEY = 'user_token'
 
     def __init__(self,
                  redis: Redis = Depends(dependencies.redis)):
@@ -253,3 +254,12 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
 
     async def get_user_card_preview_one(self, user_id: str) -> Optional[str]:
         return await self.redis.get(f'{self.ONLINE_USER_KEY}:{user_id}')
+
+    async def get_online_user_token(self, user_id: str) -> Optional[str]:
+        logger.debug(f"Fetching token of {user_id} from cache")
+        return await self.redis.get(f'{self.USER_TOKEN_KEY}:{user_id}')
+
+    async def save_online_user_token(self, user_id: str, token: str):
+        logger.debug(f"Saving token of {user_id} to cache")
+        await self.redis.setex(f'{self.USER_TOKEN_KEY}:{user_id}',
+                               time=constants.USER_TOKEN_TTL, value=token)

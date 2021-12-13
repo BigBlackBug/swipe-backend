@@ -188,8 +188,8 @@ class RedisChatCacheService:
         logger.info(f"Adding chat partner {creator_id} to {target_id} cache")
         await self.redis.sadd(f'{self.CHAT_CACHE_KEY}:{target_id}', creator_id)
 
-    async def save_chat_partner_cache(self, user_id: str,
-                                      partner_ids: list[str]):
+    async def populate_chat_partner_cache(self, user_id: str,
+                                          partner_ids: list[str]):
         await self.redis.delete(f'{self.CHAT_CACHE_KEY}:{user_id}')
         if partner_ids:
             logger.info(f"Saving chat partners of {user_id}, {partner_ids}")
