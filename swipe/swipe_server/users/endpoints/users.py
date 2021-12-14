@@ -254,6 +254,7 @@ async def fetch_user(
         user_id: UUID,
         user_service: UserService = Depends(),
         current_user_id: UUID = Depends(security.auth_user_id)):
+    # TODO cache
     user = user_service.get_user(user_id)
     user_out: UserOut = UserOut.patched_from_orm(user)
     return user_out

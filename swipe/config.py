@@ -1,5 +1,7 @@
 import logging.config
 
+from swipe.settings import settings
+
 
 def configure_logging():
     # TODO add current user to context
@@ -90,7 +92,7 @@ LOGGING_CONFIG: dict = {
 
         "root": {
             "handlers": ["default", ],
-            "level": "DEBUG",
+            "level": settings.SWIPE_LOGGING_LEVEL,
         },
     },
 }

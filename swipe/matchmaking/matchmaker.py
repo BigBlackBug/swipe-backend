@@ -291,7 +291,7 @@ class Matchmaker:
                 logger.info(f"Adding {partner_id} to {user_id} disallowed list")
                 # if he's returning after a successful call
                 # we should not offer him again
-                self._connection_graph[user_id].disallowed_users.add(partner_id)
+                self._connection_graph[user_id].disallow(partner_id)
 
     def _process_decline_pairs(self, incoming_data: MMRoundData):
         for user_a_id, user_b_id in incoming_data.decline_pairs:

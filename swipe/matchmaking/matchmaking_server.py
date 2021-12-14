@@ -233,8 +233,9 @@ async def _process_payload(base_payload: MMBasePayload,
                     limit=constants.MATCHMAKING_FETCH_LIMIT
                 ),
                 disallowed_users=disallowed_users)
-            logger.info(f"Got connections for {sender_id}: {connections}, "
-                        f"disallowed_user: {disallowed_users}")
+            logger.info(f"Got possible connections for "
+                        f"{sender_id}: {connections}, "
+                        f"disallowed_users: {disallowed_users}")
             matchmaking_data.connect(
                 sender_id, mm_settings, connections,
                 disallowed_users=disallowed_users)

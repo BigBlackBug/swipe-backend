@@ -71,12 +71,12 @@ class FetchUserService:
             shift = -1
             # we're going age+0,-1,1,-2,2 etc
             sorted_age_range = [user_age]
-            logger.info(f"Current age {user_age}, diff {age_difference}")
+            logger.debug(f"Current age {user_age}, diff {age_difference}")
             while len(sorted_age_range) < age_difference * 2 + 1:
                 sorted_age_range.append(user_age + shift)
                 sorted_age_range.append(user_age - shift)
                 shift = - (abs(shift) + 1)
-            logger.info(f"Checking age range {sorted_age_range}")
+            logger.debug(f"Checking age range {sorted_age_range}")
 
             # filling current user pool
             for current_age in sorted_age_range:
@@ -86,7 +86,7 @@ class FetchUserService:
                             current_age, filter_params)
                     user_cache = list(user_cache)
                     online_users_pool[current_age] = UserPool(user_cache)
-                    logger.info(f"Got {len(user_cache)} online users "
+                    logger.debug(f"Got {len(user_cache)} online users "
                                 f"for age={current_age}")
 
             for current_age in sorted_age_range:
@@ -95,7 +95,7 @@ class FetchUserService:
                 if current_pool.head < len(current_pool.online_users):
                     candidate = current_pool.online_users[current_pool.head]
                     current_pool.head += 1
-                    logger.info(f"Testing candidate {candidate} for {user_id}")
+                    logger.debug(f"Testing candidate {candidate} for {user_id}")
                     if candidate not in cached_user_ids \
                             and candidate not in disallowed_users:
                         if allowed_users is None or \
@@ -105,7 +105,7 @@ class FetchUserService:
                                 f"for age={current_age}")
                             result.add(candidate)
                         else:
-                            logger.info(
+                            logger.debug(
                                 f"{candidate} is disallowed for {user_id}")
 
                 if len(result) == filter_params.limit:
@@ -114,7 +114,7 @@ class FetchUserService:
             else:
                 # online users depleted, extend age_diff and try again
                 age_difference += settings.ONLINE_USER_AGE_DIFF_STEP
-                logger.info(
+                logger.debug(
                     f"Online users depleted for range {sorted_age_range}, "
                     f"increasing age_difference to {age_difference}")
                 continue
