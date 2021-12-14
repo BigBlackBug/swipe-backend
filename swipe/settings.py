@@ -15,6 +15,7 @@ class Constants(BaseSettings):
 
     CALL_FEEDBACK_RATING_DIFF = 5
 
+    # TODO change in prod
     RATING_UPDATE_AD_WATCHED = 100
     RATING_UPDATE_FRIEND_REFERRED = 100
     RATING_UPDATE_APP_REVIEWED = 100

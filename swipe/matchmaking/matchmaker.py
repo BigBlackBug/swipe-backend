@@ -11,6 +11,8 @@ from swipe.swipe_server.users.enums import Gender
 
 logger = logging.getLogger('matchmaker')
 
+ROUND_DATA_FETCH_TIMEOUT_SEC = 2
+
 
 class Vertex:
     def __init__(self, user_id: str, mm_settings: MMSettings,
@@ -62,10 +64,12 @@ class Vertex:
                     other.mm_settings.gender == self.mm_settings.gender_filter or
                     other.mm_settings.gender == Gender.ATTACK_HELICOPTER)
 
-    def __repr__(self):
-        return f'[{self.user_id}, {self.edges}, ' \
-               f'disallowed:{self.disallowed_users} ' \
-               f'matched: {self.matched}, waiting: {self.waiting}]\n'
+    # def __repr__(self):
+    #     return f'[{self.user_id}, {self.edges}, ' \
+    #            f'disallowed:{self.disallowed_users} ' \
+    #            f'matched: {self.matched}, waiting: {self.waiting}]\n'
+    def __str__(self):
+        return f'Vertex: {self.user_id}, matched: {self.matched}'
 
 
 class HeapItem:
@@ -80,7 +84,7 @@ class HeapItem:
     def __eq__(self, other: 'HeapItem'):
         return self.weight == other.weight
 
-    def __repr__(self):
+    def __str__(self):
         return f"'{self.user_id}' weight: {self.weight}"
 
 
@@ -108,7 +112,7 @@ class Matchmaker:
         ]
         heapq.heapify(current_round_heap)
 
-        logger.info("Generating")
+        logger.info("Generating matches")
         yield from self._generate_matches(current_round_heap)
 
         # before the end of the round, reset all processed flags
@@ -117,41 +121,40 @@ class Matchmaker:
 
     def prepare_round(self, incoming_data: MMRoundData):
         # round starts
-        logger.info(f"Round started, current graph\n"
-                    f"{self._connection_graph}")
-
-        logger.info(f"Clearing match flag on returning users\n"
-                    f"{incoming_data.returning_users}")
+        # logger.info(f"Round started, current graph\n"
+        #             f"{self._connection_graph}")
+        logger.info("Clearing match flag on returning users")
+        logger.debug(f"Returning users:\n{incoming_data.returning_users}")
         # clear match flag on returning users
         self._process_returning_users(incoming_data)
 
         # remove edges between returning declined users
-        logger.info(f"Removing edges between declined users\n"
-                    f"{incoming_data.decline_pairs}")
+        logger.info(f"Removing edges between declined users")
+        logger.debug(f"Decline pairs:\n{incoming_data.decline_pairs}")
         self._process_decline_pairs(incoming_data)
 
-        logger.info(f"Processing disconnected users\n"
-                    f"{incoming_data.disconnected_users}")
+        logger.info(f"Processing disconnected users")
+        logger.debug(f"Disconnected users:\n{incoming_data.disconnected_users}")
         self._process_disconnected_users(incoming_data)
 
         # merge incoming user graph with the current graph
         # at least O(n^2) fuuuuuck
-        logger.info(f"Merging new graph with current graph, incoming graph:\n"
-                    f"{incoming_data.new_users}")
+        logger.info(f"Merging new graph with current graph")
+        logger.debug(f"New users:\n{incoming_data.new_users}")
         self._merge_graphs(incoming_data)
 
         # ------------------new data processing done--------------------
         # fetch new candidates from DB for users who didn't have any matches
         # last round
-        logger.info(f"Processing empty candidates\n"
-                    f"{self._empty_candidates}")
+        logger.info(f"Processing empty candidates")
+        logger.debug(f"Empty candidates:\n{self._empty_candidates}")
         self._process_empty_candidates()
 
     def _generate_matches(self, current_round_heap: list[HeapItem]) \
             -> Iterator[Match]:
         heap_size = len(current_round_heap)
         while heap_size:
-            logger.info(f"Current heap {current_round_heap}")
+            logger.debug(f"Current heap {current_round_heap}")
             heap_size -= 1
 
             # pick heap top
@@ -180,18 +183,20 @@ class Matchmaker:
                     f"Found match {match_user_id} for {current_user_id}")
                 match_vertex = self._connection_graph[match_user_id]
 
+                logger.info(f"Resetting weight on "
+                            f"{match_user_id} and {current_user_id}")
                 # set both weights to 0 for next round
                 current_vertex.mm_settings.reset_weight()
                 match_vertex.mm_settings.reset_weight()
-                # mark as matched
+
+                logger.info(f"Marking {match_user_id} and {current_user_id} "
+                            f"as processed and matched")
                 current_vertex.matched = True
                 match_vertex.matched = True
                 # mark both as processed, so they are skipped next iteration
                 current_vertex.processed = True
                 match_vertex.processed = True
 
-                logger.info(f"marking {match_user_id} and {current_user_id} "
-                            f"as processed and matched")
                 yield current_user_id, match_user_id
             else:
                 logger.info(f"No matches found for {current_user}, "
@@ -206,8 +211,7 @@ class Matchmaker:
         current_vertex = self._connection_graph[user_id]
 
         # some of the edges might be gone by now
-        logger.info(f"Filtering dead connections of {user_id}, \n"
-                    f"before: {current_vertex.edges.items()}")
+        logger.info(f"Filtering dead connections of {user_id}")
         potential_edges: list[Tuple[str, bool]] = list(filter(  # noqa
             lambda item: item[0] in self._connection_graph,
             current_vertex.edges.items()))
@@ -220,16 +224,16 @@ class Matchmaker:
             reverse=True)
         current_vertex.edges = dict(potential_edges)
 
-        logger.info(f"Potential edges of {user_id}: {potential_edges}")
+        logger.debug(f"Potential edges of {user_id}:\n{potential_edges}")
         for potential_match_id, _ in potential_edges:
-            logger.info(f"Checking {potential_match_id}")
+            logger.info(f"Checking {potential_match_id}, {user_id}")
             vertex_matched = \
                 self._connection_graph[potential_match_id].matched
             vertex_blocked = \
                 potential_match_id in current_vertex.disallowed_users
             logger.info(
-                f"{potential_match_id} already matched: {vertex_matched}, "
-                f"vertex blocked: {vertex_blocked}")
+                f"Vertex {potential_match_id}. Matched: {vertex_matched}, "
+                f"Blocked: {vertex_blocked}")
             # if the edge is bidirectional -> we got a match
             if not vertex_matched and not vertex_blocked and \
                     current_vertex.bi_connects_to(potential_match_id):
@@ -274,18 +278,17 @@ class Matchmaker:
 
             for connection_user_id \
                     in self._connection_graph[user_id].edges.keys():
-                logger.info(f"Removing connection "
-                            f"{connection_user_id} to {user_id}")
-                self._connection_graph[connection_user_id] \
-                    .disconnect(user_id)
+                logger.info(
+                    f"Removing connection {connection_user_id} to {user_id}")
+                self._connection_graph[connection_user_id].disconnect(user_id)
 
-            logger.info(f"Removing {user_id} from graph")
+            logger.info(f"Removing {user_id} from the graph")
             del self._connection_graph[user_id]
 
     def _process_returning_users(self, incoming_data: MMRoundData):
         for user_id in incoming_data.returning_users:
             # enable edges
-            logger.info(f"Enabling {user_id}")
+            logger.info(f"{user_id}: setting 'matched' to False")
             self._connection_graph[user_id].matched = False
             if partner_id := incoming_data.returning_users.get(user_id):
                 logger.info(f"Adding {partner_id} to {user_id} disallowed list")
@@ -315,8 +318,7 @@ class Matchmaker:
     def _merge_graphs(self, incoming_data: MMRoundData):
         for incoming_user_id, incoming_vertex \
                 in incoming_data.new_users.items():
-            logger.info(
-                f"Processing {incoming_user_id} -> {incoming_vertex.edges}")
+            logger.info(f"Processing vertex: {incoming_user_id}")
 
             # TODO it's a workaround for users who have connected
             # without disconnecting. It shouldn't be possible anyway
@@ -326,16 +328,15 @@ class Matchmaker:
                 # self._connection_graph[incoming_user_id].matched = False
                 continue
 
-            logger.info(f"Removing incoming edges of {incoming_user_id} "
-                        f"that are not in the graph, incoming edges\n"
-                        f"{incoming_vertex.edges}")
+            logger.info(f"Removing edges of vertex {incoming_user_id} "
+                        f"that are not in the graph")
             # user might have disconnected before, so he won't be in the
             # connection graph
             incoming_vertex.edges = set(filter(
                 lambda edge: edge in self._connection_graph,
                 incoming_vertex.edges))
-            logger.info(f"Remaining edges of {incoming_user_id}\n"
-                        f"{incoming_vertex.edges}")
+            logger.debug(f"Remaining edges of {incoming_user_id}\n"
+                         f"{incoming_vertex.edges}")
             incoming_vertex = Vertex(
                 user_id=incoming_vertex.user_id,
                 mm_settings=incoming_vertex.mm_settings,
@@ -348,8 +349,8 @@ class Matchmaker:
             logger.info(f"Adding {incoming_vertex.user_id} to graph")
             self._connection_graph[incoming_user_id] = incoming_vertex
 
-        logger.info(f"Graphs merged, current graph\n"
-                    f"{self._connection_graph.values()}")
+        logger.info(f"Graphs merged")
+        logger.debug(f"Current graph\n{self._connection_graph.values()}")
 
     def _process_empty_candidates(self, max_candidates=10):
         while self._empty_candidates and max_candidates > 0:
@@ -378,7 +379,7 @@ class Matchmaker:
                 logger.exception(f"Error getting candidates for user {user_id}")
                 connections = []
 
-            logger.info(f"New connections for {user_id}: {connections}")
+            logger.info(f"Got new connections for {user_id}: {connections}")
             for connection_user_id in connections:
                 # new fetched user already in graph
                 # otherwise he's not in matchmaking -> not adding
@@ -407,15 +408,15 @@ def start_matchmaker(round_length_secs: int = 5):
 
         logger.info(bar)
         try:
-            logger.info("Fetching new data from matchmaker server")
+            logger.info("Fetching new data from the matchmaker server")
             response = requests.get(
                 f'{settings.MATCHMAKING_SERVER_HOST}/new_round_data',
-                timeout=2)
+                timeout=ROUND_DATA_FETCH_TIMEOUT_SEC)
             json_data = response.json()
 
             incoming_data: MMRoundData = MMRoundData.parse_obj(json_data)
-            logger.info(f"New round data\n"
-                        f"{incoming_data.repr_matchmaking()}")
+            logger.debug(f"New round data\n"
+                         f"{incoming_data.repr_matchmaking()}")
 
             for user_a, user_b \
                     in matchmaker.run_matchmaking_round(incoming_data):
