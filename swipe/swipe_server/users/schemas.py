@@ -123,6 +123,8 @@ class UserOut(UserBase):
     rating: int
     swipes: int
 
+    online: bool = False
+
     @classmethod
     def patched_from_orm(cls: UserOut, obj: Any) -> UserOut:
         schema_obj = cls.from_orm(obj)
@@ -130,7 +132,7 @@ class UserOut(UserBase):
         for photo_id in schema_obj.photos:
             patched_photos.append(storage_client.get_image_url(photo_id))
         schema_obj.photo_urls = patched_photos
-
+        schema_obj.online = obj.last_online is None
         return schema_obj
 
     class Config:
