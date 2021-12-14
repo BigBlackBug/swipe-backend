@@ -41,7 +41,7 @@ class FetchUserService:
 
         # checking against currently online users
         allowed_users = await self.redis_online.allowed_users()
-        logger.info(f"Allowed users: {allowed_users}")
+        logger.info(f"Allowed users: {allowed_users or 'ALL'}")
         logger.info(f"Disallowed users: {disallowed_users}")
 
         fetch_cache_params = UserFetchCacheKey(
