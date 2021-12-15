@@ -113,6 +113,32 @@ async def delete_user(
         user_id: UUID = Depends(security.auth_user_id)):
     current_user: User = user_service.get_user(user_id)
 
+    # somebody might want to delete user before the location is set
+    # e.g. during the registration
+    if current_user.location:
+        await redis_online.remove_from_online_caches(current_user)
+
+    await redis_blacklist.drop_blacklist_cache(str(current_user.id))
+
+    # repopulating popular caches
+    await popular_service.populate_cache(
+        country=current_user.location.country,
+        city=current_user.location.city,
+        gender=current_user.gender)
+    await popular_service.populate_cache(
+        country=current_user.location.country,
+        city=current_user.location.city)
+
+    await popular_service.populate_cache(
+        country=current_user.location.country,
+        gender=current_user.gender)
+    await popular_service.populate_cache(
+        country=current_user.location.country)
+
+    await popular_service.populate_cache(
+        gender=current_user.gender)
+    await popular_service.populate_cache()
+
     recipients = []
     # fetching only id and user ids
     chats: list[Chat] = chat_service.fetch_chat_members(current_user.id)
@@ -124,26 +150,30 @@ async def delete_user(
         # not relying on cascades because we need to delete images manually
         chat_service.delete_chat(chat.id)
 
-    # somebody might want to delete user before the location is set
-    # e.g. during the registration
-    if current_user.location:
-        await redis_online.remove_from_online_caches(current_user)
+    url = f'{settings.CHAT_SERVER_HOST}/events/user_deleted'
+    # if the user has no messages in global chat, send event only
+    # to his chat partners
+    if chat_service.has_global_chat_messages(current_user.id):
+        # they are cascaded but let's do this manually for clarity
+        chat_service.delete_global_chat_messages(current_user.id)
 
-    await redis_blacklist.drop_blacklist_cache(str(current_user.id))
-
-    # yes I know that's an overkill, but I don't want to think too much
-    # also this won't happen THAT often
-    await popular_service.populate_popular_cache()
-    user_service.delete_user(current_user)
-
-    if recipients:
+        logger.info(f"{current_user.id} has global messages, "
+                    f"everyone will be notified")
+        requests.post(url, json={
+            'user_id': str(user_id),
+        })
+    elif recipients:
+        logger.debug(
+            f"{current_user.ud} has no global messages, "
+            f"only chat partners {recipients} will be notified")
         # we gotta notify every chat participant that the user is gone
-        url = f'{settings.CHAT_SERVER_HOST}/events/user_deleted'
         requests.post(url, json={
             'user_id': str(user_id),
             'recipients': recipients
         })
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    user_service.delete_user(current_user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(

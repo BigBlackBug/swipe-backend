@@ -202,7 +202,8 @@ async def test_user_delete_with_global(
         default_user_auth_headers: dict[str, str]):
     mock_user_storage: MagicMock = \
         mocker.patch('swipe.swipe_server.users.models.storage_client')
-
+    mock_requests = \
+        mocker.patch('swipe.swipe_server.users.endpoints.me.requests')
     photos: list[str] = default_user.photos
     other_user = randomizer.generate_random_user()
     another_user = randomizer.generate_random_user()
@@ -236,6 +237,11 @@ async def test_user_delete_with_global(
     calls.append(call(default_user.avatar_id))
     mock_user_storage.delete_image.assert_has_calls(
         calls, any_order=True)
+
+    url = f'{settings.CHAT_SERVER_HOST}/events/user_deleted'
+    mock_requests.post.assert_called_with(url, json={
+        'user_id': str(default_user.id)
+    })
 
     assert not user_service.get_user(default_user.id)
     assert not session.execute(

@@ -20,7 +20,6 @@ from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
     UserJoinEventPayload, GenericEventPayload, UserEventType, \
     DeclineChatPayload, MessageLikePayload, RatingChangedEventPayload
 from swipe.chat_server.services import ChatServerRequestProcessor
-from swipe.websockets import ChatUserData, ConnectedUser, WSConnectionManager
 from swipe.settings import settings
 from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.misc.errors import SwipeError
@@ -32,6 +31,7 @@ from swipe.swipe_server.users.services.redis_services import \
     RedisBlacklistService, RedisUserFetchService, RedisChatCacheService, \
     RedisFirebaseService
 from swipe.swipe_server.users.services.services import UserService
+from swipe.websockets import ChatUserData, ConnectedUser, WSConnectionManager
 
 logger = logging.getLogger(__name__)
 
@@ -247,14 +247,19 @@ async def _send_blacklist_events(blocked_user_id: str, blocked_by_id: str):
 @app.post("/events/user_deleted")
 async def send_user_deleted_event(
         user_id: str = Body(..., embed=True),
-        recipients: list[str] = Body(..., embed=True)):
-    logger.info(f"Sending user_deleted event for {user_id} to {recipients}")
+        recipients: list[str] = Body(None, embed=True)):
+    logger.info(f"Sending user_deleted event of {user_id} to "
+                f"{recipients or 'everyone'}")
     payload = BasePayload(
         sender_id=UUID(hex=user_id), payload=GenericEventPayload(
             type=UserEventType.USER_DELETED
         ))
-    for recipient in recipients:
-        await connection_manager.send(recipient, payload.dict(by_alias=True))
+    if recipients is None:
+        await connection_manager.broadcast(user_id, payload.dict(by_alias=True))
+    else:
+        for recipient in recipients:
+            await connection_manager.send(
+                recipient, payload.dict(by_alias=True))
 
 
 @app.post("/events/rating_changed")
