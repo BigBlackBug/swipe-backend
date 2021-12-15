@@ -18,7 +18,7 @@ from swipe.swipe_server.users.services.fetch_service import FetchUserService
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
 from swipe.swipe_server.users.services.redis_services import \
-    RedisPopularService, RedisBlacklistService
+    RedisPopularService, RedisBlacklistService, RedisChatCacheService
 from swipe.swipe_server.users.services.services import UserService, \
     BlacklistService
 
@@ -85,6 +85,7 @@ async def fetch_list_of_popular_users(
 async def fetch_list_of_online_users(
         filter_params: OnlineFilterBody = Body(...),
         redis_online: RedisOnlineUserService = Depends(),
+        redis_chats: RedisChatCacheService = Depends(),
         redis_blacklist: RedisBlacklistService = Depends(),
         user_service: UserService = Depends(),
         redis: Redis = Depends(dependencies.redis),
@@ -99,10 +100,15 @@ async def fetch_list_of_online_users(
         await redis_blacklist.get_blacklist(str(current_user_id))
     logger.info(f"Blacklist for {current_user_id}: {blacklist}")
 
+    chat_partners: set[str] = \
+        await redis_chats.get_chat_partners(current_user_id)
+    logger.info(f"Chat partners of {current_user_id}: {chat_partners}")
+
+    disallowed_users = chat_partners.union(blacklist)
     collected_user_ids = \
         await fetch_service.collect(
             str(current_user_id), user_age=current_user.age,
-            filter_params=filter_params, disallowed_users=blacklist)
+            filter_params=filter_params, disallowed_users=disallowed_users)
 
     if not collected_user_ids:
         return []
