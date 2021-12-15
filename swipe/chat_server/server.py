@@ -29,8 +29,8 @@ from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
 from swipe.swipe_server.users.services.redis_services import \
-    RedisBlacklistService, RedisUserFetchService, RedisChatCacheService, \
-    RedisFirebaseService
+    RedisBlacklistService, RedisChatCacheService, \
+    RedisFirebaseService, RedisUserFetchService
 from swipe.swipe_server.users.services.services import UserService
 from swipe.websockets import ChatUserData, ConnectedUser, WSConnectionManager
 
@@ -63,8 +63,16 @@ async def docs(json_data: BasePayload = Body(..., examples={
     pass
 
 
-connection_manager = WSConnectionManager()
 loop = asyncio.get_event_loop()
+
+connection_manager = WSConnectionManager()
+
+redis_client = dependencies.redis()
+firebase_service = RedisFirebaseService(redis_client)
+redis_online = RedisOnlineUserService(redis_client)
+redis_blacklist = RedisBlacklistService(redis_client)
+redis_chats = RedisChatCacheService(redis_client)
+redis_fetch = RedisUserFetchService(redis_client)
 
 
 @app.websocket("/connect/{user_id}")
@@ -72,62 +80,14 @@ async def websocket_endpoint(
         user_id: str,
         websocket: WebSocket,
         redis: aioredis.Redis = Depends(dependencies.redis)):
+    user: User
     try:
-        user_uuid = UUID(hex=user_id)
-    except ValueError:
-        logger.exception(f"Invalid user id: {user_id}")
+        user = await _init_user(user_id, websocket)
+        logger.info(f"{user_id} connected from {websocket.client}")
+    except:
+        logger.exception(f"Error connecting user {user_id}")
         await websocket.close(1003)
         return
-
-    user: User
-    with dependencies.db_context(expire_on_commit=False) as session:
-        user_service, chat_service = UserService(session), ChatService(session)
-        # loading only required fields
-        if user := user_service.get_user_card_preview(user_uuid):
-            user.last_online = None
-            session.commit()
-        else:
-            logger.info(f"User {user_id} not found")
-            await websocket.close(1003)
-            return
-
-        blacklist: set[str] = await user_service.fetch_blacklist(user_id)
-        logger.info(f"Blacklist of {user_id}: {blacklist}")
-
-        partner_ids: list[str] = chat_service.get_chat_partners(user_id)
-        logger.info(f"Chat partners of {user_id}: {partner_ids}")
-
-    firebase_service = RedisFirebaseService(redis)
-    redis_online = RedisOnlineUserService(redis)
-    redis_blacklist = RedisBlacklistService(redis)
-    redis_fetch = RedisUserFetchService(redis)
-    redis_chats = RedisChatCacheService(dependencies.redis())
-
-    # we're online so we don't need a token in cache
-    await firebase_service.remove_token_from_cache(user_id)
-    # gender, dob, location, name, firebase_token, avatar_id + avatar_url
-    await redis_online.add_to_online_caches(user)
-    # they may have returned before the cache is dropped
-    await redis_online.remove_from_recently_online(user_id)
-    # populating blacklist cache only for online users
-    await redis_blacklist.populate_blacklist(user_id, blacklist)
-    # we're gonna need it in /fetch
-    await redis_chats.populate_chat_partner_cache(user_id, partner_ids)
-
-    user_data = ChatUserData(
-        user_id=user_id, avatar_url=user.avatar_url,
-        name=user.name, gender=user.gender)
-    await connection_manager.connect(
-        ConnectedUser(user_id=user_id, connection=websocket, data=user_data))
-
-    logger.info(f"{user_id} connected from {websocket.client}")
-    # TODO make it unified
-    await connection_manager.broadcast(
-        user_id, UserJoinEventPayload(
-            user_id=user_id,
-            name=user_data.name,
-            avatar_url=user_data.avatar_url
-        ).dict(by_alias=True))
 
     while True:
         try:
@@ -135,35 +95,7 @@ async def websocket_endpoint(
             logger.info(f"Received data {raw_data} from {user_id}")
         except WebSocketDisconnect as e:
             logger.info(f"{user_id} disconnected with code {e.code}")
-            await connection_manager.disconnect(user_id)
-            # setting last_online field
-            logger.info(f"Updating last_online on {user_id} "
-                        f"and saving firebase cache")
-            with dependencies.db_context(expire_on_commit=False) as session:
-                session.add(user)
-                # going offline, gotta save the token to cache
-                await firebase_service.add_token_to_cache(
-                    user_id, user.firebase_token)
-
-                user.last_online = datetime.datetime.utcnow()
-                session.commit()
-
-            # adding him to recently online
-            # such users are cleared every 10 minutes
-            # check main server @startup events
-            await redis_online.add_to_recently_online_cache(user)
-            # removing all /fetch responses
-            await redis_fetch.drop_fetch_response_caches(user_id)
-            # removing blacklist cache
-            await redis_blacklist.drop_blacklist_cache(user_id)
-            # dropping chat cache
-            await redis_chats.drop_chat_partner_cache(user_id)
-            # sending leave payloads to everyone
-            await connection_manager.broadcast(
-                user_id, BasePayload(
-                    sender_id=UUID(hex=user_id),
-                    payload=GenericEventPayload(type=UserEventType.USER_LEFT)
-                ).dict(by_alias=True))
+            await _process_disconnect(user)
             return
 
         try:
@@ -186,6 +118,148 @@ async def websocket_endpoint(
                 await _send_payload(payload)
         except:
             logger.exception(f"Error processing message: {raw_data}")
+
+
+async def _init_user(user_id, websocket: WebSocket) -> User:
+    try:
+        user_uuid = UUID(hex=user_id)
+    except ValueError:
+        raise SwipeError(f"Invalid user id: {user_id}")
+
+    user: User
+    with dependencies.db_context(expire_on_commit=False) as session:
+        user_service, chat_service = UserService(session), ChatService(session)
+        # loading only required fields
+        if user := user_service.get_user_card_preview(user_uuid):
+            user.last_online = None
+            session.commit()
+        else:
+            raise SwipeError(f"User {user_id} not found")
+
+        blacklist: set[str] = await user_service.fetch_blacklist(user_id)
+        logger.info(f"Blacklist of {user_id}: {blacklist}")
+
+        partner_ids: list[str] = chat_service.get_chat_partners(user_id)
+        logger.info(f"Chat partners of {user_id}: {partner_ids}")
+
+    # we're online so we don't need a token in cache
+    await firebase_service.remove_token_from_cache(user_id)
+    # gender, dob, location, name, firebase_token, avatar_id + avatar_url
+    await redis_online.add_to_online_caches(user)
+    # they may have returned before the cache is dropped
+    await redis_online.remove_from_recently_online(user_id)
+    # populating blacklist cache only for online users
+    await redis_blacklist.populate_blacklist(user_id, blacklist)
+    # we're gonna need it in /fetch
+    await redis_chats.populate_chat_partner_cache(user_id, partner_ids)
+
+    user_data = ChatUserData(
+        user_id=user_id, avatar_url=user.avatar_url,
+        name=user.name, gender=user.gender)
+    await connection_manager.connect(
+        ConnectedUser(user_id=user_id, connection=websocket, data=user_data))
+
+    # TODO make it unified
+    await connection_manager.broadcast(
+        user_id, UserJoinEventPayload(
+            user_id=user_id,
+            name=user_data.name,
+            avatar_url=user_data.avatar_url
+        ).dict(by_alias=True))
+
+    return user
+
+
+async def _process_disconnect(user: User):
+    user_id = str(user.id)
+
+    await connection_manager.disconnect(user_id)
+    # setting last_online field
+    logger.info(f"Updating last_online on {user_id} "
+                f"and saving firebase cache")
+    with dependencies.db_context(expire_on_commit=False) as session:
+        session.add(user)
+        # going offline, gotta save the token to cache
+        await firebase_service.add_token_to_cache(
+            user_id, user.firebase_token)
+
+        user.last_online = datetime.datetime.utcnow()
+        session.commit()
+
+    # adding him to recently online
+    # such users are cleared every 10 minutes
+    # check main server @startup events
+    await redis_online.add_to_recently_online_cache(user)
+    # removing all /fetch responses
+    await redis_fetch.drop_fetch_response_caches(user_id)
+    # removing blacklist cache
+    await redis_blacklist.drop_blacklist_cache(user_id)
+    # dropping chat cache
+    await redis_chats.drop_chat_partner_cache(user_id)
+    # sending leave payloads to everyone
+    await connection_manager.broadcast(
+        user_id, BasePayload(
+            sender_id=UUID(hex=user_id),
+            payload=GenericEventPayload(type=UserEventType.USER_LEFT)
+        ).dict(by_alias=True))
+
+
+async def _send_payload(base_payload: BasePayload):
+    recipient_id = str(base_payload.recipient_id)
+    sender_id = str(base_payload.sender_id)
+    payload = base_payload.payload
+    # sending message/create_chat to offline users
+    if not connection_manager.is_connected(recipient_id):
+        if not type(payload) in {MessagePayload, CreateChatPayload}:
+            return
+
+        logger.info(
+            f"{recipient_id} is offline, sending push "
+            f"notification for '{payload.type_}' payload")
+
+        on_cooldown = await firebase_service.is_on_cooldown(
+            sender_id, recipient_id)
+        if on_cooldown:
+            logger.info(f"Notifications are in cooldown "
+                        f"for {sender_id}->{recipient_id}")
+            return
+
+        firebase_token = \
+            await firebase_service.get_firebase_token(recipient_id)
+        if not firebase_token:
+            logger.error(
+                f"User {recipient_id} does not have a firebase token "
+                f"which is weird")
+            return
+
+        user_data: ChatUserData = connection_manager.get_user_data(sender_id)
+        if user_data.gender == Gender.MALE:
+            ending = ''
+        elif user_data.gender == Gender.FEMALE:
+            ending = 'а'
+        elif user_data.gender == Gender.ATTACK_HELICOPTER:
+            # sorry not sorry
+            ending = 'о'
+
+        if isinstance(payload, MessagePayload):
+            notification = firebase.Notification(
+                title=f'{user_data.name} наконец-то ответил{ending} ☺️',  # noqa
+                body='Переходи в приложение, чтобы продолжить диалог')
+        elif isinstance(payload, CreateChatPayload):
+            notification = firebase.Notification(
+                title=f'{user_data.name} хочет с тобой пообщаться ☺️',
+                body='Переходи в приложение, чтобы начать диалог')
+
+        logger.info(
+            f"Sending firebase notification '{payload.type_}' "
+            f"to {recipient_id}")
+        firebase.send(firebase.Message(
+            notification=notification, token=firebase_token))  # noqa
+
+        await firebase_service.set_cooldown_token(sender_id, recipient_id)
+    else:
+        out_payload = base_payload.dict(by_alias=True, exclude_unset=True)
+        await connection_manager.send(recipient_id, out_payload)
 
 
 @app.post("/matchmaking/chat")
@@ -273,66 +347,6 @@ async def _send_blacklist_events(blocked_user_id: str, blocked_by_id: str):
             type=UserEventType.USER_BLACKLISTED))
     await connection_manager.send(
         blocked_by_id, blacklist_payload.dict(by_alias=True))
-
-
-async def _send_payload(base_payload: BasePayload):
-    recipient_id = str(base_payload.recipient_id)
-    sender_id = str(base_payload.sender_id)
-    payload = base_payload.payload
-    # sending message/create_chat to offline users
-    if not connection_manager.is_connected(recipient_id):
-        if not type(payload) in {MessagePayload, CreateChatPayload}:
-            return
-
-        logger.info(
-            f"{recipient_id} is offline, sending push "
-            f"notification for '{payload.type_}' payload")
-
-        firebase_service = RedisFirebaseService(dependencies.redis())
-
-        on_cooldown = await firebase_service.is_on_cooldown(
-            sender_id, recipient_id)
-        if on_cooldown:
-            logger.info(f"Notifications are in cooldown "
-                        f"for {sender_id}->{recipient_id}")
-            return
-
-        firebase_token = \
-            await firebase_service.get_firebase_token(recipient_id)
-        if not firebase_token:
-            logger.error(
-                f"User {recipient_id} does not have a firebase token "
-                f"which is weird")
-            return
-
-        user_data: ChatUserData = connection_manager.get_user_data(sender_id)
-        if user_data.gender == Gender.MALE:
-            ending = ''
-        elif user_data.gender == Gender.FEMALE:
-            ending = 'а'
-        elif user_data.gender == Gender.ATTACK_HELICOPTER:
-            # sorry not sorry
-            ending = 'о'
-
-        if isinstance(payload, MessagePayload):
-            notification = firebase.Notification(
-                title=f'{user_data.name} наконец-то ответил{ending} ☺️',  # noqa
-                body='Переходи в приложение, чтобы продолжить диалог')
-        elif isinstance(payload, CreateChatPayload):
-            notification = firebase.Notification(
-                title=f'{user_data.name} хочет с тобой пообщаться ☺️',
-                body='Переходи в приложение, чтобы начать диалог')
-
-        logger.info(
-            f"Sending firebase notification '{payload.type_}' "
-            f"to {recipient_id}")
-        firebase.send(firebase.Message(
-            notification=notification, token=firebase_token))  # noqa
-
-        await firebase_service.set_cooldown_token(sender_id, recipient_id)
-    else:
-        out_payload = base_payload.dict(by_alias=True, exclude_unset=True)
-        await connection_manager.send(recipient_id, out_payload)
 
 
 def start_server():
