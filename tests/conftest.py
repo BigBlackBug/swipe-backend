@@ -22,11 +22,12 @@ from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.database import ModelBase
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
-from swipe.swipe_server.users.services.redis_services import RedisLocationService, RedisBlacklistService, RedisPopularService, \
-    RedisSwipeReaperService, RedisUserFetchService
+from swipe.swipe_server.users.schemas import AuthenticationIn
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
-from swipe.swipe_server.users.schemas import AuthenticationIn
+from swipe.swipe_server.users.services.redis_services import \
+    RedisLocationService, RedisBlacklistService, RedisPopularService, \
+    RedisSwipeReaperService, RedisUserFetchService, RedisChatCacheService
 from swipe.swipe_server.users.services.services import UserService, \
     BlacklistService
 
@@ -193,6 +194,11 @@ def redis_location(fake_redis: Redis) -> RedisLocationService:
 @pytest.fixture
 def redis_blacklist(fake_redis: Redis) -> RedisBlacklistService:
     return RedisBlacklistService(fake_redis)
+
+
+@pytest.fixture
+def redis_chats(fake_redis: Redis) -> RedisChatCacheService:
+    return RedisChatCacheService(fake_redis)
 
 
 @pytest.fixture

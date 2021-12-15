@@ -21,6 +21,7 @@ from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
     DeclineChatPayload, MessageLikePayload, RatingChangedEventPayload
 from swipe.chat_server.services import ChatServerRequestProcessor
 from swipe.settings import settings
+from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.users.enums import Gender
@@ -80,7 +81,7 @@ async def websocket_endpoint(
 
     user: User
     with dependencies.db_context(expire_on_commit=False) as session:
-        user_service = UserService(session)
+        user_service, chat_service = UserService(session), ChatService(session)
         # loading only required fields
         if user := user_service.get_user_card_preview(user_uuid):
             user.last_online = None
@@ -89,21 +90,29 @@ async def websocket_endpoint(
             logger.info(f"User {user_id} not found")
             await websocket.close(1003)
             return
+
         blacklist: set[str] = await user_service.fetch_blacklist(user_id)
+        logger.info(f"Blacklist of {user_id}: {blacklist}")
+
+        partner_ids: list[str] = chat_service.get_chat_partners(user_id)
+        logger.info(f"Chat partners of {user_id}: {partner_ids}")
 
     firebase_service = RedisFirebaseService(redis)
-    # we're online so we don't need a token in cache
-    await firebase_service.remove_token_from_cache(user_id)
-
     redis_online = RedisOnlineUserService(redis)
-    redis_chats = RedisChatCacheService(redis)
     redis_blacklist = RedisBlacklistService(redis)
     redis_fetch = RedisUserFetchService(redis)
+    redis_chats = RedisChatCacheService(dependencies.redis())
 
+    # we're online so we don't need a token in cache
+    await firebase_service.remove_token_from_cache(user_id)
     # gender, dob, location, name, firebase_token, avatar_id + avatar_url
     await redis_online.add_to_online_caches(user)
     # they may have returned before the cache is dropped
     await redis_online.remove_from_recently_online(user_id)
+    # populating blacklist cache only for online users
+    await redis_blacklist.populate_blacklist(user_id, blacklist)
+    # we're gonna need it in /fetch
+    await redis_chats.populate_chat_partner_cache(user_id, partner_ids)
 
     user_data = ChatUserData(
         user_id=user_id, avatar_url=user.avatar_url,
@@ -111,10 +120,6 @@ async def websocket_endpoint(
     await connection_manager.connect(
         ConnectedUser(user_id=user_id, connection=websocket, data=user_data))
 
-    # populating blacklist cache only for online users
-    await redis_blacklist.populate_blacklist(user_id, blacklist)
-
-    # sending join event to all connected users
     logger.info(f"{user_id} connected from {websocket.client}")
     # TODO make it unified
     await connection_manager.broadcast(
@@ -142,6 +147,7 @@ async def websocket_endpoint(
 
                 user.last_online = datetime.datetime.utcnow()
                 session.commit()
+
             # adding him to recently online
             # such users are cleared every 10 minutes
             # check main server @startup events
@@ -150,12 +156,14 @@ async def websocket_endpoint(
             await redis_fetch.drop_fetch_response_caches(user_id)
             # removing blacklist cache
             await redis_blacklist.drop_blacklist_cache(user_id)
+            # dropping chat cache
+            await redis_chats.drop_chat_partner_cache(user_id)
             # sending leave payloads to everyone
-            payload = BasePayload(
-                sender_id=UUID(hex=user_id),
-                payload=GenericEventPayload(type=UserEventType.USER_LEFT))
             await connection_manager.broadcast(
-                user_id, payload.dict(by_alias=True))
+                user_id, BasePayload(
+                    sender_id=UUID(hex=user_id),
+                    payload=GenericEventPayload(type=UserEventType.USER_LEFT)
+                ).dict(by_alias=True))
             return
 
         try:
@@ -164,17 +172,6 @@ async def websocket_endpoint(
             with dependencies.db_context() as session:
                 request_processor = ChatServerRequestProcessor(session, redis)
                 await request_processor.process(payload)
-
-            if isinstance(payload.payload, CreateChatPayload):
-                # we need to have a chat cache to speed up matchmaking queries
-                # because we should not offer users who already got a chat
-                # with the current user
-
-                # only sender_id is added to recipient_id's chat cache
-                # because recipient_id might be in the lobby
-                # but sender_id is definitely NOT in the lobby
-                await redis_chats.add_chat_partner(
-                    str(payload.sender_id), str(payload.recipient_id))
 
             if isinstance(payload.payload, DeclineChatPayload):
                 await _send_blacklist_events(
@@ -220,30 +217,6 @@ async def send_blacklist_event(blocked_by_id: str = Body(..., embed=True),
     await _send_blacklist_events(blocked_user_id, blocked_by_id)
 
 
-async def _send_blacklist_events(blocked_user_id: str, blocked_by_id: str):
-    logger.info(
-        f"Sending blacklisted event from {blocked_by_id} "
-        f"to {blocked_user_id}")
-    blacklist_payload = BasePayload(
-        sender_id=UUID(hex=blocked_by_id),
-        recipient_id=UUID(hex=blocked_user_id),
-        payload=GenericEventPayload(
-            type=UserEventType.USER_BLACKLISTED))
-    await connection_manager.send(
-        blocked_user_id, blacklist_payload.dict(by_alias=True))
-
-    logger.info(
-        f"Sending blacklisted event from {blocked_user_id} "
-        f"to {blocked_by_id}")
-    blacklist_payload = BasePayload(
-        sender_id=UUID(hex=blocked_user_id),
-        recipient_id=UUID(hex=blocked_by_id),
-        payload=GenericEventPayload(
-            type=UserEventType.USER_BLACKLISTED))
-    await connection_manager.send(
-        blocked_by_id, blacklist_payload.dict(by_alias=True))
-
-
 @app.post("/events/user_deleted")
 async def send_user_deleted_event(
         user_id: str = Body(..., embed=True),
@@ -276,6 +249,30 @@ async def send_rating_changed_event(
             user_id=user_id, rating=rating
         ))
     await connection_manager.send(user_id, payload.dict(by_alias=True))
+
+
+async def _send_blacklist_events(blocked_user_id: str, blocked_by_id: str):
+    logger.info(
+        f"Sending blacklisted event from {blocked_by_id} "
+        f"to {blocked_user_id}")
+    blacklist_payload = BasePayload(
+        sender_id=UUID(hex=blocked_by_id),
+        recipient_id=UUID(hex=blocked_user_id),
+        payload=GenericEventPayload(
+            type=UserEventType.USER_BLACKLISTED))
+    await connection_manager.send(
+        blocked_user_id, blacklist_payload.dict(by_alias=True))
+
+    logger.info(
+        f"Sending blacklisted event from {blocked_user_id} "
+        f"to {blocked_by_id}")
+    blacklist_payload = BasePayload(
+        sender_id=UUID(hex=blocked_user_id),
+        recipient_id=UUID(hex=blocked_by_id),
+        payload=GenericEventPayload(
+            type=UserEventType.USER_BLACKLISTED))
+    await connection_manager.send(
+        blocked_by_id, blacklist_payload.dict(by_alias=True))
 
 
 async def _send_payload(base_payload: BasePayload):

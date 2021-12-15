@@ -16,7 +16,8 @@ from swipe.swipe_server.chats.models import GlobalChatMessage, Chat, \
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
-from swipe.swipe_server.users.services.redis_services import RedisBlacklistService
+from swipe.swipe_server.users.services.redis_services import \
+    RedisBlacklistService, RedisChatCacheService
 from swipe.swipe_server.users.services.services import UserService
 
 NOW = datetime.datetime.now()
@@ -359,9 +360,8 @@ async def test_decline_chat(
         randomizer: RandomEntityGenerator,
         mocker: MockerFixture,
         redis_blacklist: RedisBlacklistService,
+        redis_chats: RedisChatCacheService,
         default_user_auth_headers: dict[str, str]):
-    requests_mock = \
-        mocker.patch('swipe.swipe_server.users.services.services.requests')
     mock_storage: MagicMock = \
         mocker.patch('swipe.swipe_server.chats.models.storage_client')
 
@@ -393,6 +393,9 @@ async def test_decline_chat(
     default_user_id = str(default_user.id)
     recipient_id = str(recipient.id)
 
+    await redis_chats.add_chat_partner(default_user_id, recipient_id)
+    await redis_chats.add_chat_partner(recipient_id, default_user_id)
+
     mp = ChatServerRequestProcessor(session, fake_redis)
     json_data = BasePayload.validate({
         'sender_id': default_user_id,
@@ -415,10 +418,13 @@ async def test_decline_chat(
     assert recipient in default_user.blacklist
     assert default_user in recipient.blocked_by
 
-    assert await redis_blacklist.get_blacklist(default_user_id) == \
-           {recipient_id}
-    assert await redis_blacklist.get_blacklist(recipient_id) == \
-           {default_user_id}
+    assert \
+        await redis_blacklist.get_blacklist(default_user_id) == {recipient_id}
+    assert \
+        await redis_blacklist.get_blacklist(recipient_id) == {default_user_id}
+
+    assert await redis_chats.get_chat_partners(default_user_id) == set()
+    assert await redis_chats.get_chat_partners(recipient_id) == set()
 
 
 @pytest.mark.anyio
@@ -426,6 +432,7 @@ async def test_accept_chat(
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
         fake_redis: aioredis.FakeRedis, session: Session,
+        redis_chats: RedisChatCacheService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
@@ -453,9 +460,13 @@ async def test_accept_chat(
     chat.messages.extend([msg1, msg2, msg3, msg4])
     session.commit()
     mp = ChatServerRequestProcessor(session, fake_redis)
+
+    default_user_id = str(default_user.id)
+    recipient_id = str(recipient.id)
+
     json_data = BasePayload.validate({
-        'sender_id': str(default_user.id),
-        'recipient_id': str(recipient.id),
+        'sender_id': default_user_id,
+        'recipient_id': recipient_id,
         'payload': {
             'type': 'accept_chat',
             'chat_id': str(chat_id),
@@ -465,6 +476,10 @@ async def test_accept_chat(
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     assert chat.status == ChatStatus.ACCEPTED
+    assert redis_chats.get_chat_partners(default_user_id) == {
+        recipient_id}
+    assert redis_chats.get_chat_partners(recipient_id) == {
+        default_user_id}
 
 
 @pytest.mark.anyio

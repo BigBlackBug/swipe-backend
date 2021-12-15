@@ -199,6 +199,12 @@ class RedisChatCacheService:
     async def get_chat_partners(self, user_id) -> set[str]:
         return await self.redis.smembers(f'{self.CHAT_CACHE_KEY}:{user_id}')
 
+    async def remove_chat_partner(self, user_id: str, partner_id: str):
+        key = f'{self.CHAT_CACHE_KEY}:{user_id}'
+        if await self.redis.exists(key):
+            logger.debug(f"Removing {partner_id} from {user_id} cache")
+            await self.redis.srem(key, partner_id)
+
 
 FETCH_REQUEST_KEY = 'fetch_request'
 

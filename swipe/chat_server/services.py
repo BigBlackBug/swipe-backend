@@ -14,6 +14,8 @@ from swipe.swipe_server.chats.models import MessageStatus, ChatSource, \
     ChatStatus
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.errors import SwipeError
+from swipe.swipe_server.users.services.redis_services import \
+    RedisChatCacheService
 from swipe.swipe_server.users.services.services import UserService, \
     BlacklistService
 
@@ -25,6 +27,7 @@ class ChatServerRequestProcessor:
         self.chat_service = ChatService(db)
         self.user_service = UserService(db)
         self.blacklist_service = BlacklistService(db, redis)
+        self.redis_chats = RedisChatCacheService(redis)
 
     async def process(self, data: BasePayload):
         payload = data.payload
@@ -107,6 +110,16 @@ class ChatServerRequestProcessor:
                     f"Error creating chat between {payload.chat_id} "
                     f"and {data.recipient_id}")
 
+            # we need to have a chat cache to speed up matchmaking queries
+            # because we should not offer users who already got a chat
+            # with the current user
+
+            sender_id = str(data.sender_id)
+            recipient_id = str(data.recipient_id)
+
+            await self.redis_chats.add_chat_partner(sender_id, recipient_id)
+            await self.redis_chats.add_chat_partner(recipient_id, sender_id)
+
         elif isinstance(payload, AcceptChatPayload):
             self.chat_service.update_chat_status(
                 payload.chat_id, status=ChatStatus.ACCEPTED)
@@ -115,7 +128,11 @@ class ChatServerRequestProcessor:
                 payload.chat_id, status=ChatStatus.OPENED)
         elif isinstance(payload, DeclineChatPayload):
             self.chat_service.delete_chat(chat_id=payload.chat_id)
-            logger.info(f"Chat {payload.chat_id} was declined")
 
+            sender_id = str(data.sender_id)
+            recipient_id = str(data.recipient_id)
             await self.blacklist_service.update_blacklist(
-                str(data.sender_id), str(data.recipient_id))
+                sender_id, recipient_id)
+
+            await self.redis_chats.remove_chat_partner(sender_id, recipient_id)
+            await self.redis_chats.remove_chat_partner(recipient_id, sender_id)

@@ -255,6 +255,9 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
     async def get_user_card_preview_one(self, user_id: str) -> Optional[str]:
         return await self.redis.get(f'{self.ONLINE_USER_KEY}:{user_id}')
 
+    async def is_online(self, user_id: str) -> Optional[str]:
+        return await self.get_user_card_preview_one(user_id) is not None
+
     async def get_online_user_token(self, user_id: str) -> Optional[str]:
         logger.debug(f"Fetching token of {user_id} from cache")
         return await self.redis.get(f'{self.USER_TOKEN_KEY}:{user_id}')

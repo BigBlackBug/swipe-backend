@@ -4,7 +4,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import Depends
-from sqlalchemy import select, update, delete, union_all, func
+from sqlalchemy import select, update, delete, union_all, func, cast, String
 from sqlalchemy.orm import Session, selectinload, contains_eager, load_only
 
 from swipe.swipe_server.chats.models import Chat, ChatStatus, ChatMessage, \
@@ -225,6 +225,7 @@ class ChatService:
         for message in chat.messages:
             message.delete_image()
 
+        logger.info(f"Deleting chat {chat_id}")
         self.db.execute(delete(Chat).where(Chat.id == chat_id))
         self.db.commit()
 
@@ -259,3 +260,13 @@ class ChatService:
     def has_global_chat_messages(self, user_id: UUID):
         return self.db.query(func.count(GlobalChatMessage.id)). \
                    filter(GlobalChatMessage.sender_id == user_id).scalar() > 0
+
+    def get_chat_partners(self, user_id: str) -> list[str]:
+        logger.info(f"Fetching chat partners of {user_id}")
+        a_to_b = select(cast(Chat.the_other_person_id, String)).where(
+            Chat.initiator_id == user_id
+        )
+        b_to_a = select(cast(Chat.initiator_id, String)).where(
+            Chat.the_other_person_id == user_id
+        )
+        return self.db.execute(union_all(a_to_b, b_to_a)).scalars().all()
