@@ -3,7 +3,7 @@ import logging
 import secrets
 
 import requests
-from fastapi import FastAPI, Body, Query, Depends
+from fastapi import FastAPI, Body, Query
 from fastapi import WebSocket
 from pydantic import BaseModel
 from starlette.requests import Request
@@ -17,6 +17,7 @@ from swipe.matchmaking.schemas import MMBasePayload, MMMatchPayload, \
 from swipe.settings import settings, constants
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc import dependencies
+from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.schemas import OnlineFilterBody
@@ -59,32 +60,32 @@ async def docs(json_data: MMBasePayload = Body(..., examples={
 
 
 loop = asyncio.get_event_loop()
+
 matchmaking_data = MMRoundData()
 connection_manager = WSConnectionManager()
+
+redis_client = dependencies.redis()
+redis_online = RedisMatchmakingOnlineUserService(redis_client)
+redis_chats = RedisChatCacheService(redis_client)
+redis_blacklist = RedisBlacklistService(redis_client)
+fetch_service = FetchUserService(
+    RedisMatchmakingOnlineUserService(redis_client),
+    redis_client)
 
 
 @app.websocket("/connect/{user_id}")
 async def matchmaker_endpoint(
         user_id: str, websocket: WebSocket,
         gender: Gender = Query(None)):
-    redis_online = RedisMatchmakingOnlineUserService(dependencies.redis())
     user: User
-    with dependencies.db_context(expire_on_commit=False) as session:
-        # loading only date_of_birth and gender
-        user_service, chat_service = UserService(session), ChatService(session)
-        if (user := user_service.get_matchmaking_preview(user_id)) is None:
-            logger.info(f"User {user_id} not found")
-            await websocket.close(1003)
-            return
-
-    await redis_online.add_to_online_caches(user)
-    logger.info(f"{user_id}, rounded age: {user.age} "
-                f"connected with filter: {gender}")
-
-    connected_user = ConnectedUser(
-        user_id=user_id, connection=websocket,
-        data=MMUserData(age=user.age, gender_filter=gender, gender=user.gender))
-    await connection_manager.connect(connected_user)
+    try:
+        user = await _init_user(user_id, gender, websocket)
+        logger.info(f"{user_id}, rounded age: {user.data.age} "
+                    f"connected with filter: {gender}")
+    except:
+        logger.exception(f"Error connecting user {user_id}")
+        await websocket.close(1003)
+        return
 
     while True:
         try:
@@ -99,7 +100,8 @@ async def matchmaker_endpoint(
 
         try:
             base_payload: MMBasePayload = MMBasePayload.validate(data)
-            await _process_payload(base_payload, connected_user)
+            await _process_payload(base_payload,
+                                   connection_manager.get_user_data(user_id))
 
             if base_payload.recipient_id:
                 await connection_manager.send(
@@ -109,11 +111,27 @@ async def matchmaker_endpoint(
             logger.exception(f"Error processing payload from {user_id}")
 
 
+async def _init_user(user_id: str, gender: Gender,
+                     websocket: WebSocket) -> User:
+    with dependencies.db_context(expire_on_commit=False) as session:
+        # loading only date_of_birth and gender
+        user_service, chat_service = UserService(session), ChatService(session)
+        if (user := user_service.get_matchmaking_preview(user_id)) is None:
+            raise SwipeError(f"User {user_id} not found")
+
+    await redis_online.add_to_online_caches(user)
+
+    connected_user = ConnectedUser(
+        user_id=user_id, connection=websocket,
+        data=MMUserData(age=user.age, gender_filter=gender, gender=user.gender))
+    await connection_manager.connect(connected_user)
+    return user
+
+
 async def _process_disconnect(user_id: str):
     matchmaking_data.disconnect(user_id)
     await connection_manager.disconnect(user_id)
     # user disconnected, his chat cache is no longer needed
-    redis_chats = RedisChatCacheService(dependencies.redis())
     await redis_chats.drop_chat_partner_cache(user_id)
 
     # we need to keep track of sent matches so that we could
@@ -160,8 +178,7 @@ async def _process_disconnect(user_id: str):
         matchmaking_data.remove_match(match.user_id)
 
 
-async def _process_payload(base_payload: MMBasePayload,
-                           connected_user: ConnectedUser):
+async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData):
     data_payload = base_payload.payload
     sender_id = base_payload.sender_id
     recipient_id = base_payload.recipient_id
@@ -183,8 +200,7 @@ async def _process_payload(base_payload: MMBasePayload,
             # a decline means we add them to each others blacklist
             if settings.ENABLE_MATCHMAKING_BLACKLIST:
                 with dependencies.db_context() as session:
-                    blacklist_service = BlacklistService(
-                        session, dependencies.redis())
+                    blacklist_service = BlacklistService(session, redis_client)
                     # even though we remove the graph edges,
                     # these users still have to be removed
                     # from each other's online lists
@@ -194,7 +210,6 @@ async def _process_payload(base_payload: MMBasePayload,
     elif isinstance(data_payload, MMLobbyPayload):
         if data_payload.action == MMLobbyAction.CONNECT:
             # user joined the lobby
-            user_data = connected_user.data
             mm_settings = MMSettings(
                 age=user_data.age,
                 gender=user_data.gender,
@@ -204,22 +219,17 @@ async def _process_payload(base_payload: MMBasePayload,
                         f"settings: {mm_settings}")
             logger.info(f"Current online users {matchmaking_data.online_users}")
 
-            redis_chats = RedisChatCacheService(dependencies.redis())
             # there boys and girls and helicopters are loaded in the chat server
             chat_partners: set[str] = \
                 await redis_chats.get_chat_partners(sender_id)
             logger.info(f"Chat partners for {sender_id}: {chat_partners}")
 
-            redis_blacklist = RedisBlacklistService(dependencies.redis())
             blacklist: set[str] = \
                 await redis_blacklist.get_blacklist(sender_id)
             logger.info(f"Blacklist for {sender_id}: {blacklist}")
 
             disallowed_users = chat_partners.union(blacklist)
 
-            fetch_service = FetchUserService(
-                RedisMatchmakingOnlineUserService(dependencies.redis()),
-                dependencies.redis())
             connections = await fetch_service.collect(
                 sender_id,
                 user_age=mm_settings.age,
@@ -310,19 +320,13 @@ async def fetch_user_ids_for_matchmaking(
         user_id: str = Query(None),
         user_age: int = Query(None),
         gender_filter: Gender = Query(None),
-        session_id: str = Query(None),
-        redis_chats: RedisChatCacheService = Depends(),
-        redis_blacklist: RedisBlacklistService = Depends()):
+        session_id: str = Query(None)):
     chat_partners = await redis_chats.get_chat_partners(user_id)
     logger.info(f"Chat partners of {user_id}: {chat_partners}")
 
     blacklist: set[str] = \
         await redis_blacklist.get_blacklist(user_id)
     logger.info(f"Blacklist for {user_id}: {blacklist}")
-
-    fetch_service = FetchUserService(
-        RedisMatchmakingOnlineUserService(dependencies.redis()),
-        dependencies.redis())
 
     disallowed_users = chat_partners.union(blacklist)
     connections = await fetch_service.collect(
