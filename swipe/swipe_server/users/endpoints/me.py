@@ -164,7 +164,7 @@ async def delete_user(
         })
     elif recipients:
         logger.debug(
-            f"{current_user.ud} has no global messages, "
+            f"{current_user.id} has no global messages, "
             f"only chat partners {recipients} will be notified")
         # we gotta notify every chat participant that the user is gone
         requests.post(url, json={
