@@ -120,5 +120,5 @@ if __name__ == '__main__':
     logger.info(f'Starting app at port {settings.SWIPE_PORT}')
 
     uvicorn.run('bin.swipe_server:app', host='0.0.0.0',  # noqa
-                port=settings.SWIPE_PORT, workers=4,
+                port=settings.SWIPE_PORT, workers=1,
                 reload=settings.ENABLE_WEB_SERVER_AUTORELOAD)
