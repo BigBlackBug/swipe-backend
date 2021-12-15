@@ -11,7 +11,7 @@ from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 from uvicorn import Config, Server
 
-from swipe.chat_server.services import ConnectedUser, WSConnectionManager
+from swipe.websockets import ConnectedUser, WSConnectionManager
 from swipe.matchmaking.schemas import MMRoundData
 from swipe.mm_chat_server.schemas import MMTextBasePayload, \
     MMTextMessagePayload, MMTextChatPayload, MMTextMessageLikePayload, \

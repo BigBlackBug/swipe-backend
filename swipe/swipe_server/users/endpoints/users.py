@@ -256,5 +256,8 @@ async def fetch_user(
         current_user_id: UUID = Depends(security.auth_user_id)):
     # TODO cache
     user = user_service.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f'User {user_id} not found')
     user_out: UserOut = UserOut.patched_from_orm(user)
     return user_out

@@ -19,8 +19,8 @@ from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
     MessagePayload, CreateChatPayload, \
     UserJoinEventPayload, GenericEventPayload, UserEventType, \
     DeclineChatPayload, MessageLikePayload, RatingChangedEventPayload
-from swipe.chat_server.services import ChatServerRequestProcessor, \
-    WSConnectionManager, ConnectedUser, ChatUserData
+from swipe.chat_server.services import ChatServerRequestProcessor
+from swipe.websockets import ChatUserData, ConnectedUser, WSConnectionManager
 from swipe.settings import settings
 from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.misc.errors import SwipeError
@@ -314,7 +314,7 @@ async def _send_payload(base_payload: BasePayload):
 
         if isinstance(payload, MessagePayload):
             notification = firebase.Notification(
-                title=f'{user_data.name} наконец-то ответил{ending} ☺️', # noqa
+                title=f'{user_data.name} наконец-то ответил{ending} ☺️',  # noqa
                 body='Переходи в приложение, чтобы продолжить диалог')
         elif isinstance(payload, CreateChatPayload):
             notification = firebase.Notification(
@@ -325,7 +325,7 @@ async def _send_payload(base_payload: BasePayload):
             f"Sending firebase notification '{payload.type_}' "
             f"to {recipient_id}")
         firebase.send(firebase.Message(
-            notification=notification, token=firebase_token)) # noqa
+            notification=notification, token=firebase_token))  # noqa
 
         await firebase_service.set_cooldown_token(sender_id, recipient_id)
     else:

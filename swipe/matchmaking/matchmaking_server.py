@@ -11,8 +11,7 @@ from starlette.responses import Response
 from starlette.websockets import WebSocketDisconnect
 from uvicorn import Config, Server
 
-from swipe.chat_server.services import ConnectedUser, WSConnectionManager, \
-    MMUserData
+from swipe.websockets import MMUserData, ConnectedUser, WSConnectionManager
 from swipe.matchmaking.schemas import MMBasePayload, MMMatchPayload, \
     MMResponseAction, MMLobbyPayload, MMLobbyAction, MMSettings, MMRoundData, \
     MMChatPayload, MMChatAction
