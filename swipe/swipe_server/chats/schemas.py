@@ -98,6 +98,7 @@ class MultipleChatsOut(BaseModel):
     requests: list[ChatOut] = []
     chats: list[ChatOut] = []
     users: dict[UUID, UserOutChatPreview] = {}
+    chat_ids: list[UUID] = []
 
     @staticmethod
     # sort chats by last message date
@@ -109,10 +110,12 @@ class MultipleChatsOut(BaseModel):
 
     @classmethod
     async def parse_chats(
-            cls, chats: list[Chat],
+            cls, chats: list[Chat], chat_ids: list[UUID],
             users: list[User] | list[Row],
             current_user_id: UUID) -> MultipleChatsOut:
-        result = {'chats': [], 'requests': [], 'users': {}}
+        result: dict[str, Any] = {
+            'chats': [], 'requests': [], 'users': {}, 'chat_ids': chat_ids
+        }
 
         chats.sort(key=MultipleChatsOut._date_sort_key, reverse=True)
 

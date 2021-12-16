@@ -66,6 +66,8 @@ async def test_fetch_existing_chats(
         image_id='345345.png', sender=default_user)
     newer_chat.messages.extend([msg5, msg6, msg7])
     session.commit()
+    session.refresh(older_chat)
+    session.refresh(newer_chat)
 
     # default user is online
     await redis_online.add_to_online_caches(default_user)
@@ -90,6 +92,9 @@ async def test_fetch_existing_chats(
 
     assert users[str(second_user.id)]['name'] == second_user.name
     assert users[str(second_user.id)]['last_online'] is None
+
+    chat_ids = response.json()['chat_ids']
+    assert set(chat_ids) == {str(older_chat.id), str(newer_chat.id)}
 
     chats = response.json()['chats']
     assert len(chats) == 2
@@ -168,6 +173,8 @@ async def test_fetch_existing_and_outgoing_request(
         image_id='345345.png', sender=default_user)
     outgoing_requets_chat.messages.extend([msg5, msg6, msg7])
     session.commit()
+    session.refresh(outgoing_requets_chat)
+    session.refresh(chat)
 
     # -----------------------------------------------------------
     response: Response = await client.get(
@@ -186,6 +193,9 @@ async def test_fetch_existing_and_outgoing_request(
     assert users[str(second_user.id)]['name'] == second_user.name
     assert users[str(second_user.id)]['location']['city'] \
            == second_user.location.city
+
+    chat_ids = response.json()['chat_ids']
+    assert set(chat_ids) == {str(chat.id), str(outgoing_requets_chat.id)}
 
     chats = response.json()['chats']
     assert len(chats) == 2
@@ -275,6 +285,8 @@ async def test_fetch_existing_and_incoming_request(
         image_id='345345.png', sender=default_user)
     chat_incoming_request.messages.extend([msg5, msg6, msg7])
     session.commit()
+    session.refresh(chat_incoming_request)
+    session.refresh(chat)
 
     response: Response = await client.get(
         f"{settings.API_V1_PREFIX}/me/chats",
@@ -292,6 +304,9 @@ async def test_fetch_existing_and_incoming_request(
     assert users[str(second_user.id)]['name'] == second_user.name
     assert users[str(second_user.id)]['location']['city'] \
            == second_user.location.city
+
+    chat_ids = response.json()['chat_ids']
+    assert set(chat_ids) == {str(chat.id), str(chat_incoming_request.id)}
 
     chats = response.json()['chats']
     assert len(chats) == 2
@@ -372,6 +387,8 @@ async def test_fetch_existing_chats_only_unread(
         image_id='345345.png', sender=default_user)
     newer_chat.messages.extend([msg5, msg6, msg7])
     session.commit()
+    session.refresh(newer_chat)
+    session.refresh(older_chat)
 
     response: Response = await client.get(
         f"{settings.API_V1_PREFIX}/me/chats",
@@ -389,6 +406,10 @@ async def test_fetch_existing_chats_only_unread(
     assert users[str(default_user.id)]['name'] == default_user.name
     assert users[str(second_user.id)]['name'] == second_user.name
 
+    # we need to return all chat ids
+    chat_ids = response.json()['chat_ids']
+    assert set(chat_ids) == {str(newer_chat.id), str(older_chat.id)}
+
     chat_response = response.json()['chats']
     assert len(chat_response) == 1
 
@@ -399,6 +420,30 @@ async def test_fetch_existing_chats_only_unread(
     assert messages[1]['id'] == str(msg7.id)
 
     assert messages[0]['message'] == msg6.message
+
+
+@pytest.mark.anyio
+async def test_fetch_chats_empty(
+        client: AsyncClient,
+        default_user: models.User,
+        session: Session,
+        randomizer: RandomEntityGenerator,
+        default_user_auth_headers: dict[str, str]):
+    # chat without unread messages
+    response: Response = await client.get(
+        f"{settings.API_V1_PREFIX}/me/chats",
+        params={},
+        headers=default_user_auth_headers
+    )
+    assert response.status_code == 200
+    users = response.json()['users']
+    assert len(users) == 0
+
+    chat_ids = response.json()['chat_ids']
+    assert len(chat_ids) == 0
+
+    chat_response = response.json()['chats']
+    assert len(chat_response) == 0
 
 
 @pytest.mark.anyio

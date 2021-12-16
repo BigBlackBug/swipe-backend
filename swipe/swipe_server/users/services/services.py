@@ -14,7 +14,6 @@ from sqlalchemy import select, delete, func, desc, String, cast, insert, update
 from sqlalchemy.engine import Row
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, Bundle, Load, joinedload
-from sqlalchemy.orm.strategy_options import load_only
 
 from swipe.settings import settings, constants
 from swipe.swipe_server import utils

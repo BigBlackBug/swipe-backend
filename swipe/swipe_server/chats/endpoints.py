@@ -75,8 +75,12 @@ async def fetch_chats(
 
     users: list[Row] = \
         user_service.get_user_chat_preview(list(user_ids), location=True)
+
+    # user needs to know the list of all chats in case some were deleted
+    # while he's offline
+    chat_ids: list[UUID] = chat_service.fetch_chat_ids(user_id)
     resp_data: MultipleChatsOut = \
-        await MultipleChatsOut.parse_chats(chats, users, user_id)
+        await MultipleChatsOut.parse_chats(chats, chat_ids, users, user_id)
     return resp_data
 
 
