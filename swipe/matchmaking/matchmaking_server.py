@@ -132,8 +132,6 @@ async def _init_user(user_id: str, gender: Gender,
 async def _process_disconnect(user_id: str):
     matchmaking_data.disconnect(user_id)
     await connection_manager.disconnect(user_id)
-    # user disconnected, his chat cache is no longer needed
-    await redis_chats.drop_chat_partner_cache(user_id)
 
     # we need to keep track of sent matches so that we could
     # send decline/reconnect events if one of the users disconnects
