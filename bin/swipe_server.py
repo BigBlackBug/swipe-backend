@@ -110,8 +110,8 @@ async def populate_popular_cache():
 @app.on_event("startup")
 @repeat_every(seconds=constants.RECENTLY_ONLINE_CLEAR_JOB_TIMEOUT_SEC,
               logger=logger, wait_first=True)
-async def remove_recently_online_cache():
-    logger.info("Filtering recently online users")
+async def update_recently_online_cache():
+    logger.info("Removing recently online users from the online cache")
     service = RedisOnlineUserService(dependencies.redis())
     await service.update_recently_online_cache()
 

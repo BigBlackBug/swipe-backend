@@ -233,6 +233,7 @@ async def _send_payload(base_payload: BasePayload):
             return
 
         user_data: ChatUserData = connection_manager.get_user_data(sender_id)
+        # TODO should move that to the Gender enum
         if user_data.gender == Gender.MALE:
             ending = ''
         elif user_data.gender == Gender.FEMALE:

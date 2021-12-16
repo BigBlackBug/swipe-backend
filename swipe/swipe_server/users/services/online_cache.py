@@ -19,7 +19,6 @@ from swipe.swipe_server.users.schemas import OnlineFilterBody, \
     UserCardPreviewOut
 
 logger = logging.getLogger(__name__)
-T = TypeVar('T')
 
 
 @dataclass
@@ -52,6 +51,9 @@ class OnlineUserCacheParams:
                 f'online:{self.country}:{self.city}:{self.age}:{self.gender}'
             ])
         return result
+
+
+T = TypeVar('T')
 
 
 class OnlineUserCache(ABC, Generic[T]):
@@ -217,6 +219,7 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
                     city=user_data['city'], gender=user_data['gender'])
                 user_id = str(key).split(":")[1]
 
+                logger.debug(f"Removing {user_id} from online caches")
                 # removing this dude from all online caches
                 for online_key in cache_params.online_keys():
                     await self.redis.srem(online_key, user_id)

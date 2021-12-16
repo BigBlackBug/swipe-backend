@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 
 from swipe.chat_server.schemas import BasePayload
 from swipe.chat_server.services import ChatServerRequestProcessor
-from swipe.settings import settings
 from swipe.swipe_server.chats.models import GlobalChatMessage, Chat, \
     ChatMessage, \
     MessageStatus, ChatStatus, ChatSource
@@ -220,23 +219,27 @@ async def test_create_chat_direct(
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
         fake_redis: aioredis.FakeRedis, session: Session,
+        redis_chats: RedisChatCacheService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
     mp = ChatServerRequestProcessor(session, fake_redis)
-    json_data = BasePayload.validate({
 
-        'sender_id': str(default_user.id),
-        'recipient_id': str(recipient.id),
+    default_user_id = str(default_user.id)
+    recipient_id = str(recipient.id)
+
+    json_data = BasePayload.validate({
+        'sender_id': default_user_id,
+        'recipient_id': recipient_id,
         'payload': {
             'type': 'create_chat',
             'source': ChatSource.DIRECT,
             'chat_id': str(chat_id),
             'message': {
                 'message_id': str(uuid.uuid4()),
-                'sender_id': str(default_user.id),
-                'recipient_id': str(recipient.id),
+                'sender_id': default_user_id,
+                'recipient_id': recipient_id,
                 'timestamp': NOW.isoformat(),
                 'text': 'hello'
             }
@@ -253,28 +256,37 @@ async def test_create_chat_direct(
     assert len(chat.messages) == 1
     assert chat.messages[0].message == 'hello'
 
+    assert await redis_chats.get_chat_partners(default_user_id) == {
+        recipient_id}
+    assert await redis_chats.get_chat_partners(recipient_id) == {
+        default_user_id}
+
 
 @pytest.mark.anyio
 async def test_create_chat_text_lobby(
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
         fake_redis: aioredis.FakeRedis, session: Session,
+        redis_chats: RedisChatCacheService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
     mp = ChatServerRequestProcessor(session, fake_redis)
+
+    default_user_id = str(default_user.id)
+    recipient_id = str(recipient.id)
     json_data = BasePayload.validate({
-        'sender_id': str(default_user.id),
-        'recipient_id': str(recipient.id),
+        'sender_id': default_user_id,
+        'recipient_id': recipient_id,
         'payload': {
             'type': 'create_chat',
             'source': ChatSource.TEXT_LOBBY,
             'chat_id': str(chat_id),
             'messages': [{
                 'message_id': str(uuid.uuid4()),
-                'sender_id': str(default_user.id),
-                'recipient_id': str(recipient.id),
+                'sender_id': default_user_id,
+                'recipient_id': recipient_id,
                 'timestamp': NOW.isoformat(),
                 'text': 'hello'
             } for _ in range(5)]
@@ -291,20 +303,29 @@ async def test_create_chat_text_lobby(
     assert len(chat.messages) == 5
     assert chat.messages[3].message == 'hello'
 
+    assert await redis_chats.get_chat_partners(default_user_id) == {
+        recipient_id}
+    assert await redis_chats.get_chat_partners(recipient_id) == {
+        default_user_id}
+
 
 @pytest.mark.anyio
 async def test_create_chat_audio_lobby(
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
         fake_redis: aioredis.FakeRedis, session: Session,
+        redis_chats: RedisChatCacheService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
     mp = ChatServerRequestProcessor(session, fake_redis)
+
+    default_user_id = str(default_user.id)
+    recipient_id = str(recipient.id)
     json_data = BasePayload.validate({
-        'sender_id': str(default_user.id),
-        'recipient_id': str(recipient.id),
+        'sender_id': default_user_id,
+        'recipient_id': recipient_id,
         'payload': {
             'type': 'create_chat',
             'source': ChatSource.VIDEO_LOBBY,
@@ -321,20 +342,29 @@ async def test_create_chat_audio_lobby(
     assert chat.the_other_person_id == recipient.id
     assert len(chat.messages) == 0
 
+    assert await redis_chats.get_chat_partners(default_user_id) == {
+        recipient_id}
+    assert await redis_chats.get_chat_partners(recipient_id) == {
+        default_user_id}
+
 
 @pytest.mark.anyio
 async def test_create_chat_video_lobby(
         default_user: models.User,
         chat_service: ChatService, user_service: UserService,
         fake_redis: aioredis.FakeRedis, session: Session,
+        redis_chats: RedisChatCacheService,
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     recipient = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
     mp = ChatServerRequestProcessor(session, fake_redis)
+
+    default_user_id = str(default_user.id)
+    recipient_id = str(recipient.id)
     json_data = BasePayload.validate({
-        'sender_id': str(default_user.id),
-        'recipient_id': str(recipient.id),
+        'sender_id': default_user_id,
+        'recipient_id': recipient_id,
         'payload': {
             'type': 'create_chat',
             'source': ChatSource.AUDIO_LOBBY,
@@ -350,6 +380,11 @@ async def test_create_chat_video_lobby(
     assert chat.initiator_id == default_user.id
     assert chat.the_other_person_id == recipient.id
     assert len(chat.messages) == 0
+
+    assert await redis_chats.get_chat_partners(default_user_id) == {
+        recipient_id}
+    assert await redis_chats.get_chat_partners(recipient_id) == {
+        default_user_id}
 
 
 @pytest.mark.anyio
@@ -476,10 +511,6 @@ async def test_accept_chat(
 
     chat: Chat = chat_service.fetch_chat(chat_id)
     assert chat.status == ChatStatus.ACCEPTED
-    assert redis_chats.get_chat_partners(default_user_id) == {
-        recipient_id}
-    assert redis_chats.get_chat_partners(recipient_id) == {
-        default_user_id}
 
 
 @pytest.mark.anyio
