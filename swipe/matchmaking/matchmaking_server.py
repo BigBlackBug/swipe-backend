@@ -80,7 +80,8 @@ async def matchmaker_endpoint(
     user: User
     try:
         user = await _init_user(user_id, gender, websocket)
-        logger.info(f"{user_id}, rounded age: {user.data.age} "
+        logger.info(f"{user_id}, rounded age: {user.age}, "
+                    f"gender: {user.gender}"
                     f"connected with filter: {gender}")
     except:
         logger.exception(f"Error connecting user {user_id}")

@@ -338,15 +338,16 @@ class UserService:
         logger.debug(f"Checking for {user_id} token in DB")
         return self.db.execute(
             select(AuthInfo)
-                .where(AuthInfo.user_id == user_id) \
+                .where(AuthInfo.user_id == user_id)
                 .where(AuthInfo.access_token == token)) \
             .scalar_one_or_none()
 
     def get_matchmaking_preview(self, user_id: str) -> User:
         logger.info(f"Fetching chat matchmaking preview of {user_id}")
-        return self.db.query(User).where(User.id == user_id). \
-            options(load_only(User.gender, User.date_of_birth)) \
-            .one_or_none()
+        return self.db.query(User). \
+            where(User.id == user_id). \
+            options(Load(User).load_only('gender', 'date_of_birth')
+        ).one_or_none()
 
 
 class PopularUserService:
