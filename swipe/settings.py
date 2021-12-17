@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     SWIPE_LOGGING_LEVEL: str = 'INFO'
 
     SWIPE_PORT: Optional[int] = None
+    SWIPE_SERVER_WORKER_NUMBER: int = 4
+
     DATABASE_URL: Optional[PostgresDsn] = None
     REDIS_URL: Optional[RedisDsn] = None
 
