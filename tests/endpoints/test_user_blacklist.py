@@ -28,18 +28,14 @@ async def test_add_to_blacklist(
     user_3 = randomizer.generate_random_user()
     session.commit()
 
-    requests_mock = \
-        mocker.patch('swipe.swipe_server.users.'
-                     'services.blacklist_service.requests')
+    mock_events = mocker.patch('swipe.swipe_server.users.'
+                               'services.blacklist_service.events')
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/{user_1.id}/block",
         headers=default_user_auth_headers
     )
-    url = f'{settings.CHAT_SERVER_HOST}/events/blacklist'
-    requests_mock.post.assert_called_with(url, json={
-        'blocked_by_id': str(default_user.id),
-        'blocked_user_id': str(user_1.id)
-    })
+    mock_events.send_blacklist_event.assert_called_with(
+        str(default_user.id), str(user_1.id))
 
     assert response.status_code == 204
     assert len(default_user.blacklist) == 1
@@ -56,10 +52,9 @@ async def test_add_to_blacklist(
     assert user_2 in default_user.blacklist
     assert default_user in user_2.blocked_by
 
-    requests_mock.post.assert_called_with(url, json={
-        'blocked_by_id': str(default_user.id),
-        'blocked_user_id': str(user_2.id)
-    })
+    mock_events.send_blacklist_event.assert_called_with(
+        str(default_user.id), str(user_2.id))
+
     # ----------------------------------------------------------------
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/{user_3.id}/block",
@@ -70,10 +65,8 @@ async def test_add_to_blacklist(
     assert user_3 in default_user.blacklist
     assert default_user in user_3.blocked_by
 
-    requests_mock.post.assert_called_with(url, json={
-        'blocked_by_id': str(default_user.id),
-        'blocked_user_id': str(user_3.id)
-    })
+    mock_events.send_blacklist_event.assert_called_with(
+        str(default_user.id), str(user_3.id))
 
     # --------------------------------------------------------
 

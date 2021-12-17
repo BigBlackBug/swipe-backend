@@ -18,8 +18,7 @@ async def test_add_positive_feedback(
         session: Session,
         mocker: MockerFixture,
         default_user_auth_headers: dict[str, str]):
-    mock_requests = \
-        mocker.patch('swipe.swipe_server.users.endpoints.users.requests')
+    mock_requests = mocker.patch('swipe.swipe_server.events.requests')
 
     other_user = randomizer.generate_random_user()
     session.commit()
@@ -52,8 +51,7 @@ async def test_add_negative_feedback(
         session: Session,
         mocker: MockerFixture,
         default_user_auth_headers: dict[str, str]):
-    mock_requests = \
-        mocker.patch('swipe.swipe_server.users.endpoints.users.requests')
+    mock_requests = mocker.patch('swipe.swipe_server.events.requests')
     other_user = randomizer.generate_random_user()
     session.commit()
 
@@ -85,8 +83,7 @@ async def test_add_negative_below_zero_feedback(
         session: Session,
         mocker: MockerFixture,
         default_user_auth_headers: dict[str, str]):
-    mock_requests = \
-        mocker.patch('swipe.swipe_server.users.endpoints.users.requests')
+    mock_events = mocker.patch('swipe.swipe_server.users.endpoints.users.events')
     other_user = randomizer.generate_random_user()
     other_user.rating = 0
     session.commit()
@@ -101,9 +98,8 @@ async def test_add_negative_below_zero_feedback(
     other_user = user_service.get_user(other_user.id)
     assert other_user.rating == 0
 
-    url = f'{settings.CHAT_SERVER_HOST}/events/rating_changed'
-    mock_requests.post.assert_called_with(url, json={
-        'user_id': str(other_user.id),
-        'sender_id': str(default_user.id),
-        'rating': other_user.rating
-    })
+    mock_events.send_rating_changed_event.assert_called_with(
+        target_user_id=str(other_user.id),
+        sender_id=str(default_user.id),
+        rating=other_user.rating
+    )

@@ -11,14 +11,15 @@ from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 from uvicorn import Config, Server
 
-from swipe.ws_connection import ConnectedUser, WSConnectionManager
 from swipe.matchmaking.schemas import MMRoundData
+from swipe.middlewares import CorrelationIdMiddleware
 from swipe.mm_chat_server.schemas import MMTextBasePayload, \
     MMTextMessagePayload, MMTextChatPayload, MMTextMessageLikePayload, \
     MMTextChatAction, MMTextMessageModel
 from swipe.settings import settings
 from swipe.swipe_server.chats.models import ChatSource
 from swipe.swipe_server.misc.errors import SwipeError
+from swipe.ws_connection import ConnectedUser, WSConnectionManager
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +194,7 @@ async def _process_payload(base_payload: MMTextBasePayload, chat_id: str):
 
 
 def start_server():
+    app.add_middleware(CorrelationIdMiddleware)
     server_config = Config(app=app, host='0.0.0.0',
                            port=settings.MATCHMAKING_TEXT_CHAT_SERVER_PORT,
                            workers=1, loop='asyncio')

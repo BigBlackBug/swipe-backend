@@ -20,6 +20,7 @@ from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
     UserJoinEventPayload, GenericEventPayload, UserEventType, \
     DeclineChatPayload, MessageLikePayload, RatingChangedEventPayload
 from swipe.chat_server.services import ChatServerRequestProcessor
+from swipe.middlewares import CorrelationIdMiddleware
 from swipe.settings import settings
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc import dependencies
@@ -353,6 +354,7 @@ async def _send_blacklist_events(blocked_user_id: str, blocked_by_id: str):
 def start_server():
     app.add_exception_handler(SwipeError, error_handlers.swipe_error_handler)
     app.add_exception_handler(Exception, error_handlers.global_error_handler)
+    app.add_middleware(CorrelationIdMiddleware)
     server_config = Config(app=app, host='0.0.0.0',
                            port=settings.CHAT_SERVER_PORT,
                            reload=settings.ENABLE_WEB_SERVER_AUTORELOAD,

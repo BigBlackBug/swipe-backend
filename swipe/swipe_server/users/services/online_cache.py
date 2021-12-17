@@ -187,6 +187,7 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
 
     async def remove_from_online_caches(
             self, user: User, location: Optional[Location] = None):
+        logger.info(f"Removing {user.id} from online caches")
         country = location.country if location else user.location.country
         city = location.city if location else user.location.city
         cache_params = OnlineUserCacheParams(

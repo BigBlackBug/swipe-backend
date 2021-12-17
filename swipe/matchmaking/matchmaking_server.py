@@ -14,6 +14,7 @@ from uvicorn import Config, Server
 from swipe.matchmaking.schemas import MMBasePayload, MMMatchPayload, \
     MMResponseAction, MMLobbyPayload, MMLobbyAction, MMSettings, MMRoundData, \
     MMChatPayload, MMChatAction
+from swipe.middlewares import CorrelationIdMiddleware
 from swipe.settings import settings, constants
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc import dependencies
@@ -21,12 +22,12 @@ from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.schemas import OnlineFilterBody
+from swipe.swipe_server.users.services.blacklist_service import BlacklistService
 from swipe.swipe_server.users.services.fetch_service import FetchUserService
 from swipe.swipe_server.users.services.online_cache import \
     RedisMatchmakingOnlineUserService
 from swipe.swipe_server.users.services.redis_services import \
     RedisChatCacheService, RedisBlacklistService
-from swipe.swipe_server.users.services.blacklist_service import BlacklistService
 from swipe.swipe_server.users.services.user_service import UserService
 from swipe.ws_connection import MMUserData, ConnectedUser, WSConnectionManager
 
@@ -346,6 +347,7 @@ async def fetch_user_ids_for_matchmaking(
 
 
 def start_server():
+    app.add_middleware(CorrelationIdMiddleware)
     server_config = Config(app=app, host='0.0.0.0',
                            port=settings.MATCHMAKING_SERVER_PORT,
                            workers=1, loop='asyncio')

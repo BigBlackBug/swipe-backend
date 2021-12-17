@@ -43,8 +43,8 @@ async def test_user_delete(
 
     mock_user_storage: MagicMock = \
         mocker.patch('swipe.swipe_server.users.models.storage_client')
-    mock_requests = \
-        mocker.patch('swipe.swipe_server.users.endpoints.me.requests')
+    mock_events = \
+        mocker.patch('swipe.swipe_server.users.endpoints.me.events')
 
     user_1 = randomizer.generate_random_user()
     auth_info_id: UUID = default_user.auth_info.id
@@ -72,9 +72,7 @@ async def test_user_delete(
         headers=default_user_auth_headers)
 
     # no chats -> no event
-    url = f'{settings.CHAT_SERVER_HOST}/events/user_deleted'
-    assert not mock_requests.post.call_args_list
-    assert call(url, json=ANY) not in mock_requests.post.call_args_list
+    mock_events.send_user_deleted_event.assert_not_called()
 
     mock_user_storage.delete_image.assert_has_calls(
         delete_image_calls, any_order=True)
@@ -128,8 +126,7 @@ async def test_user_delete_with_chats(
         mocker.patch('swipe.swipe_server.users.models.storage_client')
     mock_chat_storage: MagicMock = \
         mocker.patch('swipe.swipe_server.chats.models.storage_client')
-    mock_requests = \
-        mocker.patch('swipe.swipe_server.users.endpoints.me.requests')
+    mock_requests = mocker.patch('swipe.swipe_server.events.requests')
 
     other_user = randomizer.generate_random_user()
     photos: list[str] = default_user.photos
@@ -202,8 +199,8 @@ async def test_user_delete_with_global(
         default_user_auth_headers: dict[str, str]):
     mock_user_storage: MagicMock = \
         mocker.patch('swipe.swipe_server.users.models.storage_client')
-    mock_requests = \
-        mocker.patch('swipe.swipe_server.users.endpoints.me.requests')
+    mock_events = mocker.patch('swipe.swipe_server.users.endpoints.me.events')
+
     photos: list[str] = default_user.photos
     other_user = randomizer.generate_random_user()
     another_user = randomizer.generate_random_user()
@@ -238,10 +235,7 @@ async def test_user_delete_with_global(
     mock_user_storage.delete_image.assert_has_calls(
         calls, any_order=True)
 
-    url = f'{settings.CHAT_SERVER_HOST}/events/user_deleted'
-    mock_requests.post.assert_called_with(url, json={
-        'user_id': str(default_user.id)
-    })
+    mock_events.send_user_deleted_event.assert_called_with(str(default_user.id))
 
     assert not user_service.get_user(default_user.id)
     assert not session.execute(

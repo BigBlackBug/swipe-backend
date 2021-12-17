@@ -1,5 +1,6 @@
 import pytest
 from httpx import AsyncClient
+from pytest_mock import MockerFixture
 from sqlalchemy.orm import Session
 
 from swipe.settings import settings
@@ -16,8 +17,12 @@ async def test_user_add_rating(
         user_service: UserService,
         randomizer: RandomEntityGenerator,
         session: Session,
+        mocker: MockerFixture,
         redis_blacklist: RedisBlacklistService,
         default_user_auth_headers: dict[str, str]):
+    mock_events = mocker.patch(
+        'swipe.swipe_server.users.endpoints.me.events')
+
     old_rating = default_user.rating
     response = await client.post(
         f"{settings.API_V1_PREFIX}/me/rating",
@@ -31,3 +36,8 @@ async def test_user_add_rating(
 
     assert default_user.rating > old_rating
     assert response.json()['rating'] == default_user.rating
+
+    mock_events.send_rating_changed_event.assert_called_with(
+        target_user_id=str(default_user.id),
+        rating=default_user.rating
+    )

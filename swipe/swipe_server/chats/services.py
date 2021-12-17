@@ -260,6 +260,7 @@ class ChatService:
         self.db.commit()
 
     def delete_global_chat_messages(self, user_id: UUID):
+        logger.info(f"Deleting global chat messages of {user_id}")
         self.db.execute(delete(GlobalChatMessage).
                         where(GlobalChatMessage.sender_id == user_id))
         self.db.commit()

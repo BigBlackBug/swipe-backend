@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from swipe.settings import settings
+from swipe.swipe_server import events
 from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.users.models import blacklist_table
@@ -42,11 +43,4 @@ class BlacklistService:
             blocked_by_id, blocked_user_id)
 
         if send_blacklist_event:
-            logger.info(f"Calling chat server to send blacklisted event"
-                        f"{blocked_by_id} blocked {blocked_user_id}")
-            # sending 'add to blacklist' event to blocked_user_id
-            url = f'{settings.CHAT_SERVER_HOST}/events/blacklist'
-            requests.post(url, json={
-                'blocked_by_id': blocked_by_id,
-                'blocked_user_id': blocked_user_id
-            })
+            events.send_blacklist_event(blocked_by_id, blocked_user_id)

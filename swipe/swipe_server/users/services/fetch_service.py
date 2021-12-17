@@ -34,8 +34,7 @@ class FetchUserService:
                       disallowed_users: set[str] = None) -> set[str]:
         logger.info(f"Collecting users for {user_id}, params: {filter_params}")
         # TODO save current age diff with session ID
-        # so that we don't go through all previous age ranges
-        # every time
+        # so that we don't go through all previous age ranges every time
         disallowed_users = disallowed_users or set()
         disallowed_users.add(user_id)
 
@@ -58,11 +57,7 @@ class FetchUserService:
         logger.info(f"Got filter params {filter_params}, "
                     f"previous cache {cached_user_ids}")
 
-        # premium filtered by gender
-        # premium filtered by location(whole country/my city)
-        # Russia, SPB, 25+-2,3,4, ALL
-
-        # age->(index,user_list)
+        # age->(index, user_list)
         online_users_pool = {}
 
         result = set()

@@ -44,6 +44,7 @@ class CloudStorage:
 
     # TODO all sorts of error handling
     def upload_image(self, image_id: str, file_content: Union[IO, bytes]):
+        logger.info(f"Uploading image: {image_id}")
         self._client.put_object(
             Bucket=STORAGE_ACCOUNT_IMAGE_BUCKET, Key=image_id,
             Body=file_content)
@@ -57,12 +58,13 @@ class CloudStorage:
         )
 
     def delete_image(self, image_id: str):
-        logger.info(f"Deleting account image {image_id}")
+        logger.info(f"Deleting account image: {image_id}")
         # TODO any validations that objects were actually deleted?
         self._client.delete_object(
             Bucket=STORAGE_ACCOUNT_IMAGE_BUCKET, Key=image_id)
 
     def upload_chat_image(self, image_id: str, file_content: Union[IO, bytes]):
+        logger.info(f"Uploading chat image: {image_id}")
         self._client.put_object(
             Bucket=STORAGE_CHAT_IMAGE_BUCKET, Key=image_id,
             Body=file_content)
@@ -76,7 +78,7 @@ class CloudStorage:
         )
 
     def delete_chat_image(self, image_id: str):
-        logger.info(f"Deleting chat image {image_id}")
+        logger.info(f"Deleting chat image: {image_id}")
         # TODO any validations that objects were actually deleted?
         self._client.delete_object(
             Bucket=STORAGE_CHAT_IMAGE_BUCKET, Key=image_id)

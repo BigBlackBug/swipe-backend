@@ -156,6 +156,7 @@ class UserService:
             raise SwipeError(
                 "Either photo_id or image_content must be provided")
 
+        logger.info(f"Updating avatar of {user.id}")
         avatar_id = f'{uuid.uuid4()}.png'
 
         compressed_image = utils.compress_image(image_content)
@@ -175,6 +176,7 @@ class UserService:
         return photo_id
 
     def delete_photo(self, user_object: User, photo_id: str):
+        logger.info(f"Deleting photo {photo_id}")
         new_list = list(user_object.photos)
         index = new_list.index(photo_id)
         del new_list[index]
@@ -214,7 +216,7 @@ class UserService:
     def add_swipes(self, user_id: UUID, swipe_number: int) -> int:
         if swipe_number < 0:
             raise ValueError("swipe_number must be positive")
-        logger.info(f"Adding {swipe_number} swipes")
+        logger.info(f"Adding {swipe_number} swipes to {user_id}")
 
         new_swipes = self.db.execute(
             update(User).where(User.id == user_id).
@@ -289,6 +291,9 @@ class UserService:
     def add_call_feedback(
             self, target_user: User, feedback: CallFeedback) -> int:
         rating_diff = constants.CALL_FEEDBACK_RATING_DIFF
+        logger.info(f"Adding {rating_diff} rating to {target_user.id} "
+                    f"due to {feedback}")
+
         if feedback == CallFeedback.THUMBS_DOWN:
             new_rating = max(0, target_user.rating - rating_diff)
         else:
@@ -302,6 +307,8 @@ class UserService:
         if target_user.swipes < 1:
             raise SwipeError(f"{target_user.id} has 0 swipes left")
 
+        logger.info(f"Reducing swipe number of {target_user.id} "
+                    f"by {number_of_swipes}")
         target_user.swipes -= number_of_swipes
         self.db.commit()
         return target_user.swipes
@@ -319,12 +326,14 @@ class UserService:
         else:
             rating_diff = 0
 
+        logger.info(f"Adding {rating_diff} rating to {user_id}")
         new_rating = self.db.execute(
             update(User).where(User.id == user_id).
                 values(rating=(User.rating + rating_diff)).
                 returning(User.rating)).scalar_one()
         self.db.commit()
 
+        logger.info(f"{user_id} {new_rating = }")
         return new_rating
 
     def check_token(self, user_id: str, token: str):

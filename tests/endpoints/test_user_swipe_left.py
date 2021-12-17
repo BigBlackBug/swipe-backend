@@ -20,8 +20,8 @@ async def test_swipe_left_enough_swipes(
         mocker: MockerFixture,
         redis_blacklist: RedisBlacklistService,
         default_user_auth_headers: dict[str, str]):
-    requests_mock = \
-        mocker.patch('swipe.swipe_server.users.services.blacklist_service.requests')
+    mock_events = mocker.patch(
+        'swipe.swipe_server.users.services.blacklist_service.events')
     other_user = randomizer.generate_random_user()
     session.commit()
 
@@ -45,11 +45,8 @@ async def test_swipe_left_enough_swipes(
         await redis_blacklist.get_blacklist(default_user_id) == {other_user_id}
     assert \
         await redis_blacklist.get_blacklist(other_user_id) == {default_user_id}
-    url = f'{settings.CHAT_SERVER_HOST}/events/blacklist'
-    requests_mock.post.assert_called_with(url, json={
-        'blocked_by_id': default_user_id,
-        'blocked_user_id': other_user_id
-    })
+    mock_events.send_blacklist_event.assert_called_with(
+        default_user_id, other_user_id)
 
 
 @pytest.mark.anyio

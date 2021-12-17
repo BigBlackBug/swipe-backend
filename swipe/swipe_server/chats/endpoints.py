@@ -32,11 +32,13 @@ async def fetch_global_chat(
         chat_service: ChatService = Depends(),
         user_service: UserService = Depends(),
         user_id: UUID = Depends(security.auth_user_id)):
-    chats: list[GlobalChatMessage] = \
+    messages: list[GlobalChatMessage] = \
         chat_service.fetch_global_chat(last_message_id)
     users: list[Row] = \
-        user_service.get_global_chat_preview([chat.sender_id for chat in chats])
-    return GlobalChatOut.parse_chats(chats, users)
+        user_service.get_global_chat_preview([
+            message.sender_id for message in messages
+        ])
+    return GlobalChatOut.parse_chats(messages, users)
 
 
 @router.get(
@@ -79,6 +81,8 @@ async def fetch_chats(
     # user needs to know the list of all chats in case some were deleted
     # while he's offline
     chat_ids: list[UUID] = chat_service.fetch_chat_ids(user_id)
+
+    logger.info(f"Got {len(chats)} chats, total chats {len(chat_ids)}")
     resp_data: MultipleChatsOut = \
         await MultipleChatsOut.parse_chats(chats, chat_ids, users, user_id)
     return resp_data

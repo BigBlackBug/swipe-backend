@@ -1,5 +1,7 @@
 import logging.config
 
+from asgi_correlation_id import correlation_id_filter
+
 from swipe.settings import settings
 
 
@@ -26,12 +28,14 @@ LOGGING_CONFIG: dict = {
     "disable_existing_loggers": False,
     "formatters": {
         "default": {
-            "format": "[%(asctime)s] [%(levelname)s] [%(processName)s] | "
+            "format": "[%(asctime)s] [%(levelname)s] [%(processName)s] "
+                      "[%(correlation_id)s] | "
                       "%(pathname)s@%(lineno)d | %(message)s"
         },
         "access": {
             "()": "uvicorn.logging.AccessFormatter",
             "fmt": '[%(asctime)s] [%(levelname)s] [%(processName)s] | '
+                   '[%(correlation_id)s] | '
                    '%(name)s | %(client_addr)s - '
                    '"%(request_line)s" %(status_code)s',
         },
@@ -41,12 +45,13 @@ LOGGING_CONFIG: dict = {
             "formatter": "default",
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stdout",
-            "filters": ['special', ]
+            "filters": ['special', 'correlation_id']
         },
         "access": {
             "formatter": "access",
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stderr",
+            "filters": ['correlation_id', ]
         },
         "null": {
             "class": "logging.NullHandler"
@@ -54,8 +59,11 @@ LOGGING_CONFIG: dict = {
     },
     'filters': {
         'special': {
-            '()': 'swipe.config.PackagePathFilter'
-        }
+            '()': PackagePathFilter
+        },
+        'correlation_id': {
+            '()': correlation_id_filter(uuid_length=6)
+        },
     },
     "loggers": {
         "botocore": {
@@ -78,16 +86,18 @@ LOGGING_CONFIG: dict = {
         "sqlalchemy.engine": {
             "handlers": ["null", ],
             "propagate": False,
+            "filters": ['correlation_id', ]
         },
         "websockets": {
             "handlers": ["default", ],
             "propagate": False,
-            "filters": ['special', ]
+            "filters": ['special', 'correlation_id', ]
         },
         # "uvicorn.error": {"handlers": ["default"], "level": "INFO"},
         "uvicorn.access": {
             "handlers": ["access", ],
-            "propagate": False
+            "propagate": False,
+            "filters": ['correlation_id', ]
         },
 
         "root": {

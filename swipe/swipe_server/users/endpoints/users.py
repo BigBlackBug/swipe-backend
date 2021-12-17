@@ -2,24 +2,23 @@ import functools
 import logging
 from uuid import UUID
 
-import requests
 from aioredis import Redis
 from fastapi import Depends, Body, APIRouter, HTTPException
 from starlette import status
 from starlette.responses import Response, RedirectResponse
 
-from swipe.settings import settings
+from swipe.swipe_server import events
 from swipe.swipe_server.misc import security, dependencies
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.schemas import UserCardPreviewOut, \
     OnlineFilterBody, UserOut, PopularFilterBody, CallFeedback
+from swipe.swipe_server.users.services.blacklist_service import BlacklistService
 from swipe.swipe_server.users.services.fetch_service import FetchUserService
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
 from swipe.swipe_server.users.services.redis_services import \
     RedisPopularService, RedisBlacklistService, RedisChatCacheService
-from swipe.swipe_server.users.services.blacklist_service import BlacklistService
 from swipe.swipe_server.users.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
@@ -43,7 +42,8 @@ async def fetch_list_of_popular_users(
     If the size of the returned list is smaller than limit, it means
     there are no more users and further requests make no sense
     """
-    logger.info(f"Fetching popular users with {filter_params}")
+    logger.info(f"Fetching popular users for {current_user_id} "
+                f"with {filter_params}")
     popular_users: list[str] = \
         await redis_popular.get_popular_user_ids(filter_params)
     try:
@@ -53,7 +53,7 @@ async def fetch_list_of_popular_users(
         pass
 
     # TODO I might benefit from a heap insertion
-    logger.info(f"Got {len(popular_users)} popular users for {filter_params}")
+    logger.info(f"Got {len(popular_users)} popular users from cache")
     users_data: list[str] = \
         await redis_popular.get_user_card_previews(popular_users)
     collected_users = [
@@ -61,8 +61,7 @@ async def fetch_list_of_popular_users(
         for user_data in users_data if user_data is not None
     ]
 
-    logger.info(f"Got {len(collected_users)} popular users card "
-                f"previews for {filter_params}")
+    logger.info(f"Got {len(collected_users)} popular users card previews")
     # TODO don't need to sort that? check why the fuck popular users
     # are not inserted to the cache in the correct order in the first place
     collected_users = sorted(collected_users,
@@ -184,15 +183,9 @@ async def call_feedback(
 
     new_rating = user_service.add_call_feedback(target_user, feedback)
 
-    logger.info(f"Calling chat server to send rating_changed event"
-                f"user_id: {user_id}")
-
-    url = f'{settings.CHAT_SERVER_HOST}/events/rating_changed'
-    requests.post(url, json={
-        'user_id': str(user_id),
-        'sender_id': str(current_user_id),
-        'rating': new_rating
-    })
+    events.send_rating_changed_event(
+        target_user_id=str(user_id), rating=new_rating,
+        sender_id=str(current_user_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

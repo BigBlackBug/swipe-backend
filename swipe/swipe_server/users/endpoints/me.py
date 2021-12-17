@@ -2,13 +2,12 @@ import logging
 import re
 from uuid import UUID
 
-import requests
 from fastapi import Depends, Body, HTTPException, UploadFile, File, APIRouter
 from starlette import status
 from starlette.background import BackgroundTasks
 from starlette.responses import Response
 
-from swipe.settings import settings
+from swipe.swipe_server import events
 from swipe.swipe_server.chats.models import Chat
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc import security
@@ -17,10 +16,10 @@ from swipe.swipe_server.users.models import User, Location
 from swipe.swipe_server.users.schemas import RatingUpdateReason
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
+from swipe.swipe_server.users.services.popular_cache import PopularUserService
 from swipe.swipe_server.users.services.redis_services import \
     RedisLocationService, \
     RedisBlacklistService
-from swipe.swipe_server.users.services.popular_cache import PopularUserService
 from swipe.swipe_server.users.services.user_service import UserService
 
 IMAGE_CONTENT_TYPE_REGEXP = 'image/(png|jpe?g)'
@@ -60,6 +59,8 @@ async def add_rating(
         user_id: UUID = Depends(security.auth_user_id)):
     new_rating: int = user_service.add_rating(user_id, reason)
 
+    events.send_rating_changed_event(
+        target_user_id=str(user_id), rating=new_rating)
     return {
         'rating': new_rating
     }
@@ -87,14 +88,18 @@ async def patch_user(
         if previous_location and not \
                 (previous_location.city == user_body.location.city and
                  previous_location.country == user_body.location.country):
+            logger.info(f"{user_id} location has changed, "
+                        f"updating popular and online caches")
             background_tasks.add_task(
                 swipe_bg_tasks.update_location_caches, current_user,
                 previous_location)
         elif not previous_location:
+            logger.info(f"{user_id} set his location, updating country cache")
             await redis_location.add_cities(
                 user_body.location.country, [user_body.location.city])
     else:
         # a regular update
+        logger.info(f"Updating online user cache for {user_id}")
         background_tasks.add_task(
             swipe_bg_tasks.update_user_cache, current_user)
 
@@ -118,8 +123,9 @@ async def delete_user(
     if current_user.location:
         await redis_online.remove_from_online_caches(current_user)
 
-    await redis_blacklist.drop_blacklist_cache(str(current_user.id))
+    await redis_blacklist.drop_blacklist_cache(str(user_id))
 
+    logger.info("Updating popular caches")
     # repopulating popular caches
     await popular_service.populate_cache(
         country=current_user.location.country,
@@ -139,9 +145,10 @@ async def delete_user(
         gender=current_user.gender)
     await popular_service.populate_cache()
 
+    logger.info(f"Deleting chats of {user_id}")
     recipients = []
     # fetching only id and user ids
-    chats: list[Chat] = chat_service.fetch_chat_members(current_user.id)
+    chats: list[Chat] = chat_service.fetch_chat_members(user_id)
     for chat in chats:
         if user_id == chat.initiator_id:
             recipients.append(str(chat.the_other_person_id))
@@ -150,27 +157,19 @@ async def delete_user(
         # not relying on cascades because we need to delete images manually
         chat_service.delete_chat(chat.id)
 
-    url = f'{settings.CHAT_SERVER_HOST}/events/user_deleted'
     # if the user has no messages in global chat, send event only
     # to his chat partners
-    if chat_service.has_global_chat_messages(current_user.id):
+    if chat_service.has_global_chat_messages(user_id):
         # they are cascaded but let's do this manually for clarity
-        chat_service.delete_global_chat_messages(current_user.id)
-
-        logger.info(f"{current_user.id} has global messages, "
+        chat_service.delete_global_chat_messages(user_id)
+        logger.info(f"{user_id} has global messages, "
                     f"everyone will be notified")
-        requests.post(url, json={
-            'user_id': str(user_id),
-        })
+        events.send_user_deleted_event(str(user_id))
     elif recipients:
         logger.debug(
-            f"{current_user.id} has no global messages, "
+            f"{user_id} has no global messages, "
             f"only chat partners {recipients} will be notified")
-        # we gotta notify every chat participant that the user is gone
-        requests.post(url, json={
-            'user_id': str(user_id),
-            'recipients': recipients
-        })
+        events.send_user_deleted_event(str(user_id), recipients)
 
     user_service.delete_user(current_user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -225,7 +224,6 @@ async def delete_photo(
         user_id: UUID = Depends(security.auth_user_id)):
     current_user = user_service.get_user(user_id)
     try:
-        logger.info(f"Deleting photo {photo_id}")
         user_service.delete_photo(current_user, photo_id)
     except ValueError:
         raise HTTPException(status_code=404, detail='Photo not found')

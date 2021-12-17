@@ -63,4 +63,5 @@ async def auth_user_id(user_service: UserService = Depends(),
 
         await redis_online.save_online_user_token(token_payload.user_id, token)
 
+    logger.info(f"{token_payload.user_id} successfully authorized")
     return UUID(hex=token_payload.user_id)
