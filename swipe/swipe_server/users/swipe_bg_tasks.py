@@ -6,7 +6,7 @@ from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
 from swipe.swipe_server.users.services.redis_services import \
     RedisLocationService
-from swipe.swipe_server.users.services.services import PopularUserService
+from swipe.swipe_server.users.services.popular_cache import PopularUserService
 
 logger = logging.getLogger(__name__)
 

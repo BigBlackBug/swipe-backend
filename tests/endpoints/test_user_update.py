@@ -18,7 +18,7 @@ from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
 from swipe.swipe_server.users.services.redis_services import \
     RedisLocationService, RedisPopularService
-from swipe.swipe_server.users.services.services import UserService
+from swipe.swipe_server.users.services.user_service import UserService
 
 
 @pytest.mark.anyio
@@ -91,9 +91,9 @@ async def test_user_update_photo_list(
     old_avatar_id = default_user.avatar_id
     mock_storage: MagicMock = \
         mocker.patch('swipe.swipe_server.users.services.'
-                     'services.storage_client')
+                     'user_service.storage_client')
     update_avatar_mock = MagicMock()
-    mocker.patch('swipe.swipe_server.users.services.services.'
+    mocker.patch('swipe.swipe_server.users.services.user_service.'
                  'UserService._update_avatar',
                  update_avatar_mock)
     # patch
@@ -121,12 +121,12 @@ async def test_user_add_first_photo(
     session.commit()
 
     update_avatar_mock = MagicMock()
-    mocker.patch('swipe.swipe_server.users.services.services.'
+    mocker.patch('swipe.swipe_server.users.services.user_service.'
                  'UserService._update_avatar',
                  update_avatar_mock)
     mock_storage: MagicMock = \
         mocker.patch(
-            'swipe.swipe_server.users.services.services.storage_client')
+            'swipe.swipe_server.users.services.user_service.storage_client')
 
     image_data = io.BytesIO()
     random_image.save(image_data, format='png')
@@ -157,11 +157,11 @@ async def test_user_delete_photo(
     session.commit()
 
     update_avatar_mock = MagicMock()
-    mocker.patch('swipe.swipe_server.users.services.services.'
+    mocker.patch('swipe.swipe_server.users.services.user_service.'
                  'UserService._update_avatar',
                  update_avatar_mock)
     mock_storage: MagicMock = mocker.patch(
-        'swipe.swipe_server.users.services.services.storage_client')
+        'swipe.swipe_server.users.services.user_service.storage_client')
 
     image_data = io.BytesIO()
     random_image.save(image_data, format='png')

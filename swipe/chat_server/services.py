@@ -16,8 +16,8 @@ from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.users.services.redis_services import \
     RedisChatCacheService
-from swipe.swipe_server.users.services.services import UserService, \
-    BlacklistService
+from swipe.swipe_server.users.services.blacklist_service import BlacklistService
+from swipe.swipe_server.users.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
 

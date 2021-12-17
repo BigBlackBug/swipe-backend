@@ -15,8 +15,8 @@ from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService, OnlineUserCacheParams
 from swipe.swipe_server.users.services.redis_services import \
     RedisLocationService, RedisPopularService
-from swipe.swipe_server.users.services.services import UserService, \
-    PopularUserService
+from swipe.swipe_server.users.services.popular_cache import PopularUserService
+from swipe.swipe_server.users.services.user_service import UserService
 
 
 @pytest.mark.anyio

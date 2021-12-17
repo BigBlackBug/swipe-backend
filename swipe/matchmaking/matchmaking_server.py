@@ -26,9 +26,9 @@ from swipe.swipe_server.users.services.online_cache import \
     RedisMatchmakingOnlineUserService
 from swipe.swipe_server.users.services.redis_services import \
     RedisChatCacheService, RedisBlacklistService
-from swipe.swipe_server.users.services.services import BlacklistService, \
-    UserService
-from swipe.websockets import MMUserData, ConnectedUser, WSConnectionManager
+from swipe.swipe_server.users.services.blacklist_service import BlacklistService
+from swipe.swipe_server.users.services.user_service import UserService
+from swipe.ws_connection import MMUserData, ConnectedUser, WSConnectionManager
 
 logger = logging.getLogger(__name__)
 

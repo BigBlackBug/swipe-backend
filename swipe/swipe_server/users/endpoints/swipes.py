@@ -10,7 +10,7 @@ from swipe.settings import constants
 from swipe.swipe_server.misc import security
 from swipe.swipe_server.users.services.redis_services import \
     RedisSwipeReaperService
-from swipe.swipe_server.users.services.services import UserService
+from swipe.swipe_server.users.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
 

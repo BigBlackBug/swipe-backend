@@ -31,8 +31,8 @@ from swipe.swipe_server.users.services.online_cache import \
 from swipe.swipe_server.users.services.redis_services import \
     RedisBlacklistService, RedisChatCacheService, \
     RedisFirebaseService, RedisUserFetchService
-from swipe.swipe_server.users.services.services import UserService
-from swipe.websockets import ChatUserData, ConnectedUser, WSConnectionManager
+from swipe.swipe_server.users.services.user_service import UserService
+from swipe.ws_connection import ChatUserData, ConnectedUser, WSConnectionManager
 
 logger = logging.getLogger(__name__)
 

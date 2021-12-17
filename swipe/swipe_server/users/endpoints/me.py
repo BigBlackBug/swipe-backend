@@ -20,8 +20,8 @@ from swipe.swipe_server.users.services.online_cache import \
 from swipe.swipe_server.users.services.redis_services import \
     RedisLocationService, \
     RedisBlacklistService
-from swipe.swipe_server.users.services.services import UserService, \
-    PopularUserService
+from swipe.swipe_server.users.services.popular_cache import PopularUserService
+from swipe.swipe_server.users.services.user_service import UserService
 
 IMAGE_CONTENT_TYPE_REGEXP = 'image/(png|jpe?g)'
 

@@ -15,7 +15,7 @@ from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
 from swipe.swipe_server.users.services.redis_services import \
     RedisSwipeReaperService
-from swipe.swipe_server.users.services.services import UserService
+from swipe.swipe_server.users.services.user_service import UserService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

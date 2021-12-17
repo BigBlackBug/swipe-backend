@@ -22,9 +22,9 @@ from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
 from swipe.swipe_server.users.services.redis_services import \
     RedisBlacklistService
-from swipe.swipe_server.users.services.services import UserService, \
-    BlacklistService, \
-    PopularUserService, CountryCacheService
+from swipe.swipe_server.users.services.popular_cache import PopularUserService, CountryCacheService
+from swipe.swipe_server.users.services.blacklist_service import BlacklistService
+from swipe.swipe_server.users.services.user_service import UserService
 
 
 @pytest.mark.anyio

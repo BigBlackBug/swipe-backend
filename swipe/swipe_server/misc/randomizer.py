@@ -23,7 +23,7 @@ from swipe.swipe_server.users.enums import AuthProvider, ZodiacSign, Gender, \
     RecurrenceRate, NotificationTypes
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.schemas import AuthenticationIn
-from swipe.swipe_server.users.services.services import UserService
+from swipe.swipe_server.users.services.user_service import UserService
 
 AVATAR_WIDTH = 640
 AVATAR_HEIGHT = 1024

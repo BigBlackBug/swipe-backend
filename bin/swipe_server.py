@@ -15,7 +15,7 @@ import logging
 import alembic.command
 import alembic.config
 from fastapi_utils.tasks import repeat_every
-from swipe.swipe_server.users.services.services import CountryCacheService, \
+from swipe.swipe_server.users.services.popular_cache import CountryCacheService, \
     PopularUserService
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.services.redis_services import RedisUserFetchService

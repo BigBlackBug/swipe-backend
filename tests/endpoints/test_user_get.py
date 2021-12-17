@@ -10,7 +10,7 @@ from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
-from swipe.swipe_server.users.services.services import UserService
+from swipe.swipe_server.users.services.user_service import UserService
 
 
 @pytest.mark.anyio

@@ -28,8 +28,8 @@ from swipe.swipe_server.users.services.online_cache import \
 from swipe.swipe_server.users.services.redis_services import \
     RedisLocationService, RedisBlacklistService, RedisPopularService, \
     RedisSwipeReaperService, RedisUserFetchService, RedisChatCacheService
-from swipe.swipe_server.users.services.services import UserService, \
-    BlacklistService
+from swipe.swipe_server.users.services.blacklist_service import BlacklistService
+from swipe.swipe_server.users.services.user_service import UserService
 
 config.configure_logging()
 logger = logging.getLogger(__name__)

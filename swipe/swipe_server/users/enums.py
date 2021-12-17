@@ -4,6 +4,7 @@ import enum
 from datetime import datetime
 from typing import Tuple, Union, Type
 
+
 class UserInterests(str, enum.Enum):
     WORK = 'work'
     FRIENDSHIP = 'friendship'

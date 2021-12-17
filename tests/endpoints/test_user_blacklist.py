@@ -7,7 +7,8 @@ from swipe.settings import settings
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
 from swipe.swipe_server.users.services.redis_services import RedisBlacklistService
-from swipe.swipe_server.users.services.services import UserService, BlacklistService
+from swipe.swipe_server.users.services.blacklist_service import BlacklistService
+from swipe.swipe_server.users.services.user_service import UserService
 
 
 @pytest.mark.anyio
@@ -25,11 +26,11 @@ async def test_add_to_blacklist(
     user_1 = randomizer.generate_random_user()
     user_2 = randomizer.generate_random_user()
     user_3 = randomizer.generate_random_user()
-    user_4 = randomizer.generate_random_user()
     session.commit()
 
     requests_mock = \
-        mocker.patch('swipe.swipe_server.users.services.services.requests')
+        mocker.patch('swipe.swipe_server.users.'
+                     'services.blacklist_service.requests')
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/{user_1.id}/block",
         headers=default_user_auth_headers

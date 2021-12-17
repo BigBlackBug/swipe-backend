@@ -4,16 +4,14 @@ import uuid
 from typing import Optional
 from uuid import UUID
 
-import aioredis
 import requests
 from dateutil.relativedelta import relativedelta
 from fastapi import Depends
 from jose import jwt
 from jose.constants import ALGORITHMS
-from sqlalchemy import select, delete, func, desc, String, cast, insert, update
+from sqlalchemy import select, cast, String, update, delete, func, desc
 from sqlalchemy.engine import Row
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, Bundle, Load, joinedload
+from sqlalchemy.orm import Session, Load, joinedload, Bundle
 
 from swipe.settings import settings, constants
 from swipe.swipe_server import utils
@@ -22,13 +20,9 @@ from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users import schemas
 from swipe.swipe_server.users.enums import Gender
-from swipe.swipe_server.users.models import IDList, User, AuthInfo, Location, \
+from swipe.swipe_server.users.models import User, AuthInfo, Location, IDList, \
     blacklist_table
-from swipe.swipe_server.users.schemas import CallFeedback, \
-    RatingUpdateReason
-from swipe.swipe_server.users.services.redis_services import \
-    RedisBlacklistService, \
-    RedisPopularService, RedisLocationService
+from swipe.swipe_server.users.schemas import CallFeedback, RatingUpdateReason
 from swipe.swipe_server.utils import enable_blacklist
 
 logger = logging.getLogger(__name__)
@@ -346,102 +340,4 @@ class UserService:
         return self.db.query(User). \
             where(User.id == user_id). \
             options(Load(User).load_only('gender', 'date_of_birth')
-        ).one_or_none()
-
-
-class PopularUserService:
-    def __init__(self, db: Session = Depends(dependencies.db),
-                 redis: aioredis.Redis = Depends(dependencies.redis)):
-        self.user_service = UserService(db)
-        self.redis_popular = RedisPopularService(redis)
-        self.redis_locations = RedisLocationService(redis)
-
-    async def populate_cache(self, country: Optional[str] = None,
-                             city: Optional[str] = None,
-                             gender: Optional[Gender] = None):
-        users: list[User] = self.user_service.fetch_popular(
-            country=country, city=city, gender=gender)
-        logger.info(
-            f"Got {len(users)} popular users from db for: "
-            f"country:{country or 'ALL'}, city:{city or 'ALL'}, "
-            f"gender:{gender or 'ALL'}")
-        await self.redis_popular.save_popular_users(
-            country=country, city=city, gender=gender, users=users)
-
-    async def populate_popular_cache(self):
-        logger.info("Populating popular cache")
-        locations = self.redis_locations.fetch_locations()
-
-        # global popular cache
-        logger.info("Populating global cache")
-        await self.populate_cache(gender=Gender.MALE)
-        await self.populate_cache(gender=Gender.FEMALE)
-        await self.populate_cache()
-
-        async for country, cities in locations:
-            logger.info(f"Populating cache for country: '{country}'")
-            await self.populate_cache(country=country, gender=Gender.MALE)
-            await self.populate_cache(country=country, gender=Gender.FEMALE)
-            await self.populate_cache(country=country)
-
-            logger.info(f"Populating cities cache for '{country}', "
-                        f"cities: '{cities}'")
-            for city in cities:
-                await self.populate_cache(
-                    country=country, city=city, gender=Gender.MALE)
-                await self.populate_cache(
-                    country=country, city=city, gender=Gender.FEMALE)
-                await self.populate_cache(country=country, city=city)
-
-
-class CountryCacheService:
-    def __init__(self, db: Session, redis: aioredis.Redis):
-        self.user_service = UserService(db)
-        self.redis_popular = RedisPopularService(redis)
-        self.redis_locations = RedisLocationService(redis)
-
-    async def populate_country_cache(self):
-        locations: dict[str, list[str]] = self.user_service.fetch_locations()
-
-        logger.info("Dropping country cache")
-        await self.redis_locations.drop_country_cache()
-
-        logger.info(
-            f"Populating location cache with locations: {locations}")
-        for country, cities in locations.items():
-            logger.info(f"Saving {cities} to {country}")
-            await self.redis_locations.add_cities(country, cities)
-
-
-class BlacklistService:
-    def __init__(self, db: Session = Depends(dependencies.db),
-                 redis: aioredis.Redis = Depends(dependencies.redis)):
-        self.db = db
-        self.redis_blacklist = RedisBlacklistService(redis)
-
-    @enable_blacklist()
-    async def update_blacklist(
-            self, blocked_by_id: str, blocked_user_id: str,
-            send_blacklist_event: bool = False):
-        logger.info(f"{blocked_by_id} blocked {blocked_user_id}, updating db")
-        try:
-            self.db.execute(insert(blacklist_table).values(
-                blocked_user_id=blocked_user_id,
-                blocked_by_id=blocked_by_id))
-            self.db.commit()
-        except IntegrityError:
-            raise SwipeError(f"{blocked_user_id} is "
-                             f"already blocked by {blocked_by_id}")
-
-        await self.redis_blacklist.add_to_blacklist_cache(
-            blocked_by_id, blocked_user_id)
-
-        if send_blacklist_event:
-            logger.info(f"Calling chat server to send blacklisted event"
-                        f"{blocked_by_id} blocked {blocked_user_id}")
-            # sending 'add to blacklist' event to blocked_user_id
-            url = f'{settings.CHAT_SERVER_HOST}/events/blacklist'
-            requests.post(url, json={
-                'blocked_by_id': blocked_by_id,
-                'blocked_user_id': blocked_user_id
-            })
+                    ).one_or_none()

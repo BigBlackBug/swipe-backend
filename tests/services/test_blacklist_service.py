@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
 from swipe.swipe_server.users.services.redis_services import RedisBlacklistService
-from swipe.swipe_server.users.services.services import UserService, BlacklistService
+from swipe.swipe_server.users.services.blacklist_service import BlacklistService
+from swipe.swipe_server.users.services.user_service import UserService
 
 
 @pytest.mark.anyio

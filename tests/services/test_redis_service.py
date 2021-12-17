@@ -8,9 +8,9 @@ from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.schemas import PopularFilterBody, UserUpdate, \
     LocationSchema
 from swipe.swipe_server.users.services.redis_services import RedisPopularService
-from swipe.swipe_server.users.services.services import UserService, \
-    CountryCacheService, \
+from swipe.swipe_server.users.services.popular_cache import CountryCacheService, \
     PopularUserService
+from swipe.swipe_server.users.services.user_service import UserService
 
 
 @pytest.mark.anyio
