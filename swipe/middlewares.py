@@ -90,7 +90,11 @@ class CorrelationIdMiddleware:
 class RouteLoggerMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        logger.info(f"{request.method} {request.url.path} "
-                    f"{request.path_params}, "
-                    f"{request.query_params}")
-        return await call_next(request)
+        logger.info(f"{request.client.host}:{request.client.port} - "
+                    f"{request.method} {request.url.path} "
+                    f"{request.path_params} {request.query_params}")
+        response = await call_next(request)
+        logger.info(f"{request.client.host}:{request.client.port} - "
+                    f"{request.method} {request.url.path} "
+                    f"{response.status_code}")
+        return response
