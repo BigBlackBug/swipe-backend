@@ -207,6 +207,7 @@ class RedisChatCacheService:
 
 
 FETCH_REQUEST_KEY = 'fetch_request'
+FETCH_AGE_DIFF_KEY = 'fetch_request_age_diff'
 
 
 @dataclass
@@ -216,6 +217,9 @@ class UserFetchCacheKey:
 
     def cache_key(self):
         return f'{FETCH_REQUEST_KEY}:{self.user_id}:{self.session_id}'
+
+    def cache_age_diff_key(self):
+        return f'{FETCH_AGE_DIFF_KEY}:{self.user_id}:{self.session_id}'
 
     def key_user_wildcard(self):
         return f'{FETCH_REQUEST_KEY}:{self.user_id}:*'
@@ -237,6 +241,23 @@ class RedisUserFetchService:
             return await self.redis.smembers(cache_settings.cache_key())
 
         return set()
+
+    async def get_cached_age_difference(
+            self, cache_settings: UserFetchCacheKey) -> int:
+        cached_age_diff = await self.redis.get(
+            cache_settings.cache_age_diff_key())
+        return int(cached_age_diff) if cached_age_diff else \
+            settings.USER_FETCH_DEFAULT_AGE_DIFF
+
+    async def save_age_difference_cache(
+            self, cache_settings: UserFetchCacheKey, age_difference: int):
+        logger.debug(f"Saving age difference {age_difference}"
+                     f"for {cache_settings.user_id}")
+        await self.redis.set(
+            cache_settings.cache_age_diff_key(), age_difference)
+        # failsafe
+        await self.redis.expire(
+            cache_settings.cache_key(), settings.ONLINE_USER_RESPONSE_CACHE_TTL)
 
     async def drop_obsolete_caches(
             self, cache_settings: UserFetchCacheKey):
@@ -267,9 +288,17 @@ class RedisUserFetchService:
         for key in await self.redis.keys(f'{FETCH_REQUEST_KEY}:{user_id}:*'):
             await self.redis.delete(key)
 
+        logger.info(f"Dropping fetch response age diff cache for {user_id}")
+        for key in await self.redis.keys(f'{FETCH_AGE_DIFF_KEY}:{user_id}:*'):
+            await self.redis.delete(key)
+
     async def drop_all_response_caches(self):
         logger.info(f"Dropping all fetch response caches")
         for key in await self.redis.keys(f'{FETCH_REQUEST_KEY}:*'):
+            await self.redis.delete(key)
+
+        logger.info(f"Dropping fetch response age diff caches")
+        for key in await self.redis.keys(f'{FETCH_AGE_DIFF_KEY}:*'):
             await self.redis.delete(key)
 
 

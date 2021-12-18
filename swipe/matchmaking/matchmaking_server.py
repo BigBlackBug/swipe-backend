@@ -334,7 +334,7 @@ async def fetch_user_ids_for_matchmaking(
         filter_params=OnlineFilterBody(
             session_id=session_id,
             gender=gender_filter,
-            limit=100
+            limit=settings.MATCHMAKING_FETCH_LIMIT
         ),
         disallowed_users=disallowed_users)
 

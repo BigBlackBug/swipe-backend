@@ -53,23 +53,26 @@ class FetchUserService:
         cached_user_ids: set[str] = \
             await self.redis_fetch.get_response_cache(fetch_cache_params)
 
-        age_difference = settings.ONLINE_USER_DEFAULT_AGE_DIFF
-
-        logger.info(f"Got filter params {filter_params}, "
-                    f"previous cache {cached_user_ids}")
-
+        age_difference = \
+            await self.redis_fetch.get_cached_age_difference(
+                fetch_cache_params)
+        logger.debug(f"Cached age difference {age_difference}")
         # age->(index, user_list)
         online_users_pool = {}
 
         result = set()
         while len(result) < filter_params.limit \
-                and age_difference <= settings.ONLINE_USER_MAX_AGE_DIFF:
+                and age_difference <= settings.USER_FETCH_MAX_AGE_DIFF:
             shift = -1
             # we're going age+0,-1,1,-2,2 etc
             sorted_age_range = [user_age]
             logger.debug(f"Current age {user_age}, diff {age_difference}")
             while len(sorted_age_range) < age_difference * 2 + 1:
-                sorted_age_range.append(user_age + shift)
+                # less than user_age so we're checking it here
+                potential_age = user_age + shift
+                if potential_age >= settings.USER_FETCH_MINIMUM_AGE:
+                    sorted_age_range.append(potential_age)
+
                 sorted_age_range.append(user_age - shift)
                 shift = - (abs(shift) + 1)
             logger.debug(f"Checking age range {sorted_age_range}")
@@ -109,16 +112,16 @@ class FetchUserService:
                     break
             else:
                 # online users depleted, extend age_diff and try again
-                age_difference += settings.ONLINE_USER_AGE_DIFF_STEP
+                age_difference += settings.USER_FETCH_AGE_DIFF_STEP
                 logger.debug(
                     f"Online users depleted for range {sorted_age_range}, "
                     f"increasing age_difference to {age_difference}")
                 continue
 
         # got enough users or max age diff reached
-        logger.info(f"Adding {result} to user request cache "
-                    f"for {fetch_cache_params.cache_key()}")
-        # adding currently returned users to cache
         await self.redis_fetch.add_to_response_cache(
             fetch_cache_params, result)
+
+        await self.redis_fetch.save_age_difference_cache(
+            fetch_cache_params, age_difference)
         return result

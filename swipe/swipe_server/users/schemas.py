@@ -99,7 +99,7 @@ class UserCardPreviewOut(BaseModel):
                 datetime.datetime.utcnow(), user.last_online).minutes % 10
         else:
             # online users come first
-            key = 100_000_000
+            key = 1_000_000_000
         key -= 1000 * abs(current_user_dob - user.date_of_birth).days
         return key
 

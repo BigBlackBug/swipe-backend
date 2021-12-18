@@ -213,24 +213,27 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
             # dude's been gone for too long
             online_time_diff = (int(time.time()) - user_data['last_online'])
             if online_time_diff > recently_online_ttl:
+                user_id = str(key).split(":")[1]
+
+                logger.debug(f"Removing {user_id} from recently online users")
                 # removing this dude from the recently_online list
                 await self.redis.delete(key)
 
                 cache_params = OnlineUserCacheParams(
                     age=user_data['age'], country=user_data['country'],
                     city=user_data['city'], gender=user_data['gender'])
-                user_id = str(key).split(":")[1]
 
                 logger.info(f"Removing {user_id} from online caches")
-                # removing this dude from all online caches
                 for online_key in cache_params.online_keys():
                     logger.debug(f"Removing {user_id} from {online_key}")
                     await self.redis.srem(online_key, user_id)
 
     async def add_to_recently_online_cache(self, user: User):
+        user_id = str(user.id)
+
         last_online = datetime.utcnow()
         user_data = {
-            # I'm intentionally not using field value from user object
+            # I'm intentionally not using last_online field from user object
             'last_online': int(last_online.timestamp()),
             'age': user.age,
             'country': user.location.country,
@@ -239,14 +242,15 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
         }
         # user_data = zlib.compress(json.dumps(user_data).encode('utf-8'))
         await self.redis.set(
-            f'{self.RECENTLY_ONLINE_KEY}:{user.id}', json.dumps(user_data))
+            f'{self.RECENTLY_ONLINE_KEY}:{user_id}', json.dumps(user_data))
 
         # update last_online field here so that we could sort these entities
         # without touching the cache again
-        cached_user = await self.redis.get(f'{self.ONLINE_USER_KEY}:{user.id}')
+        logger.debug(f"Updating last_online field on online user {user_id}")
+        cached_user = await self.redis.get(f'{self.ONLINE_USER_KEY}:{user_id}')
         cached_user = json.loads(cached_user)
         cached_user['last_online'] = last_online.isoformat()
-        await self.redis.set(f'{self.ONLINE_USER_KEY}:{user.id}',
+        await self.redis.set(f'{self.ONLINE_USER_KEY}:{user_id}',
                              json.dumps(cached_user))
 
     async def remove_from_recently_online(self, user_id: str):

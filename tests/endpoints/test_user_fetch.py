@@ -10,6 +10,7 @@ from swipe.settings import settings
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import User
+from swipe.swipe_server.users.services import redis_services
 from swipe.swipe_server.users.services.redis_services import \
     RedisBlacklistService, RedisUserFetchService, UserFetchCacheKey
 from swipe.swipe_server.users.services.online_cache import \
@@ -81,11 +82,12 @@ async def test_user_fetch_basic_with_recently_online_check_sort(
     # we have a 10 minute step, so let's use 30 to be sure of the order
     session.commit()
 
+    session_id = str(uuid.uuid4())
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch",
         headers=default_user_auth_headers,
         json={
-            'session_id': str(uuid.uuid4()),
+            'session_id': session_id,
             'country': 'Russia',
             'limit': 10
         }
@@ -116,11 +118,17 @@ async def test_user_fetch_basic_with_recently_online_check_sort(
     assert not await fake_redis.exists(
         f'{redis_online.RECENTLY_ONLINE_KEY}:{user_4.id}')
 
+    # age diff updated
+    assert await fake_redis.exists(
+        f'{redis_services.FETCH_AGE_DIFF_KEY}:{default_user.id}:{session_id}')
+
+    # ----------------------------------------------------------------------
+    new_session_id = str(uuid.uuid4())
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch",
         headers=default_user_auth_headers,
         json={
-            'session_id': str(uuid.uuid4()),
+            'session_id': new_session_id,
             'country': 'Russia',
             'limit': 10
         }
@@ -131,6 +139,20 @@ async def test_user_fetch_basic_with_recently_online_check_sort(
     assert [user['id'] for user in resp_data] == \
            [str(user_1.id), str(user_2.id)]
 
+    # old age diff dropped
+    assert not await fake_redis.exists(
+        f'{redis_services.FETCH_AGE_DIFF_KEY}:{default_user.id}:{session_id}')
+    # old cache dropped
+    assert not await fake_redis.exists(
+        f'{redis_services.FETCH_REQUEST_KEY}:{default_user.id}:{session_id}')
+
+    # new age diff created
+    assert await fake_redis.exists(
+        f'{redis_services.FETCH_AGE_DIFF_KEY}:{default_user.id}:{new_session_id}')
+    # new fetch cache created
+    assert await fake_redis.exists(
+        f'{redis_services.FETCH_REQUEST_KEY}:{default_user.id}:{new_session_id}')
+
 
 @pytest.mark.anyio
 async def test_user_fetch_small_limit(
@@ -138,6 +160,7 @@ async def test_user_fetch_small_limit(
         default_user: User,
         randomizer: RandomEntityGenerator,
         session: Session,
+        fake_redis: aioredis.Redis,
         user_service: UserService,
         redis_online: RedisOnlineUserService,
         default_user_auth_headers: dict[str, str]):
@@ -164,12 +187,12 @@ async def test_user_fetch_small_limit(
     user_4.location.country = 'Russia'
     session.commit()
     # --------------------------------------------------------------------------
-
+    session_id = str(uuid.uuid4())
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch",
         headers=default_user_auth_headers,
         json={
-            'session_id': str(uuid.uuid4()),
+            'session_id': session_id,
             'country': 'Russia',
             'limit': 2,
         }
@@ -182,6 +205,12 @@ async def test_user_fetch_small_limit(
     assert [user['id'] for user in resp_data] == \
            [str(user_1.id), str(user_2.id)]
 
+    # request cached exist
+    assert await fake_redis.exists(
+        f'{redis_services.FETCH_REQUEST_KEY}:{default_user.id}:{session_id}')
+    assert await fake_redis.exists(
+        f'{redis_services.FETCH_AGE_DIFF_KEY}:{default_user.id}:{session_id}')
+
 
 @pytest.mark.anyio
 async def test_user_fetch_gender(
@@ -189,6 +218,7 @@ async def test_user_fetch_gender(
         default_user: User,
         randomizer: RandomEntityGenerator,
         redis_online: RedisOnlineUserService,
+        fake_redis: aioredis.Redis,
         user_service: UserService,
         session: Session,
         default_user_auth_headers: dict[str, str]):
@@ -227,13 +257,13 @@ async def test_user_fetch_gender(
     user_5.location.country = 'Russia'
     session.commit()
     # --------------------------------------------------------------------------
-
+    session_id = str(uuid.uuid4())
     # online+gender
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch",
         headers=default_user_auth_headers,
         json={
-            'session_id': str(uuid.uuid4()),
+            'session_id': session_id,
             'country': 'Russia',
             'gender': 'male'
         }
@@ -243,12 +273,19 @@ async def test_user_fetch_gender(
     resp_data = response.json()
     assert [user['id'] for user in resp_data] == [str(user_3.id)]
 
+    # fetch caches exist
+    assert await fake_redis.exists(
+        f'{redis_services.FETCH_REQUEST_KEY}:{default_user.id}:{session_id}')
+    assert await fake_redis.exists(
+        f'{redis_services.FETCH_AGE_DIFF_KEY}:{default_user.id}:{session_id}')
+
 
 @pytest.mark.anyio
 async def test_user_fetch_online_city_cached_requests_all_countries(
         client: AsyncClient,
         default_user: User,
         randomizer: RandomEntityGenerator,
+        fake_redis: aioredis.Redis,
         redis_fetch: RedisUserFetchService,
         redis_online: RedisOnlineUserService,
         user_service: UserService,
@@ -333,7 +370,8 @@ async def test_user_fetch_online_city_cached_requests_all_countries(
         json={
             'session_id': session_id,
             'country': 'Russia',
-            'city': 'Saint Petersburg'
+            'city': 'Saint Petersburg',
+            'limit': 3
         }
     )
     assert response.status_code == 200
@@ -347,8 +385,14 @@ async def test_user_fetch_online_city_cached_requests_all_countries(
                           user_id=str(default_user.id)))
     assert cached_response == {str(user_3.id), str(user_4.id), str(user_44.id)}
 
-    # -------------------fetching with a new user----------------------
+    # fetch caches exist
+    assert await fake_redis.exists(
+        f'{redis_services.FETCH_REQUEST_KEY}:{default_user.id}:{session_id}')
+    assert await fake_redis.exists(
+        f'{redis_services.FETCH_AGE_DIFF_KEY}:{default_user.id}:{session_id}')
 
+    # -------------------fetching with a new user----------------------
+    # if there was no limit
     await redis_online.add_to_online_caches(user_5)
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch",
@@ -400,6 +444,13 @@ async def test_user_fetch_online_city_cached_requests_all_countries(
                           user_id=str(default_user.id)))
     assert cached_response == {str(user_2.id)}
 
+    # old age diff dropped
+    assert not await fake_redis.exists(
+        f'{redis_services.FETCH_AGE_DIFF_KEY}:{default_user.id}:{session_id}')
+    # old cache dropped
+    assert not await fake_redis.exists(
+        f'{redis_services.FETCH_REQUEST_KEY}:{default_user.id}:{session_id}')
+
     # -------------------invalidating cache with new settings----------------
     # settings changed, sending invalidate cache
     # FETCHING EVERYONE
@@ -434,6 +485,13 @@ async def test_user_fetch_online_city_cached_requests_all_countries(
         str(user_3.id), str(user_4.id), str(user_44.id),
         str(user_5.id), str(user_6.id)
     }
+    # old age diff dropped
+    assert not await fake_redis.exists(
+        f'{redis_services.FETCH_AGE_DIFF_KEY}:{default_user.id}:{previous_session_id}')
+    # old cache dropped
+    assert not await fake_redis.exists(
+        f'{redis_services.FETCH_REQUEST_KEY}:{default_user.id}:{previous_session_id}')
+
 
 
 @pytest.mark.anyio
@@ -442,6 +500,7 @@ async def test_user_fetch_with_blacklist(
         default_user: User,
         randomizer: RandomEntityGenerator,
         session: Session,
+        fake_redis: aioredis.Redis,
         user_service: UserService,
         blacklist_service: BlacklistService,
         redis_online: RedisOnlineUserService,
@@ -503,11 +562,11 @@ async def test_user_fetch_with_blacklist(
     await redis_online.add_to_online_caches(user_5)
     session.commit()
     # --------------------------------------------------------------------------
-
+    session_id = str(uuid.uuid4())
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch",
         headers=default_user_auth_headers, json={
-            'session_id': str(uuid.uuid4()),
+            'session_id': session_id,
             'country': 'Russia'
         }
     )
@@ -516,6 +575,12 @@ async def test_user_fetch_with_blacklist(
     resp_data = response.json()
     assert {user['id'] for user in resp_data} == {str(user_4.id),
                                                   str(user_5.id)}
+    # new age diff created
+    assert await fake_redis.exists(
+        f'{redis_services.FETCH_AGE_DIFF_KEY}:{default_user.id}:{session_id}')
+    # new fetch cache created
+    assert await fake_redis.exists(
+        f'{redis_services.FETCH_REQUEST_KEY}:{default_user.id}:{session_id}')
 
 
 @pytest.mark.anyio

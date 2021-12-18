@@ -31,14 +31,14 @@ LOGGING_CONFIG: dict = {
     "disable_existing_loggers": False,
     "formatters": {
         "default": {
-            "format": "[%(asctime)s] [%(levelname)s] "
-                      "[%(correlation_id)s] | "
+            "format": "[%(asctime)s] [%(levelname)-5s] "
+                      "[%(correlation_id)-6s] | "
                       "%(pathname)s@%(lineno)d | %(message)s"
         },
         "access": {
             "()": "uvicorn.logging.AccessFormatter",
             "fmt": '[%(asctime)s] [%(levelname)s] '
-                   '[%(correlation_id)s] | '
+                   '[%(correlation_id)-6s] | '
                    '%(name)s | %(client_addr)s - '
                    '"%(request_line)s" %(status_code)s',
         },
