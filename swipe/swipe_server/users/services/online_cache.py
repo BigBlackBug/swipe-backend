@@ -181,6 +181,7 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
         )
         user_id = str(user.id)
         for key in cache_params.online_keys():
+            logger.debug(f"Adding {user_id} to {key}")
             await self.redis.sadd(key, user_id)
 
         await self.update_cached_user(user)
@@ -220,9 +221,10 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
                     city=user_data['city'], gender=user_data['gender'])
                 user_id = str(key).split(":")[1]
 
-                logger.debug(f"Removing {user_id} from online caches")
+                logger.info(f"Removing {user_id} from online caches")
                 # removing this dude from all online caches
                 for online_key in cache_params.online_keys():
+                    logger.debug(f"Removing {user_id} from {online_key}")
                     await self.redis.srem(online_key, user_id)
 
     async def add_to_recently_online_cache(self, user: User):
@@ -268,5 +270,6 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
 
     async def save_online_user_token(self, user_id: str, token: str):
         logger.debug(f"Saving token of {user_id} to cache")
-        await self.redis.setex(f'{self.USER_TOKEN_KEY}:{user_id}',
-                               time=constants.USER_TOKEN_TTL, value=token)
+        await self.redis.setex(
+            f'{self.USER_TOKEN_KEY}:{user_id}',
+            time=constants.USER_AUTH_TOKEN_TTL_SEC, value=token)

@@ -6,10 +6,11 @@ from fastapi import Depends
 
 from swipe.settings import settings
 from swipe.swipe_server.misc import dependencies
-from swipe.swipe_server.users.services.online_cache import OnlineUserCache
-from swipe.swipe_server.users.services.redis_services import RedisUserFetchService, \
-    RedisPopularService, RedisBlacklistService, UserFetchCacheKey
 from swipe.swipe_server.users.schemas import OnlineFilterBody
+from swipe.swipe_server.users.services.online_cache import OnlineUserCache
+from swipe.swipe_server.users.services.redis_services import \
+    RedisUserFetchService, \
+    RedisPopularService, RedisBlacklistService, UserFetchCacheKey
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,7 @@ class FetchUserService:
                     user_cache = list(user_cache)
                     online_users_pool[current_age] = UserPool(user_cache)
                     logger.debug(f"Got {len(user_cache)} online users "
-                                f"for age={current_age}")
+                                 f"for age={current_age}")
 
             for current_age in sorted_age_range:
                 current_pool: UserPool = online_users_pool[current_age]

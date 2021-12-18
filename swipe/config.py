@@ -31,13 +31,13 @@ LOGGING_CONFIG: dict = {
     "disable_existing_loggers": False,
     "formatters": {
         "default": {
-            "format": "[%(asctime)s] [%(levelname)s] [%(processName)s] "
+            "format": "[%(asctime)s] [%(levelname)s] "
                       "[%(correlation_id)s] | "
                       "%(pathname)s@%(lineno)d | %(message)s"
         },
         "access": {
             "()": "uvicorn.logging.AccessFormatter",
-            "fmt": '[%(asctime)s] [%(levelname)s] [%(processName)s] '
+            "fmt": '[%(asctime)s] [%(levelname)s] '
                    '[%(correlation_id)s] | '
                    '%(name)s | %(client_addr)s - '
                    '"%(request_line)s" %(status_code)s',
@@ -76,6 +76,11 @@ LOGGING_CONFIG: dict = {
             "filters": ['special', ]
         },
         "uvicorn": {
+            "handlers": ["null", ],
+            "propagate": False,
+            "filters": ['special', ]
+        },
+        "asyncio": {
             "handlers": ["null", ],
             "propagate": False,
             "filters": ['special', ]

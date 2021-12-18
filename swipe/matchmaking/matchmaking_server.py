@@ -15,7 +15,7 @@ from swipe.matchmaking.schemas import MMBasePayload, MMMatchPayload, \
     MMResponseAction, MMLobbyPayload, MMLobbyAction, MMSettings, MMRoundData, \
     MMChatPayload, MMChatAction
 from swipe.middlewares import CorrelationIdMiddleware
-from swipe.settings import settings, constants
+from swipe.settings import settings
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.misc.errors import SwipeError
@@ -226,7 +226,7 @@ async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData):
 
             blacklist: set[str] = \
                 await redis_blacklist.get_blacklist(sender_id)
-            logger.info(f"Blacklist for {sender_id}: {blacklist}")
+            logger.info(f"Blacklist of {sender_id}: {blacklist}")
 
             disallowed_users = chat_partners.union(blacklist)
 
@@ -236,7 +236,7 @@ async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData):
                 filter_params=OnlineFilterBody(
                     session_id=mm_settings.session_id,
                     gender=mm_settings.gender_filter,
-                    limit=constants.MATCHMAKING_FETCH_LIMIT
+                    limit=settings.MATCHMAKING_FETCH_LIMIT
                 ),
                 disallowed_users=disallowed_users)
             logger.info(f"Got possible connections for "
@@ -324,9 +324,8 @@ async def fetch_user_ids_for_matchmaking(
     chat_partners = await redis_chats.get_chat_partners(user_id)
     logger.info(f"Chat partners of {user_id}: {chat_partners}")
 
-    blacklist: set[str] = \
-        await redis_blacklist.get_blacklist(user_id)
-    logger.info(f"Blacklist for {user_id}: {blacklist}")
+    blacklist: set[str] = await redis_blacklist.get_blacklist(user_id)
+    logger.info(f"Blacklist of {user_id}: {blacklist}")
 
     disallowed_users = chat_partners.union(blacklist)
     connections = await fetch_service.collect(

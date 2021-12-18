@@ -290,7 +290,7 @@ class UserService:
 
     def add_call_feedback(
             self, target_user: User, feedback: CallFeedback) -> int:
-        rating_diff = constants.CALL_FEEDBACK_RATING_DIFF
+        rating_diff = constants.RATING_CALL_FEEDBACK_DIFF
         logger.info(f"Adding {rating_diff} rating to {target_user.id} "
                     f"due to {feedback}")
 

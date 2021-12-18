@@ -97,7 +97,7 @@ async def fetch_list_of_online_users(
     current_user: User = user_service.get_user_date_of_birth(current_user_id)
     blacklist: set[str] = \
         await redis_blacklist.get_blacklist(str(current_user_id))
-    logger.info(f"Blacklist for {current_user_id}: {blacklist}")
+    logger.info(f"Blacklist of {current_user_id}: {blacklist}")
 
     chat_partners: set[str] = \
         await redis_chats.get_chat_partners(current_user_id)

@@ -63,27 +63,32 @@ async def init_storage_buckets():
     storage_client.initialize_buckets()
 
 
-# TODO just for devs, remove
+# TODO just for devs
 async def populate_online_caches():
     redis_online = RedisOnlineUserService(dependencies.redis())
     redis_fetch = RedisUserFetchService(dependencies.redis())
     logger.info("Invalidating online response cache")
-    await redis_fetch.drop_fetch_response_caches()
+    await redis_fetch.drop_all_response_caches()
     # TODO just for tests, because chat server is also being restarted
     logger.info("Invalidating online user cache")
     await redis_online.invalidate_online_user_cache()
 
     with dependencies.db_context() as db:
-        last_online = datetime.datetime.utcnow() - datetime.timedelta(hours=1)
+        last_online = \
+            datetime.datetime.utcnow() - \
+            datetime.timedelta(seconds=constants.RECENTLY_ONLINE_TTL_SEC)
         last_online_users = \
             db.execute(select(User).where(
                 (User.last_online > last_online) &
                 (User.last_online != None)  # noqa
             )).scalars().all()
         logger.info(f"Found {len(last_online_users)} "
-                    f"online users during previous hour")
+                    f"online users during previous "
+                    f"{constants.RECENTLY_ONLINE_TTL_SEC} secs")
         for user in last_online_users:
+            logger.debug(f"Adding {user.id} to recently online set")
             await redis_online.add_to_recently_online_cache(user)
+            logger.debug(f"Adding {user.id} to online set")
             await redis_online.add_to_online_caches(user)
 
 
@@ -151,6 +156,7 @@ async def update_recently_online_cache():
 loop = asyncio.get_event_loop()
 
 if __name__ == '__main__':
+    # That's kinda stupid but will work for now
     loop.run_until_complete(run_migrations())
     loop.run_until_complete(init_storage_buckets())
     loop.run_until_complete(populate_online_caches())

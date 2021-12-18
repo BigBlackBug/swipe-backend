@@ -116,6 +116,7 @@ async def websocket_endpoint(
                     str(payload.sender_id), payload.dict(
                         by_alias=True, exclude_unset=True))
             else:
+                # TODO send callback
                 await _send_payload(payload)
         except:
             logger.exception(f"Error processing message: {raw_data}")
@@ -192,7 +193,7 @@ async def _process_disconnect(user: User):
     # check main server @startup events
     await redis_online.add_to_recently_online_cache(user)
     # removing all /fetch responses
-    await redis_fetch.drop_fetch_response_caches(user_id)
+    await redis_fetch.drop_response_cache(user_id)
     # removing blacklist cache
     await redis_blacklist.drop_blacklist_cache(user_id)
     # dropping chat cache

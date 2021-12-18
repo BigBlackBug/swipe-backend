@@ -255,28 +255,26 @@ class RedisUserFetchService:
         if not current_user_ids:
             return
 
+        logger.debug(f"Extending response cache for {cache_settings.user_id} "
+                     f"with {current_user_ids}")
         await self.redis.sadd(cache_settings.cache_key(), *current_user_ids)
-        # failsafe, 1 hours
+        # failsafe
         await self.redis.expire(
             cache_settings.cache_key(), settings.ONLINE_USER_RESPONSE_CACHE_TTL)
 
     async def drop_response_cache(self, user_id: str):
+        logger.info(f"Dropping fetch response cache for {user_id}")
         for key in await self.redis.keys(f'{FETCH_REQUEST_KEY}:{user_id}:*'):
             await self.redis.delete(key)
 
-    async def drop_fetch_response_caches(self, user_id: Optional[str] = None):
+    async def drop_all_response_caches(self):
+        logger.info(f"Dropping all fetch response caches")
         for key in await self.redis.keys(f'{FETCH_REQUEST_KEY}:*'):
-            await self.redis.delete(key)
-
-        if not user_id:
-            return
-
-        for key in await self.redis.keys(f'{FETCH_REQUEST_KEY}:{user_id}:*'):
             await self.redis.delete(key)
 
 
 class RedisFirebaseService:
-    FIREBASE_KEY = 'firebase_tokens'
+    FIREBASE_TOKEN_KEY = 'firebase_tokens'
     FIREBASE_COOLDOWN_KEY = 'firebase_cooldown'
 
     def __init__(self,
@@ -284,15 +282,15 @@ class RedisFirebaseService:
         self.redis = redis
 
     async def get_firebase_token(self, user_id: str):
-        return await self.redis.hget(self.FIREBASE_KEY, user_id)
+        return await self.redis.hget(self.FIREBASE_TOKEN_KEY, user_id)
 
     async def remove_token_from_cache(self, user_id: str):
-        await self.redis.hdel(self.FIREBASE_KEY, user_id)
+        await self.redis.hdel(self.FIREBASE_TOKEN_KEY, user_id)
 
     async def add_token_to_cache(self, user_id: str, token: str):
         if not token:
             return
-        await self.redis.hset(self.FIREBASE_KEY, user_id, token)
+        await self.redis.hset(self.FIREBASE_TOKEN_KEY, user_id, token)
 
     async def is_on_cooldown(self, sender_id: str, recipient_id: str) -> bool:
         return await self.redis.get(
