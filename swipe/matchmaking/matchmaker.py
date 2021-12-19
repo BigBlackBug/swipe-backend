@@ -68,7 +68,7 @@ class Vertex:
     #     return f'[{self.user_id}, {self.edges}, ' \
     #            f'disallowed:{self.disallowed_users} ' \
     #            f'matched: {self.matched}, waiting: {self.waiting}]\n'
-    def __str__(self):
+    def __repr__(self):
         return f'Vertex: {self.user_id}, matched: {self.matched}'
 
 
@@ -84,7 +84,7 @@ class HeapItem:
     def __eq__(self, other: 'HeapItem'):
         return self.weight == other.weight
 
-    def __str__(self):
+    def __repr__(self):
         return f"'{self.user_id}' weight: {self.weight}"
 
 
