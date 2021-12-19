@@ -249,10 +249,17 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
         last_online = last_online.isoformat()
         logger.debug(f"Updating {last_online=} field on online user {user_id}")
         cached_user = await self.redis.get(f'{self.ONLINE_USER_KEY}:{user_id}')
-        cached_user = json.loads(cached_user)
+
+        if not cached_user:
+            logger.debug(f"{user_id} not in online cache, saving")
+            cached_user = UserCardPreviewOut.patched_from_orm(user).dict()
+        else:
+            cached_user = json.loads(cached_user)
+
         cached_user['last_online'] = last_online
         await self.redis.set(f'{self.ONLINE_USER_KEY}:{user_id}',
                              json.dumps(cached_user))
+
 
     async def remove_from_recently_online(self, user_id: str):
         logger.debug(f"Removing {user_id} from recently online set")
