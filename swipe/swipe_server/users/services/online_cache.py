@@ -246,14 +246,16 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
 
         # update last_online field here so that we could sort these entities
         # without touching the cache again
-        logger.debug(f"Updating last_online field on online user {user_id}")
+        last_online = last_online.isoformat()
+        logger.debug(f"Updating {last_online=} field on online user {user_id}")
         cached_user = await self.redis.get(f'{self.ONLINE_USER_KEY}:{user_id}')
         cached_user = json.loads(cached_user)
-        cached_user['last_online'] = last_online.isoformat()
+        cached_user['last_online'] = last_online
         await self.redis.set(f'{self.ONLINE_USER_KEY}:{user_id}',
                              json.dumps(cached_user))
 
     async def remove_from_recently_online(self, user_id: str):
+        logger.debug(f"Removing {user_id} from recently online set")
         await self.redis.delete(f'{self.RECENTLY_ONLINE_KEY}:{user_id}')
 
     async def get_user_card_previews(self, user_ids: Iterable[str]) \

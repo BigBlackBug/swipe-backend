@@ -31,9 +31,6 @@ class RedisSwipeReaperService:
         Sets the timestamp for when the free swipes can be reaped
         for the specified user
         """
-        # this "optional parameter" junk is required only so that
-        # I could test the method
-
         reap_date = datetime.utcnow() + timedelta(
             seconds=constants.SWIPES_REAP_TIMEOUT_SEC)
         reap_date = reap_date.replace(microsecond=0)
@@ -314,11 +311,13 @@ class RedisFirebaseService:
         return await self.redis.hget(self.FIREBASE_TOKEN_KEY, user_id)
 
     async def remove_token_from_cache(self, user_id: str):
+        logger.debug(f"Removing firebase token of {user_id}")
         await self.redis.hdel(self.FIREBASE_TOKEN_KEY, user_id)
 
     async def add_token_to_cache(self, user_id: str, token: str):
         if not token:
             return
+        logger.debug(f"Saving firebase token of {user_id}")
         await self.redis.hset(self.FIREBASE_TOKEN_KEY, user_id, token)
 
     async def is_on_cooldown(self, sender_id: str, recipient_id: str) -> bool:

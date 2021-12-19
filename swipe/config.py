@@ -6,23 +6,21 @@ from swipe.settings import settings
 
 
 def configure_logging():
-    # TODO add current user to context
     logging.config.dictConfig(LOGGING_CONFIG)
 
 
 class PackagePathFilter(logging.Filter):
-    def filter(self, record):
+    def _patch_pathname(self, record, piece: str):
         pathname = record.pathname
-        if '/swipe/' in pathname:
-            index = pathname.index('/swipe/')
-            record.pathname = 'app->' + pathname[index + len('/swipe/'):]
-        elif '/bin/' in pathname:
-            index = pathname.index('/bin/')
-            record.pathname = 'app->' + pathname[index + len('/bin/'):]
-        elif '/site-packages/' in pathname:
-            index = pathname.index('/site-packages/')
-            record.pathname = \
-                'lib->' + pathname[index + len('/site-packages/'):]
+        if piece in pathname:
+            index = pathname.index(piece)
+            record.pathname = 'app->' + pathname[index + len(piece):]
+        return record
+
+    def filter(self, record):
+        record = self._patch_pathname(record, '/swipe/')
+        record = self._patch_pathname(record, '/bin/')
+        record = self._patch_pathname(record, '/site-packages/')
         return record
 
 
