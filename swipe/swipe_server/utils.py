@@ -42,8 +42,10 @@ def enable_blacklist(
             if enable:
                 return await func(self, *args, **kwargs)
             elif return_value_class:
-                logger.info(f"Blacklist disabled {func} not executed. "
-                            f"returning {return_value_class()}")
+                logger.info(
+                    f"Blacklist disabled, "
+                    f"{func.__module__}.{func.__name__} was not executed. "
+                    f"Returning {return_value_class()}")
                 return return_value_class()
             else:
                 return None

@@ -186,7 +186,7 @@ class ChatService:
             last_message = self.fetch_global_message(last_message_id)
             if not last_message:
                 raise SwipeError(
-                    f"Message with {last_message_id} does not exist")
+                    f"Message with id: {last_message_id} does not exist")
             query = select(GlobalChatMessage). \
                 where(GlobalChatMessage.timestamp > last_message.timestamp). \
                 order_by(GlobalChatMessage.timestamp)
@@ -244,7 +244,7 @@ class ChatService:
                                  values(status=status))
         self.db.commit()
         if result.rowcount == 0:
-            raise SwipeError(f'Chat with id:{chat_id} does not exist')
+            raise SwipeError(f'Chat with id: {chat_id} does not exist')
 
     def create_chat(self, chat_id: UUID, initiator_id: UUID,
                     the_other_person_id: UUID, chat_status: ChatStatus,

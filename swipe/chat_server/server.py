@@ -10,6 +10,7 @@ from fastapi import WebSocket
 from firebase_admin import messaging as firebase
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from starlette import status
 from starlette.responses import Response
 from starlette.websockets import WebSocketDisconnect
 from uvicorn import Server, Config
@@ -285,13 +286,15 @@ async def matchmaking_chat_handler(
     logger.info(f"Sending data to {payload.sender_id}")
     await connection_manager.send(str(payload.sender_id), out_payload)
 
-    return Response()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.post("/events/blacklist")
 async def send_blacklist_event(blocked_by_id: str = Body(..., embed=True),
                                blocked_user_id: str = Body(..., embed=True)):
     await _send_blacklist_events(blocked_user_id, blocked_by_id)
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.post("/events/user_deleted")
@@ -311,6 +314,8 @@ async def send_user_deleted_event(
             await connection_manager.send(
                 recipient, payload.dict(by_alias=True))
 
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
 
 @app.post("/events/rating_changed")
 async def send_rating_changed_event(
@@ -326,6 +331,8 @@ async def send_rating_changed_event(
             user_id=user_id, rating=rating
         ))
     await connection_manager.send(user_id, payload.dict(by_alias=True))
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 async def _send_blacklist_events(blocked_user_id: str, blocked_by_id: str):
