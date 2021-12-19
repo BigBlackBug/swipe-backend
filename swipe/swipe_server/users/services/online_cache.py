@@ -17,6 +17,7 @@ from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import User, Location
 from swipe.swipe_server.users.schemas import OnlineFilterBody, \
     UserCardPreviewOut
+from swipe.ws_connection import PayloadEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -257,9 +258,9 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
             cached_user = json.loads(cached_user)
 
         cached_user['last_online'] = last_online
+        # TODO stupid dump shit, use orjson
         await self.redis.set(f'{self.ONLINE_USER_KEY}:{user_id}',
-                             json.dumps(cached_user))
-
+                             json.dumps(cached_user, cls=PayloadEncoder))
 
     async def remove_from_recently_online(self, user_id: str):
         logger.debug(f"Removing {user_id} from recently online set")
