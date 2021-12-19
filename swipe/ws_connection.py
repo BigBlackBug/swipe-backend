@@ -9,6 +9,7 @@ from uuid import UUID
 
 from starlette.websockets import WebSocket
 
+from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.users.enums import Gender
 
 logger = logging.getLogger(__name__)
@@ -65,9 +66,11 @@ class WSConnectionManager:
         if user_id in self.active_connections:
             del self.active_connections[user_id]
 
-    async def send(self, user_id: str, payload: dict):
+    async def send(self, user_id: str, payload: dict, raise_on_disconnect=False):
         if user_id not in self.active_connections:
             logger.info(f"{user_id} is not online, payload won't be sent")
+            if raise_on_disconnect:
+                raise SwipeError(f"{user_id} is not online")
             return
 
         # TODO stupid workaround
@@ -83,6 +86,8 @@ class WSConnectionManager:
                 json.dumps(payload, cls=PayloadEncoder))
         except:
             logger.exception(f"Unable to send '{payload_type}' to {user_id}")
+            if raise_on_disconnect:
+                raise SwipeError(f"{user_id} is not online")
 
     async def broadcast(self, sender_id: str, payload: dict):
         # TODO stupid workaround

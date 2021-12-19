@@ -19,7 +19,8 @@ from swipe import error_handlers
 from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
     MessagePayload, CreateChatPayload, \
     UserJoinEventPayload, GenericEventPayload, UserEventType, \
-    DeclineChatPayload, MessageLikePayload, RatingChangedEventPayload
+    DeclineChatPayload, MessageLikePayload, RatingChangedEventPayload, \
+    OutPayload, AckPayload, AckType
 from swipe.chat_server.services import ChatServerRequestProcessor
 from swipe.middlewares import CorrelationIdMiddleware
 from swipe.settings import settings
@@ -102,9 +103,16 @@ async def websocket_endpoint(
 
         try:
             payload: BasePayload = BasePayload.validate(json.loads(raw_data))
+        except:
+            logger.exception(f"Invalid message: {raw_data}")
+            continue
 
+        logger.info(f"request_id={payload.request_id} successfully acked, "
+                    f"processing payload")
+        try:
             with dependencies.db_context() as session:
-                request_processor = ChatServerRequestProcessor(session, redis)
+                request_processor = ChatServerRequestProcessor(session,
+                                                               redis)
                 await request_processor.process(payload)
 
             if isinstance(payload.payload, DeclineChatPayload):
@@ -117,10 +125,30 @@ async def websocket_endpoint(
                     str(payload.sender_id), payload.dict(
                         by_alias=True, exclude_unset=True))
             else:
-                # TODO send callback
                 await _send_payload(payload)
         except:
-            logger.exception(f"Error processing message: {raw_data}")
+            logger.exception(f"Error processing payload {payload}")
+            await _send_ack(payload, failed=True)
+        else:
+            await _send_ack(payload)
+
+
+async def _send_ack(payload: BasePayload, failed: bool = False):
+    try:
+        logger.info(
+            f"Sending ack={failed} payload to request_id={payload.request_id}")
+        out_payload = OutPayload(payload=AckPayload(
+            type=AckType.ACK if not failed else AckType.ACK_FAILED,
+            request_id=payload.request_id,
+            timestamp=datetime.datetime.utcnow(),
+        ))
+        await connection_manager.send(
+            str(payload.sender_id), out_payload.dict(by_alias=True),
+            raise_on_disconnect=True)
+    except:
+        logger.exception(
+            f"Unable to send ack payload to {payload.sender_id},"
+            f"request={payload.request_id}")
 
 
 async def _init_user(user_id, websocket: WebSocket) -> User:

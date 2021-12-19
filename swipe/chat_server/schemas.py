@@ -92,13 +92,31 @@ class UserEventType(str, enum.Enum):
     USER_DELETED = 'user_deleted'
 
 
+class AckType(str, enum.Enum):
+    ACK = 'ack'
+    ACK_FAILED = 'ack_failed'
+
+
 class GenericEventPayload(BaseModel):
     type_: UserEventType = Field(..., alias='type')
 
 
+class AckPayload(BaseModel):
+    type_: AckType = Field(..., alias='type')
+    timestamp: datetime.datetime
+    request_id: UUID
+
+
+class OutPayload(BaseModel):
+    payload: AckPayload
+
+
 class BasePayload(BaseModel):
-    sender_id: UUID
+    sender_id: Optional[UUID] = None
     recipient_id: Optional[UUID] = None
+    timestamp: Optional[datetime.datetime] = None
+    request_id: Optional[UUID] = None
+
     payload: Union[
         MessagePayload, GlobalMessagePayload,
         MessageStatusPayload, MessageLikePayload,
