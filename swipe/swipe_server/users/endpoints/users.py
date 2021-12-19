@@ -116,7 +116,7 @@ async def fetch_list_of_online_users(
     users_data = await redis_online.get_user_card_previews(collected_user_ids)
     collected_users = [
         UserCardPreviewOut.parse_raw(user_data)
-        for user_data in users_data
+        for user_data in users_data if user_data is not None
     ]
     collected_users.sort(
         key=functools.partial(UserCardPreviewOut.sort_key,
