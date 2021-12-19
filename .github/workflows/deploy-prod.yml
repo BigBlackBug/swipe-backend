@@ -3,7 +3,7 @@ name: Docker Image CI
 on:
   push:
     branches:
-      - 'feature-nginx'
+      - 'main'
 env:
   APP_DIR: /opt/swipe
   SWIPE_IMAGE: cr.yandex/crpju5a53b9mblhf6ebg/swipe/swipe-backend:latest
