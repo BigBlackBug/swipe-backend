@@ -184,6 +184,9 @@ class ChatService:
         logger.info(f"Fetching global chat starting from {last_message_id}")
         if last_message_id:
             last_message = self.fetch_global_message(last_message_id)
+            if not last_message:
+                raise SwipeError(
+                    f"Message with {last_message_id} does not exist")
             query = select(GlobalChatMessage). \
                 where(GlobalChatMessage.timestamp > last_message.timestamp). \
                 order_by(GlobalChatMessage.timestamp)
