@@ -64,12 +64,13 @@ class Vertex:
                     other.mm_settings.gender == self.mm_settings.gender_filter or
                     other.mm_settings.gender == Gender.ATTACK_HELICOPTER)
 
-    # def __repr__(self):
-    #     return f'[{self.user_id}, {self.edges}, ' \
-    #            f'disallowed:{self.disallowed_users} ' \
-    #            f'matched: {self.matched}, waiting: {self.waiting}]\n'
     def __repr__(self):
-        return f'Vertex: {self.user_id}, matched: {self.matched}'
+        if settings.MATCHMAKING_DEBUG_MODE:
+            return f'[{self.user_id}, {self.edges}, ' \
+                   f'disallowed:{self.disallowed_users} ' \
+                   f'matched: {self.matched}, waiting: {self.waiting}]\n'
+        else:
+            return f'Vertex: {self.user_id}, matched: {self.matched}'
 
 
 class HeapItem:
@@ -227,16 +228,17 @@ class Matchmaker:
         logger.debug(f"Potential edges of {user_id}:\n{potential_edges}")
         for potential_match_id, _ in potential_edges:
             logger.info(f"Checking {potential_match_id}, {user_id}")
+            # TODO just for debug, remove logging in prod
             vertex_matched = \
                 self._connection_graph[potential_match_id].matched
             vertex_blocked = \
                 potential_match_id in current_vertex.disallowed_users
+            can_connect = current_vertex.bi_connects_to(potential_match_id)
             logger.info(
                 f"Vertex {potential_match_id}. Matched: {vertex_matched}, "
-                f"Blocked: {vertex_blocked}")
+                f"Blocked: {vertex_blocked}, can connect: {can_connect}")
             # if the edge is bidirectional -> we got a match
-            if not vertex_matched and not vertex_blocked and \
-                    current_vertex.bi_connects_to(potential_match_id):
+            if not vertex_matched and not vertex_blocked and can_connect:
                 return potential_match_id
 
         return None
