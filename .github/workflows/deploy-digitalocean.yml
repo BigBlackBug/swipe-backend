@@ -3,7 +3,6 @@ name: Docker Image CI
 on:
   push:
     branches:
-      - 'feature-*'
       - 'dev'
 env:
   SWIPE_LOCAL_IMAGE: swipe/swipe-backend:latest
