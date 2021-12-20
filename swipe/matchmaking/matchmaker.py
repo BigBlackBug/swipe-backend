@@ -375,7 +375,8 @@ class Matchmaker:
                         'user_age': vertex.mm_settings.age,
                         'gender_filter': vertex.mm_settings.gender_filter,
                         'session_id': vertex.mm_settings.session_id
-                    }, timeout=0.25)
+                    }, timeout=1)
+
                 json_data = response.json()
                 connections = json_data['connections']
                 if not connections:
