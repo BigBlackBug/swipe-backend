@@ -164,7 +164,7 @@ if __name__ == '__main__':
     loop.run_until_complete(populate_popular_cache())
     loop.run_until_complete(update_recently_online_cache())
 
-    logger.info(f'Starting app at port {settings.SWIPE_PORT}')
+    logger.info(f'Starting app at port 80')
     uvicorn.run('bin.swipe_server:app', host='0.0.0.0',  # noqa
                 port=80,
                 workers=settings.SWIPE_SERVER_WORKER_NUMBER,

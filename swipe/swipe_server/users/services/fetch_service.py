@@ -34,8 +34,6 @@ class FetchUserService:
                       filter_params: OnlineFilterBody,
                       disallowed_users: set[str] = None) -> set[str]:
         logger.info(f"Collecting users for {user_id}, params: {filter_params}")
-        # TODO save current age diff with session ID
-        # so that we don't go through all previous age ranges every time
         disallowed_users = disallowed_users or set()
         disallowed_users.add(user_id)
 

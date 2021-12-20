@@ -1,6 +1,7 @@
 import heapq
 import logging
 import time
+import uuid
 from typing import Optional, Iterator, Tuple
 
 import requests
@@ -377,11 +378,19 @@ class Matchmaker:
                     }, timeout=0.25)
                 json_data = response.json()
                 connections = json_data['connections']
+                if not connections:
+                    logger.debug(f"Got no candidates for {user_id}, "
+                                 f"resetting session_id")
+                    # in case we reached max age limit and still get no
+                    # candidates, reset the session_id to start fetching
+                    # starting from the default age difference
+                    vertex.mm_settings.session_id = uuid.uuid4()
+                    continue
             except:
                 logger.exception(f"Error getting candidates for user {user_id}")
                 connections = []
 
-            logger.info(f"Got new connections for {user_id}: {connections}")
+            logger.info(f"Got new candidates for {user_id}: {connections}")
             for connection_user_id in connections:
                 # new fetched user already in graph
                 # otherwise he's not in matchmaking -> not adding
