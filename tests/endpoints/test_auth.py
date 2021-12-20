@@ -58,8 +58,8 @@ async def test_auth_existing_user(
            == default_user.auth_info.access_token
     assert response.json().get('user_id')
 
-    # free swipes cache is set
-    assert await redis_swipes.get_swipe_reap_timestamp(default_user.id)
+    # free swipes cache is not set
+    assert not await redis_swipes.get_swipe_reap_timestamp(default_user.id)
     assert await redis_online.get_online_user_token(str(default_user.id))
 
 

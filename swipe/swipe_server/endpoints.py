@@ -128,8 +128,8 @@ async def authenticate_user(auth_payload: user_schemas.AuthenticationIn,
         new_token = user_service.create_access_token(user, auth_payload)
 
         response.status_code = status.HTTP_201_CREATED
+        await redis_swipe.reset_swipe_reap_timestamp(user.id)
 
-    await redis_online.save_online_user_token(str(user.id), new_token)
-    await redis_swipe.reset_swipe_reap_timestamp(user.id)
+    await redis_online.save_auth_token(str(user.id), new_token)
     return user_schemas.AuthenticationOut(
         user_id=user.id, access_token=new_token)

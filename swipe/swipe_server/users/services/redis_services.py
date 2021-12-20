@@ -35,6 +35,7 @@ class RedisSwipeReaperService:
             seconds=constants.SWIPES_REAP_TIMEOUT_SEC)
         reap_date = reap_date.replace(microsecond=0)
 
+        logger.debug(f"Resetting swipe reap timestamp for {user_id}")
         await self.redis.setex(
             f'{self.FREE_SWIPES_REDIS_PREFIX}:{user_id}',
             time=constants.SWIPES_REAP_TIMEOUT_SEC,

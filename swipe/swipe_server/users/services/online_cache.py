@@ -279,11 +279,11 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
         return await self.get_user_card_preview_one(user_id) is not None
 
     async def get_online_user_token(self, user_id: str) -> Optional[str]:
-        logger.debug(f"Fetching token of {user_id} from cache")
+        logger.debug(f"Fetching auth token of {user_id} from cache")
         return await self.redis.get(f'{self.USER_TOKEN_KEY}:{user_id}')
 
-    async def save_online_user_token(self, user_id: str, token: str):
-        logger.debug(f"Saving token of {user_id} to cache")
+    async def save_auth_token(self, user_id: str, token: str):
+        logger.debug(f"Saving auth token of {user_id} to cache")
         await self.redis.setex(
             f'{self.USER_TOKEN_KEY}:{user_id}',
             time=constants.USER_AUTH_TOKEN_TTL_SEC, value=token)

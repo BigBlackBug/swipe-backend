@@ -61,7 +61,7 @@ async def auth_user_id(user_service: UserService = Depends(),
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail='No user found with provided token')
 
-        await redis_online.save_online_user_token(token_payload.user_id, token)
+        await redis_online.save_auth_token(token_payload.user_id, token)
 
     logger.info(f"{token_payload.user_id} successfully authorized")
     return UUID(hex=token_payload.user_id)
