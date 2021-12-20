@@ -41,18 +41,14 @@ class ChatServerRequestProcessor:
                 recipient_id=data.recipient_id,
                 message=payload.text,
                 image_id=payload.image_id,
-                # it's a stub, because some devices might have
-                # their local time fucked up
-                timestamp=datetime.datetime.utcnow()
+                timestamp=payload.timestamp
             )
         elif isinstance(payload, GlobalMessagePayload):
             self.chat_service.post_message_to_global(
                 message_id=payload.message_id,
                 sender_id=data.sender_id,
                 message=payload.text,
-                # it's a stub, because some devices might have
-                # their local time fucked up
-                timestamp=datetime.datetime.utcnow()
+                timestamp=payload.timestamp
             )
         elif isinstance(payload, MessageStatusPayload):
             message_status = MessageStatus.__members__[payload.status.upper()]
