@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 
 from swipe import error_handlers
-from swipe.middlewares import AccessMiddleware, CorrelationIdMiddleware
+from swipe.middlewares import CorrelationIdMiddleware
 from swipe.settings import settings
 from swipe.swipe_server import endpoints as misc_endpoints
 from swipe.swipe_server.chats.endpoints import router as chat_router
@@ -31,6 +31,5 @@ def init_app() -> FastAPI:
                        tags=['my chats'])
     app.add_exception_handler(SwipeError, error_handlers.swipe_error_handler)
     app.add_exception_handler(Exception, error_handlers.global_error_handler)
-    app.add_middleware(AccessMiddleware)
     app.add_middleware(CorrelationIdMiddleware)
     return app

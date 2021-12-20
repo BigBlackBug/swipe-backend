@@ -35,7 +35,7 @@ LOGGING_CONFIG: dict = {
         },
         "access": {
             "()": "uvicorn.logging.AccessFormatter",
-            "fmt": '[%(asctime)s] [%(levelname)s] '
+            "fmt": '[%(asctime)s] [%(levelname)-5s] '
                    '[%(correlation_id)-6s] | '
                    '%(name)s | %(client_addr)s - '
                    '"%(request_line)s" %(status_code)s',
@@ -48,12 +48,12 @@ LOGGING_CONFIG: dict = {
             "stream": "ext://sys.stdout",
             "filters": ['special', 'correlation_id']
         },
-        # "access": {
-        #     "formatter": "access",
-        #     "class": "logging.StreamHandler",
-        #     "stream": "ext://sys.stdout",
-        #     "filters": ['correlation_id', ]
-        # },
+        "access": {
+            "formatter": "access",
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stdout",
+            "filters":  ['special', 'correlation_id']
+        },
         "null": {
             "class": "logging.NullHandler"
         },
@@ -71,41 +71,33 @@ LOGGING_CONFIG: dict = {
             "handlers": ["default", ],
             "level": "INFO",
             "propagate": False,
-            "filters": ['special', ]
         },
         "uvicorn": {
             "handlers": ["null", ],
             "propagate": False,
-            "filters": ['special', ]
         },
         "asyncio": {
             "handlers": ["null", ],
             "propagate": False,
-            "filters": ['special', ]
         },
         'alembic': {
             'handlers': ['default', ],
             'propagate': False,
-            "filters": ['special', ]
         },
         # using stock logger for sqlalchemy
         "sqlalchemy.engine": {
             "handlers": ["null", ],
             "propagate": False,
-            "filters": ['correlation_id', ]
         },
         "websockets": {
             "handlers": ["default", ],
             "propagate": False,
-            "filters": ['special', 'correlation_id', ]
         },
         # "uvicorn.error": {"handlers": ["default"], "level": "INFO"},
-        # "uvicorn.access": {
-        #     "handlers": ["access", ],
-        #     "propagate": False,
-        #     "filters": ['correlation_id', ]
-        # },
-
+        "uvicorn.access": {
+            "handlers": ["access", ],
+            "propagate": False,
+        },
         "root": {
             "handlers": ["default", ],
             "level": settings.SWIPE_LOGGING_LEVEL,

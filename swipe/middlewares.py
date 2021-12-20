@@ -1,14 +1,10 @@
 import logging
-from collections import Callable
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 from asgi_correlation_id.context import correlation_id
 from asgi_correlation_id.extensions.sentry import get_sentry_extension
 from starlette.datastructures import Headers
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 logger = logging.getLogger(__name__)
@@ -85,13 +81,3 @@ class CorrelationIdMiddleware:
             load_correlation_ids()
         except ImportError:  # pragma: no cover
             pass
-
-
-class AccessMiddleware(BaseHTTPMiddleware):
-
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        response = await call_next(request)
-        logger.info(f"{request.client.host}:{request.client.port} - "
-                    f"{request.method} {request.url.path} "
-                    f"{response.status_code}")
-        return response
