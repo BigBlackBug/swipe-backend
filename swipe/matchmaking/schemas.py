@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import datetime
+import enum
 from dataclasses import dataclass
 from enum import Enum
 from typing import Union, Type, Tuple, Any, Optional
@@ -56,9 +58,27 @@ class MMChatPayload(BaseModel):
     source: Optional[ChatSource] = None
 
 
+class MMAckType(str, enum.Enum):
+    ACK = 'ack'
+    ACK_FAILED = 'ack_failed'
+
+
+class MMAckPayload(BaseModel):
+    type_: MMAckType = Field(..., alias='type')
+    timestamp: datetime.datetime
+    request_id: UUID
+
+
+class MMOutPayload(BaseModel):
+    payload: MMAckPayload
+
+
 class MMBasePayload(BaseModel):
     sender_id: str
     recipient_id: Optional[str] = None
+    timestamp: Optional[datetime.datetime] = None
+    request_id: Optional[UUID] = None
+
     payload: Union[
         MMLobbyPayload, MMSDPPayload, MMMatchPayload, MMICEPayload,
         MMChatPayload

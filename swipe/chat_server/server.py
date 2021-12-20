@@ -111,8 +111,8 @@ async def websocket_endpoint(
                     f"processing payload")
         try:
             with dependencies.db_context() as session:
-                request_processor = ChatServerRequestProcessor(session,
-                                                               redis)
+                request_processor = \
+                    ChatServerRequestProcessor(session, redis)
                 await request_processor.process(payload)
 
             if isinstance(payload.payload, DeclineChatPayload):
@@ -134,6 +134,9 @@ async def websocket_endpoint(
 
 
 async def _send_ack(payload: BasePayload, failed: bool = False):
+    if not payload.request_id:
+        return
+
     try:
         logger.info(
             f"Sending ack={failed} payload to request_id={payload.request_id}")

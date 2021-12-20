@@ -248,7 +248,7 @@ class RedisUserFetchService:
 
     async def save_age_difference_cache(
             self, cache_settings: UserFetchCacheKey, age_difference: int):
-        logger.debug(f"Saving age difference {age_difference}"
+        logger.debug(f"Saving age difference {age_difference} "
                      f"for {cache_settings.user_id}")
         await self.redis.set(
             cache_settings.cache_age_diff_key(), age_difference)

@@ -92,13 +92,13 @@ class UserEventType(str, enum.Enum):
     USER_DELETED = 'user_deleted'
 
 
+class GenericEventPayload(BaseModel):
+    type_: UserEventType = Field(..., alias='type')
+
+
 class AckType(str, enum.Enum):
     ACK = 'ack'
     ACK_FAILED = 'ack_failed'
-
-
-class GenericEventPayload(BaseModel):
-    type_: UserEventType = Field(..., alias='type')
 
 
 class AckPayload(BaseModel):

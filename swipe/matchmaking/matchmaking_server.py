@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import logging
 import secrets
 
@@ -13,7 +14,7 @@ from uvicorn import Config, Server
 
 from swipe.matchmaking.schemas import MMBasePayload, MMMatchPayload, \
     MMResponseAction, MMLobbyPayload, MMLobbyAction, MMSettings, MMRoundData, \
-    MMChatPayload, MMChatAction
+    MMChatPayload, MMChatAction, MMAckType, MMOutPayload, MMAckPayload
 from swipe.middlewares import CorrelationIdMiddleware
 from swipe.settings import settings
 from swipe.swipe_server.chats.services import ChatService
@@ -102,15 +103,43 @@ async def matchmaker_endpoint(
 
         try:
             base_payload: MMBasePayload = MMBasePayload.validate(data)
+        except:
+            logger.exception(f"Invalid message: {data}")
+            continue
+
+        try:
             await _process_payload(base_payload,
                                    connection_manager.get_user_data(user_id))
-
             if base_payload.recipient_id:
                 await connection_manager.send(
                     base_payload.recipient_id,
                     base_payload.dict(by_alias=True, exclude_unset=True))
         except:
-            logger.exception(f"Error processing payload from {user_id}")
+            logger.exception(f"Error processing payload {base_payload}")
+            await _send_ack(base_payload, failed=True)
+        else:
+            await _send_ack(base_payload)
+
+
+async def _send_ack(payload: MMBasePayload, failed: bool = False):
+    if not payload.request_id:
+        return
+
+    try:
+        logger.info(
+            f"Sending ack={failed} payload to request_id={payload.request_id}")
+        out_payload = MMOutPayload(payload=MMAckPayload(
+            type=MMAckType.ACK if not failed else MMAckType.ACK_FAILED,
+            request_id=payload.request_id,
+            timestamp=datetime.datetime.utcnow(),
+        ))
+        await connection_manager.send(
+            str(payload.sender_id), out_payload.dict(by_alias=True),
+            raise_on_disconnect=True)
+    except:
+        logger.exception(
+            f"Unable to send ack payload to {payload.sender_id},"
+            f"request={payload.request_id}")
 
 
 async def _init_user(user_id: str, gender: Gender,
@@ -265,6 +294,7 @@ async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData):
                 f"sending request to chat server")
             url = f'{settings.CHAT_SERVER_HOST}/matchmaking/chat'
             # yeah they are reversed
+            # we don't need to send an ack, so no request_id
             output_payload = {
                 'sender_id': base_payload.recipient_id,
                 'recipient_id': base_payload.sender_id,
