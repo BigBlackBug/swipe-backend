@@ -11,7 +11,8 @@ from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
-from swipe.swipe_server.users.services.popular_cache import PopularUserService, CountryCacheService
+from swipe.swipe_server.users.services.popular_cache import PopularUserService, \
+    CountryCacheService
 from swipe.swipe_server.users.services.user_service import UserService
 
 
@@ -71,6 +72,15 @@ async def test_user_fetch_popular(
         'country': 'USA', 'city': 'New York', 'flag': 'F'
     })
     user_5.date_of_birth = datetime.date.today().replace(year=2005)
+
+    user_6 = randomizer.generate_random_user()
+    user_6.rating = 50
+    user_6.gender = Gender.FEMALE
+    user_6.set_location({
+        'country': 'USA', 'city': 'New York', 'flag': 'F'
+    })
+    user_6.date_of_birth = datetime.date.today().replace(year=2005)
+    user_6.deactivation_date = datetime.datetime.utcnow()
     session.commit()
     # --------------------------------------------------------------------------
     # populating caches
@@ -89,7 +99,7 @@ async def test_user_fetch_popular(
     assert response.status_code == 200
     resp_data = response.json()
     assert [user['id'] for user in resp_data] == \
-           [str(user_1.id), str(user_2.id),str(user_3.id)]
+           [str(user_1.id), str(user_2.id), str(user_3.id)]
 
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/users/fetch_popular",

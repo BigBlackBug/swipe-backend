@@ -1,6 +1,6 @@
 import datetime
 import uuid
-from unittest.mock import MagicMock, call, ANY
+from unittest.mock import MagicMock, call
 from uuid import UUID
 
 import aioredis
@@ -14,16 +14,18 @@ from swipe.settings import settings
 from swipe.swipe_server.chats.models import ChatMessage, MessageStatus, Chat, \
     ChatStatus, \
     ChatSource, GlobalChatMessage
+from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import AuthInfo, User
 from swipe.swipe_server.users.schemas import OnlineFilterBody
+from swipe.swipe_server.users.services.blacklist_service import BlacklistService
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
+from swipe.swipe_server.users.services.popular_cache import PopularUserService, \
+    CountryCacheService
 from swipe.swipe_server.users.services.redis_services import \
     RedisBlacklistService
-from swipe.swipe_server.users.services.popular_cache import PopularUserService, CountryCacheService
-from swipe.swipe_server.users.services.blacklist_service import BlacklistService
 from swipe.swipe_server.users.services.user_service import UserService
 
 
@@ -69,6 +71,9 @@ async def test_user_delete(
     # -----------------------------------------------------
     await client.delete(
         f"{settings.API_V1_PREFIX}/me",
+        params={
+            'delete': True,
+        },
         headers=default_user_auth_headers)
 
     # no chats -> no event
@@ -158,6 +163,9 @@ async def test_user_delete_with_chats(
     # ---------------------------------------------------------------------
     await client.delete(
         f"{settings.API_V1_PREFIX}/me",
+        params={
+            'delete': True,
+        },
         headers=default_user_auth_headers)
     # --------------------------------------------------------------------
 
@@ -226,6 +234,9 @@ async def test_user_delete_with_global(
     auth_info_id: UUID = default_user.auth_info.id
     await client.delete(
         f"{settings.API_V1_PREFIX}/me",
+        params={
+            'delete': True,
+        },
         headers=default_user_auth_headers)
 
     calls = []
@@ -239,6 +250,69 @@ async def test_user_delete_with_global(
 
     assert not user_service.get_user(default_user.id)
     assert not session.execute(
+        select(AuthInfo).where(AuthInfo.id == auth_info_id)). \
+        scalars().one_or_none()
+
+    assert set(session.execute(select(GlobalChatMessage.id)).scalars()) \
+           == {msg3.id, msg4.id}
+
+
+@pytest.mark.anyio
+async def test_user_delete_with_global_deactivate(
+        mocker: MockerFixture,
+        client: AsyncClient,
+        default_user: User,
+        user_service: UserService,
+        randomizer: RandomEntityGenerator,
+        session: Session,
+        default_user_auth_headers: dict[str, str]):
+    mock_user_storage: MagicMock = \
+        mocker.patch('swipe.swipe_server.users.models.storage_client')
+    mock_events = mocker.patch('swipe.swipe_server.users.endpoints.me.events')
+
+    photos: list[str] = default_user.photos
+    other_user = randomizer.generate_random_user()
+    another_user = randomizer.generate_random_user()
+
+    msg1 = GlobalChatMessage(
+        timestamp=datetime.datetime.now(),
+        message='wtf omg lol', sender=default_user)
+    msg2 = GlobalChatMessage(
+        timestamp=datetime.datetime.now(),
+        message='why dont u answer me???', sender=default_user)
+    msg3 = GlobalChatMessage(
+        timestamp=datetime.datetime.now(),
+        message='fuck off', sender=other_user)
+    msg4 = GlobalChatMessage(
+        timestamp=datetime.datetime.now(), message='what..',
+        sender=another_user)
+    session.add(msg1)
+    session.add(msg2)
+    session.add(msg3)
+    session.add(msg4)
+    session.commit()
+
+    auth_info_id: UUID = default_user.auth_info.id
+    await client.delete(
+        f"{settings.API_V1_PREFIX}/me",
+        params={
+            'delete': False,
+        },
+        headers=default_user_auth_headers)
+
+    # photos remain in storage
+    mock_user_storage.delete_image.assert_not_called()
+
+    mock_events.send_user_deleted_event.assert_called_with(str(default_user.id))
+
+    with pytest.raises(SwipeError) as exc_info:
+        assert user_service.get_user(default_user.id)
+    assert 'is deactivated' in str(exc_info.value)
+
+    assert session.execute(
+        select(User.deactivation_date).where(User.id == default_user.id)
+    ).scalars().one_or_none() is not None
+    assert session.execute(
         select(AuthInfo).where(AuthInfo.id == auth_info_id)). \
         scalars().one_or_none()
 
@@ -267,6 +341,9 @@ async def test_user_delete_with_blacklist(
     auth_info_id: UUID = default_user.auth_info.id
     await client.delete(
         f"{settings.API_V1_PREFIX}/me",
+        params={
+            'delete': True,
+        },
         headers=default_user_auth_headers)
 
     assert not user_service.get_user(default_user.id)

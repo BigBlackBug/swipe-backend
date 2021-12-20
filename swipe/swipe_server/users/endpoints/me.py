@@ -110,6 +110,7 @@ async def patch_user(
     '',
     name="Delete user", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
+        delete: bool = False,
         user_service: UserService = Depends(),
         chat_service: ChatService = Depends(),
         redis_blacklist: RedisBlacklistService = Depends(),
@@ -171,7 +172,10 @@ async def delete_user(
             f"only chat partners {recipients} will be notified")
         events.send_user_deleted_event(str(user_id), recipients)
 
-    user_service.delete_user(current_user)
+    if delete:
+        user_service.delete_user(current_user)
+    else:
+        user_service.deactivate_user(current_user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

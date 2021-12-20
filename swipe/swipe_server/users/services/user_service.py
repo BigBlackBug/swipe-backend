@@ -1,3 +1,4 @@
+import datetime
 import logging
 import time
 import uuid
@@ -75,9 +76,12 @@ class UserService:
         return self.db.execute(query).scalars().all()
 
     def get_user(self, user_id: UUID) -> Optional[User]:
-        return self.db.execute(
-            select(User).where(User.id == user_id)) \
-            .scalar_one_or_none()
+        user = self.db.execute(
+            select(User).where(User.id == user_id)
+        ).scalar_one_or_none()
+        if user and user.deactivation_date:
+            raise SwipeError(f"User {user_id} is deactivated")
+        return user
 
     def get_user_card_preview(self, user_id: UUID) -> User:
         query = self.db.query(User). \
@@ -191,15 +195,22 @@ class UserService:
     def find_user_by_auth(
             self,
             user_payload: schemas.AuthenticationIn) -> Optional[User]:
+        logger.debug(f"Checking auth_info on user from {user_payload}")
         auth_info = self.db.execute(
-            select(AuthInfo)
+            select(AuthInfo, User.deactivation_date, User.id)
+                .join(User)
                 .where(AuthInfo.auth_provider
                        == user_payload.auth_provider)
                 .where(AuthInfo.provider_user_id
                        == user_payload.provider_user_id)) \
             .scalar_one_or_none()
-        # TODO check queries for extra joins
-        return auth_info.user if auth_info else None
+
+        if auth_info:
+            if auth_info.user.deactivation_date:
+                raise SwipeError(f'User {auth_info.user.id} is deactivated')
+            return auth_info.user
+
+        return None
 
     def create_access_token(self, user_object: User,
                             payload: schemas.AuthenticationIn) -> str:
@@ -234,6 +245,13 @@ class UserService:
         self.db.execute(delete(User).where(User.id == user.id))
         self.db.commit()
 
+    def deactivate_user(self, user: User):
+        logger.info(f"Deactivating user {user.id}")
+        self.db.execute(
+            update(User).where(User.id == user.id)
+            .values(deactivation_date=datetime.datetime.now()))
+        self.db.commit()
+
     def fetch_locations(self) -> dict[str, list[str]]:
         """
         Returns rows of cities grouped by country.
@@ -264,6 +282,7 @@ class UserService:
         query = self.db.query(User). \
             join(User.location). \
             where(country_clause).where(city_clause).where(gender_clause). \
+            where(User.deactivation_date == None). \
             options(
             Load(User).load_only('id', 'name', 'bio', 'zodiac_sign',
                                  'date_of_birth', 'rating', 'interests',
@@ -339,14 +358,21 @@ class UserService:
     def check_token(self, user_id: str, token: str):
         logger.debug(f"Checking for {user_id} token in DB")
         return self.db.execute(
-            select(AuthInfo)
-                .where(AuthInfo.user_id == user_id)
-                .where(AuthInfo.access_token == token)) \
-            .scalar_one_or_none()
+            select(AuthInfo).join(User). \
+                where(AuthInfo.user_id == user_id). \
+                where(AuthInfo.access_token == token). \
+                where(User.deactivation_date == None)). \
+            scalar_one_or_none()
 
     def get_matchmaking_preview(self, user_id: str) -> User:
-        logger.info(f"Fetching chat matchmaking preview of {user_id}")
+        logger.debug(f"Fetching chat matchmaking preview of {user_id}")
         return self.db.query(User). \
             where(User.id == user_id). \
-            options(Load(User).load_only('gender', 'date_of_birth')
-                    ).one_or_none()
+            options(Load(User).load_only('gender', 'date_of_birth')). \
+            one_or_none()
+
+    def get_deactivated_users(self, since: datetime.datetime) -> list[UUID]:
+        logger.debug(f'Fetching deactivated users since {since}')
+        return self.db.execute(
+            select(User.id).where(User.deactivation_date >= since)
+        ).scalars().all()

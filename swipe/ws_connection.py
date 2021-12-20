@@ -21,6 +21,8 @@ class PayloadEncoder(json.JSONEncoder):
             return str(obj)
         elif isinstance(obj, datetime.datetime):
             return str(obj)
+        elif isinstance(obj, datetime.date):
+            return str(obj)
         elif isinstance(obj, bytes):
             # avatars are b64 encoded byte strings
             return obj.decode('utf-8')

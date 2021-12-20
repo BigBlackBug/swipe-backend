@@ -1,3 +1,4 @@
+import datetime
 import functools
 import logging
 from uuid import UUID
@@ -24,6 +25,18 @@ from swipe.swipe_server.users.services.user_service import UserService
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+@router.get(
+    '/deactivated',
+    name='Get a list of deactivated users',
+    response_model=list[UUID])
+async def fetch_deactivated_users(
+        since: datetime.datetime,
+        user_service: UserService = Depends(),
+        current_user_id: UUID = Depends(security.auth_user_id)):
+    user_ids = user_service.get_deactivated_users(since)
+    return user_ids
 
 
 @router.post(

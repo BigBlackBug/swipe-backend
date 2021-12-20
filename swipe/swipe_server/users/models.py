@@ -47,6 +47,7 @@ class User(ModelBase):
     registration_date = Column(
         DateTime, nullable=False,
         default=datetime.datetime.utcnow().replace(microsecond=0))
+    deactivation_date = Column(DateTime)
     # NULL if he is online
     last_online = Column(DateTime)
     name = Column(String(30), nullable=False, default='')

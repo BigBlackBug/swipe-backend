@@ -65,3 +65,60 @@ async def test_user_get_offline(
     assert response.status_code == 200
     resp_data = response.json()
     assert not resp_data['online']
+
+
+@pytest.mark.anyio
+async def test_user_fetch_single(
+        client: AsyncClient,
+        default_user: User,
+        randomizer: RandomEntityGenerator,
+        session: Session,
+        default_user_auth_headers: dict[str, str]):
+    response: Response = await client.get(
+        f"{settings.API_V1_PREFIX}/users/{default_user.id}",
+        headers=default_user_auth_headers
+    )
+    assert response.json()['avatar_url'] == \
+           f'{settings.SWIPE_REST_SERVER_HOST}/v1/users/' \
+           f'{default_user.id}/avatar'
+
+
+@pytest.mark.anyio
+async def test_user_fetch_deactivated(
+        client: AsyncClient,
+        default_user: User,
+        randomizer: RandomEntityGenerator,
+        session: Session,
+        default_user_auth_headers: dict[str, str]):
+    user_1 = randomizer.generate_random_user()
+    user_1.deactivation_date = datetime.datetime.utcnow()
+    session.commit()
+    response: Response = await client.get(
+        f"{settings.API_V1_PREFIX}/users/{user_1.id}",
+        headers=default_user_auth_headers
+    )
+    assert response.status_code == 409
+
+
+@pytest.mark.anyio
+async def test_user_fetch_all_deactivated(
+        client: AsyncClient,
+        default_user: User,
+        randomizer: RandomEntityGenerator,
+        session: Session,
+        default_user_auth_headers: dict[str, str]):
+    user_1 = randomizer.generate_random_user()
+    user_1.deactivation_date = datetime.datetime.utcnow()
+    session.commit()
+
+    since = datetime.datetime.utcnow() - datetime.timedelta(days=1)
+    response: Response = await client.get(
+        f"{settings.API_V1_PREFIX}/users/deactivated",
+        params={
+            'since': since.isoformat()
+        },
+        headers=default_user_auth_headers
+    )
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+    assert response.json()[0] == str(user_1.id)

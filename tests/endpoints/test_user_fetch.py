@@ -581,19 +581,3 @@ async def test_user_fetch_with_blacklist(
     # new fetch cache created
     assert await fake_redis.exists(
         f'{redis_services.FETCH_REQUEST_KEY}:{default_user.id}:{session_id}')
-
-
-@pytest.mark.anyio
-async def test_user_fetch_single(
-        client: AsyncClient,
-        default_user: User,
-        randomizer: RandomEntityGenerator,
-        session: Session,
-        default_user_auth_headers: dict[str, str]):
-    response: Response = await client.get(
-        f"{settings.API_V1_PREFIX}/users/{default_user.id}",
-        headers=default_user_auth_headers
-    )
-    assert response.json()['avatar_url'] == \
-           f'{settings.SWIPE_REST_SERVER_HOST}/v1/users/' \
-           f'{default_user.id}/avatar'
