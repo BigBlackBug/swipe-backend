@@ -64,3 +64,4 @@ jobs:
 
           docker-compose -f ${{ env.APP_DIR }}/docker-compose-prod.yml pull
           docker-compose -f ${{ env.APP_DIR }}/docker-compose-prod.yml up -d
+          docker exec swipe_nginx_1 nginx -s reload
