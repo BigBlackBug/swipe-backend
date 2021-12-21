@@ -6,7 +6,7 @@ volumes:
       name: letsencrypt_keys
 
 services:
-  turn:
+  turn_server:
     image: coturn/coturn
     network_mode: host
     volumes:
@@ -57,6 +57,8 @@ services:
     environment:
       - CHAT_SERVER_HOST=http://chat_server:80
     entrypoint: python bin/matchmaking_server.py
+    depends_on:
+      - turn_server
 
   video_matchmaker:
     image: ${SWIPE_IMAGE:?unset}
@@ -75,6 +77,9 @@ services:
     environment:
       - CHAT_SERVER_HOST=http://chat_server:80
     entrypoint: python bin/matchmaking_server.py
+    depends_on:
+      - turn_server
+
 
   audio_matchmaker:
     image: ${SWIPE_IMAGE:?unset}
@@ -93,6 +98,9 @@ services:
     environment:
       - CHAT_SERVER_HOST=http://chat_server:80
     entrypoint: python bin/matchmaking_server.py
+    depends_on:
+      - turn_server
+
 
   text_matchmaker:
     image: ${SWIPE_IMAGE:?unset}
