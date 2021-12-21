@@ -11,12 +11,14 @@ logging = logging.getLogger(__name__)
 # TCP connections are represented as file descriptors,
 # each process must have it's own engine instance,
 # pooled connections must not be shared
-engine = create_engine(settings.DATABASE_URL, future=True,
+engine = create_engine(settings.DATABASE_URL,
+                       future=True,
                        echo=settings.ENABLE_SQL_ECHO,
                        echo_pool=settings.ENABLE_SQL_ECHO,
                        pool_pre_ping=True,
                        pool_timeout=1,
-                       pool_size=10, max_overflow=20)
+                       pool_size=10, max_overflow=20,
+                       connect_args={"options": "-c timezone=utc"})
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False,
                             future=True, bind=engine)
