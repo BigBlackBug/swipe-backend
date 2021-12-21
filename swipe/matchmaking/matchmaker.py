@@ -8,7 +8,6 @@ import requests
 
 from swipe.matchmaking.schemas import Match, MMSettings, MMRoundData
 from swipe.settings import settings
-from swipe.swipe_server.users.enums import Gender
 
 logger = logging.getLogger('matchmaker')
 
@@ -62,8 +61,7 @@ class Vertex:
         max_age = self.mm_settings.age + self.mm_settings.age_diff
         return min_age <= other.mm_settings.age <= max_age \
                and (self.mm_settings.gender_filter is None or
-                    other.mm_settings.gender == self.mm_settings.gender_filter or
-                    other.mm_settings.gender == Gender.ATTACK_HELICOPTER)
+                    self.mm_settings.gender_filter == other.mm_settings.gender)
 
     def __repr__(self):
         if settings.MATCHMAKING_DEBUG_MODE:
