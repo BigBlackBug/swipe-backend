@@ -68,7 +68,8 @@ class WSConnectionManager:
         if user_id in self.active_connections:
             del self.active_connections[user_id]
 
-    async def send(self, user_id: str, payload: dict, raise_on_disconnect=False):
+    async def send(self, user_id: str, payload: dict,
+                   raise_on_disconnect=False):
         if user_id not in self.active_connections:
             logger.info(f"{user_id} is not online, payload won't be sent")
             if raise_on_disconnect:

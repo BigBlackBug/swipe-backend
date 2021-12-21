@@ -102,35 +102,53 @@ async def websocket_endpoint(
             return
 
         try:
-            payload: BasePayload = BasePayload.validate(json.loads(raw_data))
+            base_payload = BasePayload.validate(json.loads(raw_data))
         except:
             logger.exception(f"Invalid message: {raw_data}")
             continue
 
-        logger.info(f"request_id={payload.request_id} successfully acked, "
+        logger.info(f"request_id={base_payload.request_id} successfully acked, "
                     f"processing payload")
         try:
             with dependencies.db_context() as session:
                 request_processor = \
                     ChatServerRequestProcessor(session, redis)
-                await request_processor.process(payload)
-
-            if isinstance(payload.payload, DeclineChatPayload):
-                await _send_blacklist_events(
-                    blocked_user_id=str(payload.recipient_id),
-                    blocked_by_id=str(payload.sender_id))
-
-            if isinstance(payload.payload, GlobalMessagePayload):
-                await connection_manager.broadcast(
-                    str(payload.sender_id), payload.dict(
-                        by_alias=True, exclude_unset=True))
-            else:
-                await _send_payload(payload)
+                await request_processor.process(base_payload)
         except:
-            logger.exception(f"Error processing payload {payload}")
-            await _send_ack(payload, failed=True)
+            logger.exception(f"Error processing payload {base_payload}")
+            await _send_ack(base_payload, failed=True)
+            continue
         else:
-            await _send_ack(payload)
+            await _send_ack(base_payload)
+
+        try:
+            await _send_response_to_sender(base_payload)
+        except:
+            logger.exception(
+                f"Error delivering payload to {base_payload.recipient_id}")
+
+
+async def _send_response_to_sender(base_payload: BasePayload):
+    if isinstance(base_payload.payload, DeclineChatPayload):
+        await _send_blacklist_events(
+            blocked_user_id=str(base_payload.recipient_id),
+            blocked_by_id=str(base_payload.sender_id))
+
+    if isinstance(base_payload.payload, GlobalMessagePayload):
+        await connection_manager.broadcast(
+            str(base_payload.sender_id), base_payload.dict(
+                by_alias=True, exclude_unset=True))
+    else:
+        recipient_id = str(base_payload.recipient_id)
+        # offline users receive a notification instead
+        if not connection_manager.is_connected(recipient_id):
+            if type(base_payload.payload) \
+                    in {MessagePayload, CreateChatPayload}:
+                await _send_firebase_notification(base_payload)
+        else:
+            out_payload = base_payload.dict(by_alias=True,
+                                            exclude_unset=True)
+            await connection_manager.send(recipient_id, out_payload)
 
 
 async def _send_ack(payload: BasePayload, failed: bool = False):
@@ -238,63 +256,55 @@ async def _process_disconnect(user: User):
         ).dict(by_alias=True))
 
 
-async def _send_payload(base_payload: BasePayload):
+async def _send_firebase_notification(base_payload: BasePayload):
     recipient_id = str(base_payload.recipient_id)
     sender_id = str(base_payload.sender_id)
     payload = base_payload.payload
-    # sending message/create_chat to offline users
-    if not connection_manager.is_connected(recipient_id):
-        if not type(payload) in {MessagePayload, CreateChatPayload}:
-            return
+    logger.info(
+        f"{recipient_id} is offline, sending push "
+        f"notification for '{payload.type_}' payload")
 
-        logger.info(
-            f"{recipient_id} is offline, sending push "
-            f"notification for '{payload.type_}' payload")
+    on_cooldown = await firebase_service.is_on_cooldown(
+        sender_id, recipient_id)
+    if on_cooldown:
+        logger.info(f"Notifications are in cooldown "
+                    f"for {sender_id}->{recipient_id}")
+        return
 
-        on_cooldown = await firebase_service.is_on_cooldown(
-            sender_id, recipient_id)
-        if on_cooldown:
-            logger.info(f"Notifications are in cooldown "
-                        f"for {sender_id}->{recipient_id}")
-            return
+    firebase_token = \
+        await firebase_service.get_firebase_token(recipient_id)
+    if not firebase_token:
+        logger.error(
+            f"User {recipient_id} does not have a firebase token "
+            f"which is weird")
+        return
 
-        firebase_token = \
-            await firebase_service.get_firebase_token(recipient_id)
-        if not firebase_token:
-            logger.error(
-                f"User {recipient_id} does not have a firebase token "
-                f"which is weird")
-            return
+    user_data: ChatUserData = connection_manager.get_user_data(sender_id)
+    # TODO should move that to the Gender enum
+    if user_data.gender == Gender.MALE:
+        ending = ''
+    elif user_data.gender == Gender.FEMALE:
+        ending = 'а'
+    elif user_data.gender == Gender.ATTACK_HELICOPTER:
+        # sorry not sorry
+        ending = 'о'
 
-        user_data: ChatUserData = connection_manager.get_user_data(sender_id)
-        # TODO should move that to the Gender enum
-        if user_data.gender == Gender.MALE:
-            ending = ''
-        elif user_data.gender == Gender.FEMALE:
-            ending = 'а'
-        elif user_data.gender == Gender.ATTACK_HELICOPTER:
-            # sorry not sorry
-            ending = 'о'
+    if isinstance(payload, MessagePayload):
+        notification = firebase.Notification(
+            title=f'{user_data.name} наконец-то ответил{ending} ☺️',  # noqa
+            body='Переходи в приложение, чтобы продолжить диалог')
+    elif isinstance(payload, CreateChatPayload):
+        notification = firebase.Notification(
+            title=f'{user_data.name} хочет с тобой пообщаться ☺️',
+            body='Переходи в приложение, чтобы начать диалог')
 
-        if isinstance(payload, MessagePayload):
-            notification = firebase.Notification(
-                title=f'{user_data.name} наконец-то ответил{ending} ☺️',  # noqa
-                body='Переходи в приложение, чтобы продолжить диалог')
-        elif isinstance(payload, CreateChatPayload):
-            notification = firebase.Notification(
-                title=f'{user_data.name} хочет с тобой пообщаться ☺️',
-                body='Переходи в приложение, чтобы начать диалог')
+    logger.info(
+        f"Sending firebase notification '{payload.type_}' "
+        f"to {recipient_id}")
+    firebase.send(firebase.Message(
+        notification=notification, token=firebase_token))  # noqa
 
-        logger.info(
-            f"Sending firebase notification '{payload.type_}' "
-            f"to {recipient_id}")
-        firebase.send(firebase.Message(
-            notification=notification, token=firebase_token))  # noqa
-
-        await firebase_service.set_cooldown_token(sender_id, recipient_id)
-    else:
-        out_payload = base_payload.dict(by_alias=True, exclude_unset=True)
-        await connection_manager.send(recipient_id, out_payload)
+    await firebase_service.set_cooldown_token(sender_id, recipient_id)
 
 
 @app.post("/matchmaking/chat")
@@ -311,11 +321,14 @@ async def matchmaking_chat_handler(
     await request_processor.process(payload)
 
     out_payload = payload.dict(by_alias=True, exclude_unset=True)
-    logger.info(f"Sending data to {payload.recipient_id}")
-    await connection_manager.send(str(payload.recipient_id), out_payload)
 
+    # chat host
     logger.info(f"Sending data to {payload.sender_id}")
     await connection_manager.send(str(payload.sender_id), out_payload)
+
+    # chat partner
+    logger.info(f"Sending data to {payload.recipient_id}")
+    await connection_manager.send(str(payload.recipient_id), out_payload)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

@@ -110,15 +110,18 @@ async def matchmaker_endpoint(
         try:
             await _process_payload(base_payload,
                                    connection_manager.get_user_data(user_id))
-            if base_payload.recipient_id:
-                await connection_manager.send(
-                    base_payload.recipient_id,
-                    base_payload.dict(by_alias=True, exclude_unset=True))
         except:
             logger.exception(f"Error processing payload {base_payload}")
             await _send_ack(base_payload, failed=True)
+            continue
         else:
             await _send_ack(base_payload)
+
+        if base_payload.recipient_id:
+            # does not raise, so we're safe
+            await connection_manager.send(
+                base_payload.recipient_id,
+                base_payload.dict(by_alias=True, exclude_unset=True))
 
 
 async def _send_ack(payload: MMBasePayload, failed: bool = False):
