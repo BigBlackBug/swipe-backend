@@ -6,6 +6,11 @@ volumes:
       name: letsencrypt_keys
 
 services:
+  turn:
+    image: coturn/coturn
+    network_mode: host
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
 
   nginx:
     image: nginx:1.18
