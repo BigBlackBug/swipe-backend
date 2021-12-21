@@ -118,6 +118,9 @@ async def delete_user(
         popular_service: PopularUserService = Depends(),
         user_id: UUID = Depends(security.auth_user_id)):
     current_user: User = user_service.get_user(user_id)
+    country = current_user.location.country
+    city = current_user.location.city
+    gender = current_user.gender
 
     # somebody might want to delete user before the location is set
     # e.g. during the registration
@@ -125,26 +128,6 @@ async def delete_user(
         await redis_online.remove_from_online_caches(current_user)
 
     await redis_blacklist.drop_blacklist_cache(str(user_id))
-
-    logger.info("Updating popular caches")
-    # repopulating popular caches
-    await popular_service.populate_cache(
-        country=current_user.location.country,
-        city=current_user.location.city,
-        gender=current_user.gender)
-    await popular_service.populate_cache(
-        country=current_user.location.country,
-        city=current_user.location.city)
-
-    await popular_service.populate_cache(
-        country=current_user.location.country,
-        gender=current_user.gender)
-    await popular_service.populate_cache(
-        country=current_user.location.country)
-
-    await popular_service.populate_cache(
-        gender=current_user.gender)
-    await popular_service.populate_cache()
 
     logger.info(f"Deleting chats of {user_id}")
     recipients = []
@@ -176,6 +159,19 @@ async def delete_user(
         user_service.delete_user(current_user)
     else:
         user_service.deactivate_user(current_user)
+
+    logger.info("Updating popular caches")
+    # repopulating popular caches
+    await popular_service.populate_cache(
+        country=country, city=city, gender=gender)
+    await popular_service.populate_cache(country=country, city=city)
+
+    await popular_service.populate_cache(country=country, gender=gender)
+    await popular_service.populate_cache(country=country)
+
+    await popular_service.populate_cache(gender=gender)
+    await popular_service.populate_cache()
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
