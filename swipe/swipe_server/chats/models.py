@@ -47,9 +47,7 @@ class Chat(ModelBase):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    creation_date = Column(
-        DateTime, nullable=False,
-        default=datetime.datetime.utcnow().replace(microsecond=0))
+    creation_date = Column(DateTime, nullable=False)
     source = Column(Enum(ChatSource), nullable=False)
     status = Column(Enum(ChatStatus), nullable=False,
                     default=ChatStatus.REQUESTED)

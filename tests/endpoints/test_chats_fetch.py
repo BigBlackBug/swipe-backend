@@ -26,11 +26,11 @@ async def test_fetch_existing_chats(
     # he's offline
     other_user.last_online = datetime.datetime.utcnow()
 
-    older_chat = Chat(
-        status=ChatStatus.ACCEPTED,
-        source=ChatSource.VIDEO_LOBBY,
-        initiator=other_user,
-        the_other_person=default_user)
+    older_chat = Chat(creation_date=datetime.datetime.utcnow(),
+                      status=ChatStatus.ACCEPTED,
+                      source=ChatSource.VIDEO_LOBBY,
+                      initiator=other_user,
+                      the_other_person=default_user)
     session.add(older_chat)
 
     msg1 = ChatMessage(
@@ -49,10 +49,10 @@ async def test_fetch_existing_chats(
 
     # chat with unread messages
     second_user = randomizer.generate_random_user()
-    newer_chat = Chat(
-        status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
-        initiator=default_user,
-        the_other_person=second_user)
+    newer_chat = Chat(creation_date=datetime.datetime.utcnow(),
+                      status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
+                      initiator=default_user,
+                      the_other_person=second_user)
     session.add(newer_chat)
 
     msg5 = ChatMessage(
@@ -133,11 +133,11 @@ async def test_fetch_existing_and_outgoing_request(
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     other_user = randomizer.generate_random_user()
-    chat = Chat(
-        status=ChatStatus.ACCEPTED,
-        source=ChatSource.VIDEO_LOBBY,
-        initiator=other_user,
-        the_other_person=default_user)
+    chat = Chat(creation_date=datetime.datetime.utcnow(),
+                status=ChatStatus.ACCEPTED,
+                source=ChatSource.VIDEO_LOBBY,
+                initiator=other_user,
+                the_other_person=default_user)
     session.add(chat)
 
     msg1 = ChatMessage(
@@ -156,10 +156,11 @@ async def test_fetch_existing_and_outgoing_request(
 
     # outgoing request
     second_user = randomizer.generate_random_user()
-    outgoing_requets_chat = Chat(
-        status=ChatStatus.REQUESTED, source=ChatSource.VIDEO_LOBBY,
-        initiator=default_user,
-        the_other_person=second_user)
+    outgoing_requets_chat = Chat(creation_date=datetime.datetime.utcnow(),
+                                 status=ChatStatus.REQUESTED,
+                                 source=ChatSource.VIDEO_LOBBY,
+                                 initiator=default_user,
+                                 the_other_person=second_user)
     session.add(outgoing_requets_chat)
 
     msg5 = ChatMessage(
@@ -236,11 +237,11 @@ async def test_fetch_existing_and_incoming_request(
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     other_user = randomizer.generate_random_user()
-    chat = Chat(
-        status=ChatStatus.ACCEPTED,
-        source=ChatSource.VIDEO_LOBBY,
-        initiator=other_user,
-        the_other_person=default_user)
+    chat = Chat(creation_date=datetime.datetime.utcnow(),
+                status=ChatStatus.ACCEPTED,
+                source=ChatSource.VIDEO_LOBBY,
+                initiator=other_user,
+                the_other_person=default_user)
     session.add(chat)
 
     msg1 = ChatMessage(
@@ -259,19 +260,20 @@ async def test_fetch_existing_and_incoming_request(
 
     whatever_user = randomizer.generate_random_user()
     # chat wth no messages
-    chat_no_messages = Chat(
-        status=ChatStatus.ACCEPTED,
-        source=ChatSource.VIDEO_LOBBY,
-        initiator=whatever_user,
-        the_other_person=default_user)
+    chat_no_messages = Chat(creation_date=datetime.datetime.utcnow(),
+                            status=ChatStatus.ACCEPTED,
+                            source=ChatSource.VIDEO_LOBBY,
+                            initiator=whatever_user,
+                            the_other_person=default_user)
     session.add(chat_no_messages)
 
     # incoming request
     second_user = randomizer.generate_random_user()
-    chat_incoming_request = Chat(
-        status=ChatStatus.REQUESTED, source=ChatSource.VIDEO_LOBBY,
-        initiator=second_user,
-        the_other_person=default_user)
+    chat_incoming_request = Chat(creation_date=datetime.datetime.utcnow(),
+                                 status=ChatStatus.REQUESTED,
+                                 source=ChatSource.VIDEO_LOBBY,
+                                 initiator=second_user,
+                                 the_other_person=default_user)
     session.add(chat_incoming_request)
 
     msg5 = ChatMessage(
@@ -348,10 +350,10 @@ async def test_fetch_existing_chats_only_unread(
         default_user_auth_headers: dict[str, str]):
     first_user = randomizer.generate_random_user()
     # chat without unread messages
-    older_chat = Chat(
-        status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
-        initiator=first_user,
-        the_other_person=default_user)
+    older_chat = Chat(creation_date=datetime.datetime.utcnow(),
+                      status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
+                      initiator=first_user,
+                      the_other_person=default_user)
     session.add(older_chat)
 
     msg1 = ChatMessage(
@@ -370,10 +372,10 @@ async def test_fetch_existing_chats_only_unread(
 
     # chat with unread messages
     second_user = randomizer.generate_random_user()
-    newer_chat = Chat(
-        status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
-        initiator=default_user,
-        the_other_person=second_user)
+    newer_chat = Chat(creation_date=datetime.datetime.utcnow(),
+                      status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
+                      initiator=default_user,
+                      the_other_person=second_user)
     session.add(newer_chat)
 
     msg5 = ChatMessage(
@@ -454,10 +456,10 @@ async def test_fetch_single_chat(
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     initiator = randomizer.generate_random_user()
-    chat = Chat(
-        status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
-        initiator=initiator,
-        the_other_person=default_user)
+    chat = Chat(creation_date=datetime.datetime.utcnow(),
+                status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
+                initiator=initiator,
+                the_other_person=default_user)
     session.add(chat)
 
     msg1 = ChatMessage(
@@ -495,10 +497,10 @@ async def test_fetch_single_chat_only_unread(
         randomizer: RandomEntityGenerator,
         default_user_auth_headers: dict[str, str]):
     initiator = randomizer.generate_random_user()
-    chat = Chat(
-        status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
-        initiator=initiator,
-        the_other_person=default_user)
+    chat = Chat(creation_date=datetime.datetime.utcnow(),
+                status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
+                initiator=initiator,
+                the_other_person=default_user)
     session.add(chat)
 
     msg1 = ChatMessage(

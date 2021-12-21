@@ -1,7 +1,7 @@
 import heapq
 import logging
+import secrets
 import time
-import uuid
 from typing import Optional, Iterator, Tuple
 
 import requests
@@ -384,8 +384,8 @@ class Matchmaker:
                                  f"resetting session_id")
                     # in case we reached max age limit and still get no
                     # candidates, reset the session_id to start fetching
-                    # starting from the default age difference
-                    vertex.mm_settings.session_id = uuid.uuid4()
+                    # starting with the default age difference
+                    vertex.mm_settings.session_id = secrets.token_urlsafe(16)
                     continue
             except:
                 logger.exception(f"Error getting candidates for user {user_id}")

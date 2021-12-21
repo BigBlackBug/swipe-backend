@@ -72,7 +72,7 @@ async def test_delete_chat(
     other_user = randomizer.generate_random_user()
     chat_id = uuid.uuid4()
     chat = Chat(
-        id=chat_id,
+        id=chat_id, creation_date=datetime.datetime.utcnow(),
         status=ChatStatus.ACCEPTED,
         source=ChatSource.VIDEO_LOBBY,
         initiator=other_user,
@@ -137,7 +137,9 @@ async def test_post_message_chat_exists(
     user_1 = randomizer.generate_random_user()
     user_2 = randomizer.generate_random_user()
 
-    chat = Chat(status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
+    chat = Chat(status=ChatStatus.ACCEPTED,
+                creation_date=datetime.datetime.utcnow(),
+                source=ChatSource.VIDEO_LOBBY,
                 initiator=user_1, the_other_person=user_2)
     session.add(chat)
     session.commit()
@@ -245,7 +247,9 @@ async def test_set_read(
         randomizer: RandomEntityGenerator,
         chat_service: ChatService):
     user_1 = randomizer.generate_random_user()
-    chat = Chat(status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
+    chat = Chat(status=ChatStatus.ACCEPTED,
+                creation_date=datetime.datetime.utcnow(),
+                source=ChatSource.VIDEO_LOBBY,
                 initiator=user_1, the_other_person=default_user)
     session.add(chat)
 
@@ -288,7 +292,9 @@ async def test_set_like(
         randomizer: RandomEntityGenerator,
         chat_service: ChatService):
     user_1 = randomizer.generate_random_user()
-    chat = Chat(status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
+    chat = Chat(status=ChatStatus.ACCEPTED,
+                creation_date=datetime.datetime.utcnow(),
+                source=ChatSource.VIDEO_LOBBY,
                 initiator=user_1, the_other_person=default_user)
     session.add(chat)
 

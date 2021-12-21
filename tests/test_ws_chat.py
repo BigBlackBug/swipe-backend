@@ -404,7 +404,7 @@ async def test_decline_chat(
     chat_id = uuid.uuid4()
     initiator = randomizer.generate_random_user()
     chat = Chat(
-        id=chat_id,
+        id=chat_id, creation_date=datetime.datetime.utcnow(),
         status=ChatStatus.ACCEPTED, source=ChatSource.VIDEO_LOBBY,
         initiator=initiator,
         the_other_person=default_user)
@@ -474,7 +474,7 @@ async def test_accept_chat(
     chat_id = uuid.uuid4()
     initiator = randomizer.generate_random_user()
     chat = Chat(
-        id=chat_id,
+        id=chat_id, creation_date=datetime.datetime.utcnow(),
         status=ChatStatus.OPENED, source=ChatSource.DIRECT,
         initiator=initiator,
         the_other_person=default_user)
@@ -525,7 +525,7 @@ async def test_open_chat(
     chat_id = uuid.uuid4()
     initiator = randomizer.generate_random_user()
     chat = Chat(
-        id=chat_id,
+        id=chat_id, creation_date=datetime.datetime.utcnow(),
         status=ChatStatus.REQUESTED, source=ChatSource.DIRECT,
         initiator=initiator,
         the_other_person=default_user)

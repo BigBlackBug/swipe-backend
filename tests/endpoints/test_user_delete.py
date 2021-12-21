@@ -137,7 +137,7 @@ async def test_user_delete_with_chats(
     photos: list[str] = default_user.photos
     chat_id = uuid.uuid4()
     chat = Chat(
-        id=chat_id,
+        id=chat_id, creation_date=datetime.datetime.utcnow(),
         status=ChatStatus.ACCEPTED,
         source=ChatSource.VIDEO_LOBBY,
         initiator=other_user,

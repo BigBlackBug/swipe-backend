@@ -255,6 +255,7 @@ class ChatService:
         logger.info(f"Creating chat, id:'{chat_id}' "
                     f"between '{initiator_id}' and '{the_other_person_id}'")
         chat = Chat(id=chat_id,
+                    creation_date=datetime.datetime.utcnow(),
                     source=source,
                     status=chat_status,
                     initiator_id=initiator_id,
