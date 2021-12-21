@@ -76,6 +76,7 @@ async def patch_user(
         user_body: schemas.UserUpdate = Body(...),
         user_service: UserService = Depends(),
         redis_location: RedisLocationService = Depends(),
+        redis_online: RedisOnlineUserService = Depends(),
         user_id: UUID = Depends(security.auth_user_id)):
     current_user = user_service.get_user(user_id)
     previous_location: Location = current_user.location
@@ -100,8 +101,7 @@ async def patch_user(
     else:
         # a regular update
         logger.info(f"Updating online user cache for {user_id}")
-        background_tasks.add_task(
-            swipe_bg_tasks.update_user_cache, current_user)
+        await redis_online.update_cached_user(current_user)
 
     return current_user
 
@@ -143,17 +143,9 @@ async def delete_user(
 
     # if the user has no messages in global chat, send event only
     # to his chat partners
-    if chat_service.has_global_chat_messages(user_id):
-        # they are cascaded but let's do this manually for clarity
-        chat_service.delete_global_chat_messages(user_id)
-        logger.info(f"{user_id} has global messages, "
-                    f"everyone will be notified")
-        events.send_user_deleted_event(str(user_id))
-    elif recipients:
-        logger.debug(
-            f"{user_id} has no global messages, "
-            f"only chat partners {recipients} will be notified")
-        events.send_user_deleted_event(str(user_id), recipients)
+    chat_service.delete_global_chat_messages(user_id)
+
+    events.send_user_deleted_event(str(user_id))
 
     if delete:
         user_service.delete_user(current_user)

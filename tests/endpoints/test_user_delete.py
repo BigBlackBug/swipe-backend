@@ -68,6 +68,9 @@ async def test_user_delete(
         delete_image_calls.append(call(photo))
     delete_image_calls.append(call(default_user.avatar_id))
 
+    old_country = default_user.location.country
+    old_city = default_user.location.city
+    old_gender = default_user.gender
     # -----------------------------------------------------
     await client.delete(
         f"{settings.API_V1_PREFIX}/me",
@@ -76,8 +79,7 @@ async def test_user_delete(
         },
         headers=default_user_auth_headers)
 
-    # no chats -> no event
-    mock_events.send_user_deleted_event.assert_not_called()
+    mock_events.send_user_deleted_event.assert_called_with(str(default_user.id))
 
     mock_user_storage.delete_image.assert_has_calls(
         delete_image_calls, any_order=True)
@@ -88,30 +90,20 @@ async def test_user_delete(
         scalars().one_or_none()
 
     all_settings = OnlineFilterBody(
-        country=default_user.location.country,
-        city=default_user.location.city,
-        gender=default_user.gender
+        country=old_country, city=old_city, gender=old_gender
     )
     assert user_id not in await redis_online.get_online_users(
         default_user.age, all_settings)
 
-    all_settings = OnlineFilterBody(
-        country=default_user.location.country,
-        gender=default_user.gender
-    )
+    all_settings = OnlineFilterBody(country=old_country, gender=old_gender)
     assert user_id not in await redis_online.get_online_users(
         default_user.age, all_settings)
 
-    all_settings = OnlineFilterBody(
-        country=default_user.location.country,
-        city=default_user.location.city,
-    )
+    all_settings = OnlineFilterBody(country=old_country, city=old_city, )
     assert user_id not in await redis_online.get_online_users(
         default_user.age, all_settings)
 
-    all_settings = OnlineFilterBody(
-        country=default_user.location.country,
-    )
+    all_settings = OnlineFilterBody(country=old_country)
     assert user_id not in await redis_online.get_online_users(
         default_user.age, all_settings)
 
@@ -180,8 +172,7 @@ async def test_user_delete_with_chats(
 
     url = f'{settings.CHAT_SERVER_HOST}/events/user_deleted'
     mock_requests.post.assert_called_with(url, json={
-        'user_id': str(default_user.id),
-        'recipients': [str(other_user.id), ]
+        'user_id': str(default_user.id)
     })
 
     assert not user_service.get_user(default_user.id)
@@ -331,6 +322,7 @@ async def test_user_delete_with_blacklist(
         session: Session,
         default_user_auth_headers: dict[str, str]):
     mocker.patch('swipe.swipe_server.users.models.storage_client')
+    mock_events = mocker.patch('swipe.swipe_server.users.endpoints.me.events')
 
     other_user = randomizer.generate_random_user()
     await blacklist_service.update_blacklist(
@@ -345,6 +337,7 @@ async def test_user_delete_with_blacklist(
         },
         headers=default_user_auth_headers)
 
+    mock_events.send_user_deleted_event.assert_called_with(str(default_user.id))
     assert not user_service.get_user(default_user.id)
     assert not session.execute(
         select(AuthInfo).where(AuthInfo.id == auth_info_id)). \

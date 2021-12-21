@@ -22,6 +22,7 @@ def send_blacklist_event(blocked_by_id: str, blocked_user_id: str):
 
 def send_user_deleted_event(user_id: str,
                             recipients: Optional[list[str]] = None):
+    logger.info(f"Sending 'user_deleted' {user_id} notification")
     if recipients:
         # we gotta notify every chat participant that the user is gone
         requests.post(BASE_URL + 'user_deleted', json={

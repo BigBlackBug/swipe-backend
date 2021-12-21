@@ -269,10 +269,6 @@ class ChatService:
                         where(GlobalChatMessage.sender_id == user_id))
         self.db.commit()
 
-    def has_global_chat_messages(self, user_id: UUID):
-        return self.db.query(func.count(GlobalChatMessage.id)). \
-                   filter(GlobalChatMessage.sender_id == user_id).scalar() > 0
-
     def get_chat_partners(self, user_id: str) -> list[str]:
         logger.info(f"Fetching chat partners of {user_id}")
         a_to_b = select(cast(Chat.the_other_person_id, String)).where(
