@@ -197,12 +197,13 @@ class UserService:
             user_payload: schemas.AuthenticationIn) -> Optional[User]:
         logger.debug(f"Checking auth_info on user from {user_payload}")
         auth_info = self.db.execute(
-            select(AuthInfo, User.id)
-                .where(AuthInfo.auth_provider
-                       == user_payload.auth_provider)
-                .where(AuthInfo.provider_user_id
-                       == user_payload.provider_user_id)) \
-            .scalar_one_or_none()
+            select(AuthInfo, User.id). \
+                join(User). \
+                where(AuthInfo.auth_provider
+                      == user_payload.auth_provider). \
+                where(AuthInfo.provider_user_id
+                      == user_payload.provider_user_id)). \
+            scalar_one_or_none()
 
         return auth_info.user if auth_info else None
 
@@ -243,7 +244,7 @@ class UserService:
         logger.info(f"Deactivating user {user.id}")
         self.db.execute(
             update(User).where(User.id == user.id)
-            .values(deactivation_date=datetime.datetime.now()))
+                .values(deactivation_date=datetime.datetime.now()))
         self.db.execute(delete(AuthInfo).where(AuthInfo.user_id == user.id))
         self.db.commit()
 
