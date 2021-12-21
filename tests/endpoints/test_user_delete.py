@@ -270,7 +270,6 @@ async def test_user_delete_with_global_deactivate(
         mocker.patch('swipe.swipe_server.users.models.storage_client')
     mock_events = mocker.patch('swipe.swipe_server.users.endpoints.me.events')
 
-    photos: list[str] = default_user.photos
     other_user = randomizer.generate_random_user()
     another_user = randomizer.generate_random_user()
 
@@ -312,7 +311,7 @@ async def test_user_delete_with_global_deactivate(
     assert session.execute(
         select(User.deactivation_date).where(User.id == default_user.id)
     ).scalars().one_or_none() is not None
-    assert session.execute(
+    assert not session.execute(
         select(AuthInfo).where(AuthInfo.id == auth_info_id)). \
         scalars().one_or_none()
 

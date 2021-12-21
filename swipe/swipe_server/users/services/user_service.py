@@ -197,20 +197,14 @@ class UserService:
             user_payload: schemas.AuthenticationIn) -> Optional[User]:
         logger.debug(f"Checking auth_info on user from {user_payload}")
         auth_info = self.db.execute(
-            select(AuthInfo, User.deactivation_date, User.id)
-                .join(User)
+            select(AuthInfo, User.id)
                 .where(AuthInfo.auth_provider
                        == user_payload.auth_provider)
                 .where(AuthInfo.provider_user_id
                        == user_payload.provider_user_id)) \
             .scalar_one_or_none()
 
-        if auth_info:
-            if auth_info.user.deactivation_date:
-                raise SwipeError(f'User {auth_info.user.id} is deactivated')
-            return auth_info.user
-
-        return None
+        return auth_info.user if auth_info else None
 
     def create_access_token(self, user_object: User,
                             payload: schemas.AuthenticationIn) -> str:
@@ -250,6 +244,7 @@ class UserService:
         self.db.execute(
             update(User).where(User.id == user.id)
             .values(deactivation_date=datetime.datetime.now()))
+        self.db.execute(delete(AuthInfo).where(AuthInfo.user_id == user.id))
         self.db.commit()
 
     def fetch_locations(self) -> dict[str, list[str]]:

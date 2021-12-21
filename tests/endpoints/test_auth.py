@@ -68,23 +68,31 @@ async def test_auth_existing_user_deactivated(
         client: AsyncClient,
         session: Session,
         fake_redis: Redis,
+        user_service: UserService,
         redis_swipes: RedisSwipeReaperService,
         redis_online: RedisOnlineUserService,
         default_user: models.User) -> None:
-    default_user.deactivation_date = datetime.datetime.utcnow()
-    session.commit()
+    auth_provider = default_user.auth_info.auth_provider
+    provider_user_id = default_user.auth_info.provider_user_id
+    user_service.deactivate_user(default_user)
 
     response: Response = await client.post(
         f"{settings.API_V1_PREFIX}/auth", json={
-            'auth_provider': default_user.auth_info.auth_provider,
-            'provider_user_id': default_user.auth_info.provider_user_id
+            'auth_provider': auth_provider,
+            'provider_user_id': provider_user_id
         }
     )
-    assert response.status_code == 409
+    # a new user is created
+    assert response.status_code == 201
+    assert response.json().get('access_token')
 
-    # free swipes cache not is set
-    assert not await redis_swipes.get_swipe_reap_timestamp(default_user.id)
-    assert not await redis_online.get_online_user_token(str(default_user.id))
+    new_user_id = response.json().get('user_id')
+    assert new_user_id != str(default_user.id)
+
+    user = user_service.get_user(new_user_id)
+    # free swipes cache is set
+    assert await redis_swipes.get_swipe_reap_timestamp(user.id)
+    assert await redis_online.get_online_user_token(str(user.id))
 
 
 @pytest.mark.anyio
