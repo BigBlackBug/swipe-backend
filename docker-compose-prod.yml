@@ -9,6 +9,7 @@ services:
   turn_server:
     image: coturn/coturn
     network_mode: host
+    restart: always
     volumes:
       - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
 
@@ -32,6 +33,7 @@ services:
 
   swipe_server:
     image: ${SWIPE_IMAGE:?unset}
+    restart: on-failure
     env_file:
       - swipe.env
     environment:
@@ -40,6 +42,7 @@ services:
 
   chat_server:
     image: ${SWIPE_IMAGE:?unset}
+    restart: on-failure
     env_file:
       - swipe.env
     environment:
@@ -52,6 +55,7 @@ services:
 
   video_matchmaking_server:
     image: ${SWIPE_IMAGE:?unset}
+    restart: on-failure
     env_file:
       - swipe.env
     environment:
@@ -62,6 +66,7 @@ services:
 
   video_matchmaker:
     image: ${SWIPE_IMAGE:?unset}
+    restart: on-failure
     env_file:
       - swipe.env
     environment:
@@ -72,6 +77,7 @@ services:
 
   audio_matchmaking_server:
     image: ${SWIPE_IMAGE:?unset}
+    restart: on-failure
     env_file:
       - swipe.env
     environment:
@@ -80,9 +86,9 @@ services:
     depends_on:
       - turn_server
 
-
   audio_matchmaker:
     image: ${SWIPE_IMAGE:?unset}
+    restart: on-failure
     env_file:
       - swipe.env
     environment:
@@ -93,6 +99,7 @@ services:
 
   text_matchmaking_server:
     image: ${SWIPE_IMAGE:?unset}
+    restart: on-failure
     env_file:
       - swipe.env
     environment:
@@ -101,9 +108,9 @@ services:
     depends_on:
       - turn_server
 
-
   text_matchmaker:
     image: ${SWIPE_IMAGE:?unset}
+    restart: on-failure
     env_file:
       - swipe.env
     environment:
@@ -114,6 +121,7 @@ services:
 
   text_matchmaking_chat_server:
     image: ${SWIPE_IMAGE:?unset}
+    restart: on-failure
     env_file:
       - swipe.env
     environment:
