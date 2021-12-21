@@ -19,7 +19,7 @@ from swipe.swipe_server.users.services.online_cache import \
 from swipe.swipe_server.users.services.popular_cache import PopularUserService
 from swipe.swipe_server.users.services.redis_services import \
     RedisLocationService, \
-    RedisBlacklistService
+    RedisBlacklistService, RedisUserCacheService
 from swipe.swipe_server.users.services.user_service import UserService
 
 IMAGE_CONTENT_TYPE_REGEXP = 'image/(png|jpe?g)'
@@ -77,6 +77,7 @@ async def patch_user(
         user_service: UserService = Depends(),
         redis_location: RedisLocationService = Depends(),
         redis_online: RedisOnlineUserService = Depends(),
+        redis_user: RedisUserCacheService = Depends(),
         user_id: UUID = Depends(security.auth_user_id)):
     current_user = user_service.get_user(user_id)
     previous_location: Location = current_user.location
@@ -101,7 +102,8 @@ async def patch_user(
     else:
         # a regular update
         logger.info(f"Updating online user cache for {user_id}")
-        await redis_online.update_cached_user(current_user)
+        await redis_online.cache_user(current_user)
+        await redis_user.cache_user(current_user)
 
     return current_user
 
@@ -115,6 +117,7 @@ async def delete_user(
         chat_service: ChatService = Depends(),
         redis_blacklist: RedisBlacklistService = Depends(),
         redis_online: RedisOnlineUserService = Depends(),
+        redis_user:RedisUserCacheService = Depends(),
         popular_service: PopularUserService = Depends(),
         user_id: UUID = Depends(security.auth_user_id)):
     current_user: User = user_service.get_user(user_id)
@@ -127,6 +130,7 @@ async def delete_user(
     if current_user.location:
         await redis_online.remove_from_online_caches(current_user)
 
+    await redis_user.drop_user(str(user_id))
     await redis_blacklist.drop_blacklist_cache(str(user_id))
 
     logger.info(f"Deleting chats of {user_id}")

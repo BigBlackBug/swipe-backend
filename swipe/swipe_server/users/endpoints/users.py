@@ -19,7 +19,8 @@ from swipe.swipe_server.users.services.fetch_service import FetchUserService
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
 from swipe.swipe_server.users.services.redis_services import \
-    RedisPopularService, RedisBlacklistService, RedisChatCacheService
+    RedisPopularService, RedisBlacklistService, RedisChatCacheService, \
+    RedisUserCacheService
 from swipe.swipe_server.users.services.user_service import UserService
 
 logger = logging.getLogger(__name__)
@@ -265,11 +266,17 @@ async def avatar_redirect(
 async def fetch_user(
         user_id: UUID,
         user_service: UserService = Depends(),
+        redis_user: RedisUserCacheService = Depends(),
         current_user_id: UUID = Depends(security.auth_user_id)):
-    # TODO cache
-    user = user_service.get_user(user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f'User {user_id} not found')
-    user_out: UserOut = UserOut.patched_from_orm(user)
+    user_out = await redis_user.get_user(str(user_id))
+    if not user_out:
+        logger.debug(f"User {user_id} is not in cache")
+        user = user_service.get_user(user_id)
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail=f'User {user_id} not found')
+
+        user_out = UserOut.patched_from_orm(user)
+        await redis_user.cache_user(user_out)
+
     return user_out

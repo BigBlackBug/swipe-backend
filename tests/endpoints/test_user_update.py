@@ -17,7 +17,7 @@ from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
 from swipe.swipe_server.users.services.redis_services import \
-    RedisLocationService, RedisPopularService
+    RedisLocationService, RedisPopularService, RedisUserCacheService
 from swipe.swipe_server.users.services.user_service import UserService
 
 
@@ -27,6 +27,7 @@ async def test_user_update_dob_zodiac(
         default_user: User,
         user_service: UserService,
         session: Session,
+        redis_user: RedisUserCacheService,
         default_user_auth_headers: dict[str, str]):
     default_user.date_of_birth = datetime.date.today()
     default_user.zodiac_sign = None
@@ -40,6 +41,8 @@ async def test_user_update_dob_zodiac(
     assert default_user.zodiac_sign == ZodiacSign.from_date('2020-02-01')
     assert default_user.date_of_birth == \
            dateutil.parser.parse('2020-02-01').date()
+
+    assert await redis_user.get_user(str(default_user.id))
 
 
 @pytest.mark.anyio
@@ -83,6 +86,7 @@ async def test_user_update_photo_list(
         client: AsyncClient,
         default_user: User,
         user_service: UserService,
+        redis_user: RedisUserCacheService,
         session: Session,
         default_user_auth_headers: dict[str, str]):
     default_user.photos = ['photo_1.png', 'photo_2.png']
@@ -103,9 +107,12 @@ async def test_user_update_photo_list(
         json={
             'photos': ['photo_2.png', 'photo_1.png']
         })
+
     assert response.status_code == 200
     update_avatar_mock.assert_called_with(default_user, photo_id='photo_2.png')
     mock_storage.delete_image.assert_called_with(old_avatar_id)
+
+    assert await redis_user.get_user(str(default_user.id))
 
 
 @pytest.mark.anyio

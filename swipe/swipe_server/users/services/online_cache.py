@@ -163,7 +163,7 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
             city=filter_params.city, gender=filter_params.gender)
         return await self.redis.smembers(cache_params.cache_key())
 
-    async def update_cached_user(self, user: User):
+    async def cache_user(self, user: User):
         json_data = UserCardPreviewOut.patched_from_orm(user).json()
         # TODO man, I need a separate connection without decoding
         # but I don't wanna do that atm
@@ -185,7 +185,7 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
             logger.debug(f"Adding {user_id} to {key}")
             await self.redis.sadd(key, user_id)
 
-        await self.update_cached_user(user)
+        await self.cache_user(user)
 
     async def remove_from_online_caches(
             self, user: User, location: Optional[Location] = None):

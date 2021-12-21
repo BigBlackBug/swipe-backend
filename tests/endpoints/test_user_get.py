@@ -10,6 +10,8 @@ from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
+from swipe.swipe_server.users.services.redis_services import \
+    RedisUserCacheService
 from swipe.swipe_server.users.services.user_service import UserService
 
 
@@ -73,11 +75,18 @@ async def test_user_fetch_single(
         default_user: User,
         randomizer: RandomEntityGenerator,
         session: Session,
+        redis_user: RedisUserCacheService,
         default_user_auth_headers: dict[str, str]):
+    # not cached
+    assert not await redis_user.get_user(str(default_user.id))
+
     response: Response = await client.get(
         f"{settings.API_V1_PREFIX}/users/{default_user.id}",
         headers=default_user_auth_headers
     )
+    # cached
+    assert await redis_user.get_user(str(default_user.id))
+
     assert response.json()['avatar_url'] == \
            f'{settings.SWIPE_REST_SERVER_HOST}/v1/users/' \
            f'{default_user.id}/avatar'

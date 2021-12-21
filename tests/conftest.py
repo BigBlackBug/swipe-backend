@@ -23,12 +23,13 @@ from swipe.swipe_server.misc.database import ModelBase
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
 from swipe.swipe_server.users.schemas import AuthenticationIn
+from swipe.swipe_server.users.services.blacklist_service import BlacklistService
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
 from swipe.swipe_server.users.services.redis_services import \
     RedisLocationService, RedisBlacklistService, RedisPopularService, \
-    RedisSwipeReaperService, RedisUserFetchService, RedisChatCacheService
-from swipe.swipe_server.users.services.blacklist_service import BlacklistService
+    RedisSwipeReaperService, RedisUserFetchService, RedisChatCacheService, \
+    RedisUserCacheService
 from swipe.swipe_server.users.services.user_service import UserService
 
 config.configure_logging()
@@ -169,6 +170,11 @@ def randomizer(user_service: UserService,
 @pytest.fixture
 def user_service(session: Session) -> UserService:
     return UserService(session)
+
+
+@pytest.fixture
+def redis_user(fake_redis: Redis) -> RedisUserCacheService:
+    return RedisUserCacheService(fake_redis)
 
 
 @pytest.fixture

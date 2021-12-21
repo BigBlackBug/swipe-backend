@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     SENTRY_MATCHMAKING_SERVER_URL: Optional[str] = None
     SENTRY_CHAT_SERVER_URL: Optional[str] = None
 
+    USER_MODEL_CACHE_TTL_SEC = 60 * 60
+
     SENTRY_SAMPLE_RATE = 1.0
 
     class Config:

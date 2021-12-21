@@ -78,6 +78,7 @@ class UserCardPreviewOut(BaseModel):
     tiktok_profile: Optional[str] = None
     snapchat_profile: Optional[str] = None
 
+    online: bool = False
     last_online: Optional[datetime.datetime] = None
 
     @classmethod
@@ -88,6 +89,8 @@ class UserCardPreviewOut(BaseModel):
         for photo_id in schema_obj.photos:
             patched_photos.append(storage_client.get_image_url(photo_id))
         schema_obj.photo_urls = patched_photos
+        schema_obj.online = obj.last_online is None
+        schema_obj.last_online = obj.last_online
         return schema_obj
 
     @staticmethod

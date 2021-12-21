@@ -25,7 +25,7 @@ from swipe.swipe_server.users.services.online_cache import \
 from swipe.swipe_server.users.services.popular_cache import PopularUserService, \
     CountryCacheService
 from swipe.swipe_server.users.services.redis_services import \
-    RedisBlacklistService
+    RedisBlacklistService, RedisUserCacheService
 from swipe.swipe_server.users.services.user_service import UserService
 
 
@@ -39,6 +39,7 @@ async def test_user_delete(
         session: Session,
         fake_redis: aioredis.Redis,
         redis_online: RedisOnlineUserService,
+        redis_user: RedisUserCacheService,
         redis_blacklist: RedisBlacklistService,
         default_user_auth_headers: dict[str, str]):
     default_user.gender = Gender.MALE
@@ -59,6 +60,7 @@ async def test_user_delete(
     await cache_service.populate_country_cache()
     popular_service = PopularUserService(session, fake_redis)
     await popular_service.populate_popular_cache()
+    await redis_user.cache_user(default_user)
 
     await redis_blacklist.add_to_blacklist_cache(
         blocked_user_id=str(user_1.id), blocked_by_id=user_id)
@@ -84,6 +86,7 @@ async def test_user_delete(
     mock_user_storage.delete_image.assert_has_calls(
         delete_image_calls, any_order=True)
 
+    assert not await redis_user.get_user(str(default_user.id))
     assert not user_service.get_user(default_user.id)
     assert not session.execute(
         select(AuthInfo).where(AuthInfo.id == auth_info_id)). \
@@ -116,6 +119,7 @@ async def test_user_delete_with_chats(
         client: AsyncClient,
         default_user: User,
         user_service: UserService,
+        redis_user: RedisUserCacheService,
         randomizer: RandomEntityGenerator,
         session: Session,
         default_user_auth_headers: dict[str, str]):
@@ -151,6 +155,8 @@ async def test_user_delete_with_chats(
     chat.messages.extend([msg1, msg2, msg3, msg4])
     session.commit()
 
+    await redis_user.cache_user(default_user)
+
     auth_info_id: UUID = default_user.auth_info.id
     # ---------------------------------------------------------------------
     await client.delete(
@@ -175,6 +181,7 @@ async def test_user_delete_with_chats(
         'user_id': str(default_user.id)
     })
 
+    assert not await redis_user.get_user(str(default_user.id))
     assert not user_service.get_user(default_user.id)
     assert not session.execute(
         select(AuthInfo).where(AuthInfo.id == auth_info_id)). \
@@ -193,6 +200,7 @@ async def test_user_delete_with_global(
         client: AsyncClient,
         default_user: User,
         user_service: UserService,
+        redis_user: RedisUserCacheService,
         randomizer: RandomEntityGenerator,
         session: Session,
         default_user_auth_headers: dict[str, str]):
@@ -222,6 +230,8 @@ async def test_user_delete_with_global(
     session.add(msg4)
     session.commit()
 
+    await redis_user.cache_user(default_user)
+
     auth_info_id: UUID = default_user.auth_info.id
     await client.delete(
         f"{settings.API_V1_PREFIX}/me",
@@ -239,6 +249,7 @@ async def test_user_delete_with_global(
 
     mock_events.send_user_deleted_event.assert_called_with(str(default_user.id))
 
+    assert not await redis_user.get_user(str(default_user.id))
     assert not user_service.get_user(default_user.id)
     assert not session.execute(
         select(AuthInfo).where(AuthInfo.id == auth_info_id)). \
@@ -254,6 +265,7 @@ async def test_user_delete_with_global_deactivate(
         client: AsyncClient,
         default_user: User,
         user_service: UserService,
+        redis_user: RedisUserCacheService,
         randomizer: RandomEntityGenerator,
         session: Session,
         default_user_auth_headers: dict[str, str]):
@@ -282,6 +294,8 @@ async def test_user_delete_with_global_deactivate(
     session.add(msg4)
     session.commit()
 
+    await redis_user.cache_user(default_user)
+
     auth_info_id: UUID = default_user.auth_info.id
     await client.delete(
         f"{settings.API_V1_PREFIX}/me",
@@ -299,6 +313,8 @@ async def test_user_delete_with_global_deactivate(
         assert user_service.get_user(default_user.id)
     assert 'is deactivated' in str(exc_info.value)
 
+    # still gone from cache
+    assert not await redis_user.get_user(str(default_user.id))
     assert session.execute(
         select(User.deactivation_date).where(User.id == default_user.id)
     ).scalars().one_or_none() is not None
@@ -316,6 +332,7 @@ async def test_user_delete_with_blacklist(
         client: AsyncClient,
         default_user: User,
         user_service: UserService,
+        redis_user: RedisUserCacheService,
         blacklist_service: BlacklistService,
         redis_blacklist: RedisBlacklistService,
         randomizer: RandomEntityGenerator,
@@ -329,6 +346,8 @@ async def test_user_delete_with_blacklist(
         str(other_user.id), str(default_user.id))
     session.commit()
 
+    await redis_user.cache_user(default_user)
+
     auth_info_id: UUID = default_user.auth_info.id
     await client.delete(
         f"{settings.API_V1_PREFIX}/me",
@@ -338,6 +357,8 @@ async def test_user_delete_with_blacklist(
         headers=default_user_auth_headers)
 
     mock_events.send_user_deleted_event.assert_called_with(str(default_user.id))
+
+    assert not await redis_user.get_user(str(default_user.id))
     assert not user_service.get_user(default_user.id)
     assert not session.execute(
         select(AuthInfo).where(AuthInfo.id == auth_info_id)). \

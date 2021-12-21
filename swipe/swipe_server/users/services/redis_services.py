@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, AsyncGenerator, Iterable
+from typing import Optional, Tuple, AsyncGenerator, Iterable, Union
 from uuid import UUID
 
 import aioredis
@@ -13,7 +13,7 @@ from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.users.enums import Gender
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.schemas import PopularFilterBody, \
-    UserCardPreviewOut
+    UserCardPreviewOut, UserOut
 from swipe.swipe_server.utils import enable_blacklist
 
 logger = logging.getLogger(__name__)
@@ -333,3 +333,26 @@ class RedisFirebaseService:
             f'{self.FIREBASE_COOLDOWN_KEY}:{sender_id}:{recipient_id}',
             time=constants.FIREBASE_NOTIFICATION_COOLDOWN_SEC,
             value='1')
+
+
+class RedisUserCacheService:
+    USER_CACHE_KEY = 'swipe_user'
+
+    def __init__(self,
+                 redis: aioredis.Redis = Depends(dependencies.redis)):
+        self.redis = redis
+
+    async def get_user(self, user_id: str) -> Optional[UserOut]:
+        return await self.redis.get(f'{self.USER_CACHE_KEY}:{user_id}')
+
+    async def cache_user(self, user: Union[UserOut, User]):
+        if isinstance(user, User):
+            user = UserOut.patched_from_orm(user)
+
+        logger.debug(f'Saving {user.id} to user cache')
+        await self.redis.setex(f'{self.USER_CACHE_KEY}:{user.id}',
+                               time=settings.USER_MODEL_CACHE_TTL_SEC,
+                               value=user.json())
+
+    async def drop_user(self, user_id: str):
+        await self.redis.delete(f'{self.USER_CACHE_KEY}:{user_id}')
