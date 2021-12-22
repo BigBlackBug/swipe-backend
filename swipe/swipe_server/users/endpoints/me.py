@@ -11,9 +11,10 @@ from swipe.swipe_server import events
 from swipe.swipe_server.chats.models import Chat
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc import security
-from swipe.swipe_server.users import schemas, swipe_bg_tasks
+from swipe.swipe_server.users import swipe_bg_tasks
 from swipe.swipe_server.users.models import User, Location
-from swipe.swipe_server.users.schemas import RatingUpdateReason
+from swipe.swipe_server.users.schemas import RatingUpdateReason, UserOut, \
+    UserUpdate
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
 from swipe.swipe_server.users.services.popular_cache import PopularUserService
@@ -32,11 +33,11 @@ router = APIRouter()
 @router.get(
     '',
     name="Get current users profile",
-    response_model=schemas.UserOut)
+    response_model=UserOut)
 async def fetch_user(user_service: UserService = Depends(),
                      user_id: UUID = Depends(security.auth_user_id)):
     current_user = user_service.get_user(user_id)
-    user_out: schemas.UserOut = schemas.UserOut.patched_from_orm(current_user)
+    user_out: UserOut = UserOut.patched_from_orm(current_user)
     return user_out
 
 
@@ -69,11 +70,11 @@ async def add_rating(
 @router.patch(
     '',
     name="Update the authenticated users fields",
-    response_model=schemas.UserOut,
+    response_model=UserOut,
     response_model_exclude={'photo_urls', })
 async def patch_user(
         background_tasks: BackgroundTasks,
-        user_body: schemas.UserUpdate = Body(...),
+        user_body: UserUpdate = Body(...),
         user_service: UserService = Depends(),
         redis_location: RedisLocationService = Depends(),
         redis_online: RedisOnlineUserService = Depends(),
@@ -110,7 +111,7 @@ async def patch_user(
             logger.warning(
                 f"No location set on user {user_id}, not updating cache")
 
-    return current_user
+    return UserOut.patched_from_orm(current_user)
 
 
 @router.delete(

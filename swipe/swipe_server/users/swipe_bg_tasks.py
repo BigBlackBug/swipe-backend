@@ -6,16 +6,18 @@ from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
 from swipe.swipe_server.users.services.popular_cache import PopularUserService
 from swipe.swipe_server.users.services.redis_services import \
-    RedisLocationService
+    RedisLocationService, RedisUserCacheService
 
 logger = logging.getLogger(__name__)
 
 
 async def update_location_caches(user: User, old_location: Location):
     with dependencies.db_context() as db:
-        redis_online = RedisOnlineUserService(dependencies.redis())
-        popular_service = PopularUserService(db, dependencies.redis())
-        redis_location = RedisLocationService(dependencies.redis())
+        redis = dependencies.redis()
+        redis_online = RedisOnlineUserService(redis)
+        popular_service = PopularUserService(db, redis)
+        redis_location = RedisLocationService(redis)
+        redis_user = RedisUserCacheService(redis)
         await redis_location.add_cities(
             user.location.country, [user.location.city])
 
@@ -24,6 +26,7 @@ async def update_location_caches(user: User, old_location: Location):
                 user, old_location)
             # putting him back to caches with correct location
             await redis_online.add_to_online_caches(user)
+            await redis_user.cache_user(user)
         except:
             logger.exception(f"Unable to update caches for {user.id}"
                              f"after location update")
