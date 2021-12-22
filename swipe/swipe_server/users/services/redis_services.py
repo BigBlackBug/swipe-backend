@@ -343,7 +343,8 @@ class RedisUserCacheService:
         self.redis = redis
 
     async def get_user(self, user_id: str) -> Optional[UserOut]:
-        return await self.redis.get(f'{self.USER_CACHE_KEY}:{user_id}')
+        user_data = await self.redis.get(f'{self.USER_CACHE_KEY}:{user_id}')
+        return UserOut.parse_raw(user_data) if user_data else None
 
     async def cache_user(self, user: Union[UserOut, User]):
         if isinstance(user, User):
@@ -356,3 +357,8 @@ class RedisUserCacheService:
 
     async def drop_user(self, user_id: str):
         await self.redis.delete(f'{self.USER_CACHE_KEY}:{user_id}')
+
+    async def drop_cache(self):
+        logger.info('Dropping user cache')
+        for key in await self.redis.keys(f'{self.USER_CACHE_KEY}:*'):
+            await self.redis.delete(key)

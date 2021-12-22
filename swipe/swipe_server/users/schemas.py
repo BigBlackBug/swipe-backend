@@ -143,6 +143,7 @@ class UserOut(UserBase):
     class Config:
         # allows Pydantic to read orm models and not just dicts
         orm_mode = True
+        use_enum_values = True
 
 
 class UserUpdate(UserBase):

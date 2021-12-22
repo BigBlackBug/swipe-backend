@@ -30,7 +30,7 @@ from swipe.swipe_server.users.services.online_cache import \
 from swipe.swipe_server.users.services.popular_cache import CountryCacheService, \
     PopularUserService
 from swipe.swipe_server.users.services.redis_services import \
-    RedisUserFetchService
+    RedisUserFetchService, RedisUserCacheService
 
 if settings.SENTRY_SWIPE_SERVER_URL:
     sentry_sdk.init(
@@ -90,6 +90,12 @@ async def populate_online_caches():
             await redis_online.add_to_recently_online_cache(user)
             logger.debug(f"Adding {user.id} to online set")
             await redis_online.add_to_online_caches(user)
+
+
+# TODO just for dev
+async def drop_user_cache():
+    redis_user = RedisUserCacheService(dependencies.redis())
+    await redis_user.drop_cache()
 
 
 async def populate_country_cache():
@@ -159,6 +165,7 @@ if __name__ == '__main__':
     # That's kinda stupid but will work for now
     loop.run_until_complete(run_migrations())
     loop.run_until_complete(init_storage_buckets())
+    loop.run_until_complete(drop_user_cache())
     loop.run_until_complete(populate_online_caches())
     loop.run_until_complete(populate_country_cache())
     loop.run_until_complete(populate_popular_cache())

@@ -268,9 +268,9 @@ async def fetch_user(
         user_service: UserService = Depends(),
         redis_user: RedisUserCacheService = Depends(),
         current_user_id: UUID = Depends(security.auth_user_id)):
-    user_out = await redis_user.get_user(str(user_id))
+    user_out: UserOut = await redis_user.get_user(str(user_id))
     if not user_out:
-        logger.debug(f"User {user_id} is not in cache")
+        logger.debug(f"User {user_id} is not in user cache")
         user = user_service.get_user(user_id)
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
