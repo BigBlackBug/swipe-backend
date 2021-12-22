@@ -101,9 +101,14 @@ async def patch_user(
                 user_body.location.country, [user_body.location.city])
     else:
         # a regular update
-        logger.info(f"Updating online user cache for {user_id}")
-        await redis_online.cache_user(current_user)
-        await redis_user.cache_user(current_user)
+        if previous_location:
+            # TODO whyyy is it possible?
+            logger.info(f"Updating online user cache for {user_id}")
+            await redis_online.cache_user(current_user)
+            await redis_user.cache_user(current_user)
+        else:
+            logger.warning(
+                f"No location set on user {user_id}, not updating cache")
 
     return current_user
 
