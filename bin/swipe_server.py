@@ -79,6 +79,7 @@ async def populate_online_caches():
             datetime.timedelta(seconds=constants.RECENTLY_ONLINE_TTL_SEC)
         last_online_users = \
             db.execute(select(User).where(
+                (User.deactivation_date == None) &
                 (User.last_online > last_online) &
                 (User.last_online != None)  # noqa
             )).scalars().all()
