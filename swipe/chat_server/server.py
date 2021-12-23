@@ -116,19 +116,19 @@ async def websocket_endpoint(
                 await request_processor.process(base_payload)
         except:
             logger.exception(f"Error processing payload {base_payload}")
-            await _send_ack(base_payload, failed=True)
+            await _send_ack(base_payload, success=False)
             continue
         else:
             await _send_ack(base_payload)
 
         try:
-            await _send_response_to_sender(base_payload)
+            await _send_response_to_recipient(base_payload)
         except:
             logger.exception(
                 f"Error delivering payload to {base_payload.recipient_id}")
 
 
-async def _send_response_to_sender(base_payload: BasePayload):
+async def _send_response_to_recipient(base_payload: BasePayload):
     if isinstance(base_payload.payload, DeclineChatPayload):
         await _send_blacklist_events(
             blocked_user_id=str(base_payload.recipient_id),
@@ -151,15 +151,15 @@ async def _send_response_to_sender(base_payload: BasePayload):
             await connection_manager.send(recipient_id, out_payload)
 
 
-async def _send_ack(payload: BasePayload, failed: bool = False):
+async def _send_ack(payload: BasePayload, success: bool = True):
     if not payload.request_id:
         return
 
     try:
         logger.info(
-            f"Sending ack={failed} payload to request_id={payload.request_id}")
+            f"Sending ack={success} payload to request_id={payload.request_id}")
         out_payload = OutPayload(payload=AckPayload(
-            type=AckType.ACK if not failed else AckType.ACK_FAILED,
+            type=AckType.ACK if success else AckType.ACK_FAILED,
             request_id=payload.request_id,
             timestamp=datetime.datetime.utcnow(),
         ))

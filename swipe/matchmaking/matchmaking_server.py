@@ -112,7 +112,7 @@ async def matchmaker_endpoint(
                                    connection_manager.get_user_data(user_id))
         except:
             logger.exception(f"Error processing payload {base_payload}")
-            await _send_ack(base_payload, failed=True)
+            await _send_ack(base_payload, success=False)
             continue
         else:
             await _send_ack(base_payload)
@@ -124,15 +124,15 @@ async def matchmaker_endpoint(
                 base_payload.dict(by_alias=True, exclude_unset=True))
 
 
-async def _send_ack(payload: MMBasePayload, failed: bool = False):
+async def _send_ack(payload: MMBasePayload, success: bool = True):
     if not payload.request_id:
         return
 
     try:
         logger.info(
-            f"Sending ack={failed} payload to request_id={payload.request_id}")
+            f"Sending ack={success} payload to request_id={payload.request_id}")
         out_payload = MMOutPayload(payload=MMAckPayload(
-            type=MMAckType.ACK if not failed else MMAckType.ACK_FAILED,
+            type=MMAckType.ACK if not success else MMAckType.ACK_FAILED,
             request_id=payload.request_id,
             timestamp=datetime.datetime.utcnow(),
         ))
