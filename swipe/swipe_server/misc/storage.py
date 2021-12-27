@@ -14,7 +14,7 @@ STORAGE_CHAT_IMAGE_BUCKET = 'chat-images'
 
 logger = logging.getLogger(__name__)
 
-
+# TODO all sorts of error handling
 class CloudStorage:
     def __init__(self):
         self._client = boto3.client(
@@ -42,7 +42,6 @@ class CloudStorage:
             else:
                 raise
 
-    # TODO all sorts of error handling
     def upload_image(self, image_id: str, file_content: Union[IO, bytes]):
         logger.info(f"Uploading image: {image_id}")
         self._client.put_object(
@@ -50,7 +49,6 @@ class CloudStorage:
             Body=file_content)
 
     def get_image_url(self, image_id: str) -> str:
-        # TODO add a check for file existence
         return self._client.generate_presigned_url(
             "get_object",
             Params={"Bucket": STORAGE_ACCOUNT_IMAGE_BUCKET, "Key": image_id},
@@ -59,7 +57,6 @@ class CloudStorage:
 
     def delete_image(self, image_id: str):
         logger.info(f"Deleting account image: {image_id}")
-        # TODO any validations that objects were actually deleted?
         self._client.delete_object(
             Bucket=STORAGE_ACCOUNT_IMAGE_BUCKET, Key=image_id)
 
@@ -70,7 +67,6 @@ class CloudStorage:
             Body=file_content)
 
     def get_chat_image_url(self, image_id: str) -> str:
-        # TODO add a check for file existence
         return self._client.generate_presigned_url(
             "get_object",
             Params={"Bucket": STORAGE_CHAT_IMAGE_BUCKET, "Key": image_id},
@@ -79,7 +75,6 @@ class CloudStorage:
 
     def delete_chat_image(self, image_id: str):
         logger.info(f"Deleting chat image: {image_id}")
-        # TODO any validations that objects were actually deleted?
         self._client.delete_object(
             Bucket=STORAGE_CHAT_IMAGE_BUCKET, Key=image_id)
 

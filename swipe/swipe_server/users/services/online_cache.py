@@ -164,7 +164,7 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
         return await self.redis.smembers(cache_params.cache_key())
 
     async def cache_user(self, user: User):
-        json_data = UserCardPreviewOut.patched_from_orm(user).json()
+        json_data = UserCardPreviewOut.from_orm(user).json()
         # TODO man, I need a separate connection without decoding
         # but I don't wanna do that atm
         # json_data = zlib.compress(json_data.encode('utf-8'))
@@ -253,7 +253,7 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
 
         if not cached_user:
             logger.debug(f"{user_id} not in online cache, saving")
-            cached_user = UserCardPreviewOut.patched_from_orm(user).dict()
+            cached_user = UserCardPreviewOut.from_orm(user).dict()
         else:
             cached_user = json.loads(cached_user)
 

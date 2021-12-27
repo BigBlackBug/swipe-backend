@@ -45,15 +45,14 @@ class GlobalChatOut(BaseModel):
     users: dict[UUID, UserOutGlobalChatPreviewORM] = {}
 
     @classmethod
-    def parse_chats(cls, messages: list[GlobalChatMessage],
-                    users: list[User] | list[Row]):
+    def parse_chats(cls, messages: list[GlobalChatMessage], users: list[User]):
         result = {'messages': [], 'users': {}}
         for message in messages:
             result['messages'].append(
                 ChatMessageORMSchema.patched_from_orm(message))
         for user in users:
             result['users'][user.id] = \
-                UserOutGlobalChatPreviewORM.patched_from_orm(user)
+                UserOutGlobalChatPreviewORM.from_orm(user)
         return cls.parse_obj(result)
 
 
@@ -111,7 +110,7 @@ class MultipleChatsOut(BaseModel):
     @classmethod
     async def parse_chats(
             cls, chats: list[Chat], chat_ids: list[UUID],
-            users: list[User] | list[Row],
+            users: list[User],
             current_user_id: UUID) -> MultipleChatsOut:
         result: dict[str, Any] = {
             'chats': [], 'requests': [], 'users': {}, 'chat_ids': chat_ids

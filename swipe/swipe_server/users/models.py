@@ -36,6 +36,8 @@ blacklist_table = Table(
 Index("idx_blacklist_blocked_by", blacklist_table.c.blocked_by_id)
 Index("idx_blacklist_blocked_user", blacklist_table.c.blocked_user_id)
 
+DEFAULT_PHOTO_ID = '23d66fc7-d87c-415d-9834-ba84a0a72a6f.jpg'
+
 
 class User(ModelBase):
     __tablename__ = 'users'
@@ -101,14 +103,27 @@ class User(ModelBase):
                              self.date_of_birth).years
 
     @property
+    def online(self):
+        return self.last_online is None
+
+    @property
+    def photo_urls(self):
+        return [self.photo_url(photo_id) for photo_id in self.photos]
+
+    @property
     def avatar_url(self):
         if self.avatar_id:
-            avatar_url = f'{settings.SWIPE_REST_SERVER_HOST}' \
-                         f'/v1/users/{self.id}/avatar'
+            photo_id = self.avatar_id
         else:
-            # TODO default
-            avatar_url = ''
-        return avatar_url
+            photo_id = DEFAULT_PHOTO_ID
+        return f'{settings.SWIPE_REST_SERVER_HOST}' \
+               f'/v1/users/photos/{photo_id}'
+
+    def photo_url(self, photo_id: str):
+        if not photo_id or photo_id not in self.photos:
+            photo_id = DEFAULT_PHOTO_ID
+        return f'{settings.SWIPE_REST_SERVER_HOST}' \
+               f'/v1/users/photos/{photo_id}'
 
     def set_location(self, location: dict[str, str]):
         # location rows are unique with regards to city/country

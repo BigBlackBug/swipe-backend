@@ -37,7 +37,7 @@ router = APIRouter()
 async def fetch_user(user_service: UserService = Depends(),
                      user_id: UUID = Depends(security.auth_user_id)):
     current_user = user_service.get_user(user_id)
-    user_out: UserOut = UserOut.patched_from_orm(current_user)
+    user_out: UserOut = UserOut.from_orm(current_user)
     return user_out
 
 
@@ -111,7 +111,7 @@ async def patch_user(
             logger.warning(
                 f"No location set on user {user_id}, not updating cache")
 
-    return UserOut.patched_from_orm(current_user)
+    return UserOut.from_orm(current_user)
 
 
 @router.delete(
@@ -211,9 +211,8 @@ async def add_photo(
     _, _, extension = file.content_type.partition('/')
 
     photo_id = user_service.add_photo(current_user, file.file.read(), extension)
-    photo_url = user_service.get_photo_url(photo_id)
 
-    return {'photo_id': photo_id, 'photo_url': photo_url}
+    return {'photo_id': photo_id, 'photo_url': current_user.photo_url(photo_id)}
 
 
 @router.delete(

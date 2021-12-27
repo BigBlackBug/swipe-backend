@@ -81,10 +81,7 @@ async def fetch_list_of_popular_users(
     collected_users = sorted(collected_users,
                              key=lambda user: user.rating, reverse=True)
 
-    return [
-        UserCardPreviewOut.patched_from_orm(user)
-        for user in collected_users
-    ]
+    return collected_users
 
 
 @router.post(
@@ -138,10 +135,7 @@ async def fetch_list_of_online_users(
         reverse=True
     )
 
-    return [
-        UserCardPreviewOut.patched_from_orm(user)
-        for user in collected_users[:filter_params.limit]
-    ]
+    return collected_users
 
 
 @router.post(
@@ -237,25 +231,10 @@ async def decline_card_offer(
 
 
 @router.get(
-    '/{user_id}/avatar',
-    name='Get a single users avatar')
-async def avatar_redirect(
-        user_id: UUID,
-        user_service: UserService = Depends(),
-        redis_online: RedisOnlineUserService = Depends()):
-    user_data = await redis_online.get_user_card_preview_one(str(user_id))
-    if not user_data:
-        url = user_service.get_avatar_url(user_id)
-        if not url:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    else:
-        card_preview = UserCardPreviewOut.parse_raw(user_data)
-        if card_preview.avatar_id:
-            url = storage_client.get_image_url(card_preview.avatar_id)
-        else:
-            logger.error(f"avatar_id missing in cache for {user_id}")
-            url = user_service.get_avatar_url(user_id)
-
+    '/photos/{photo_id}',
+    name='Get a photo by id')
+async def photo_redirect(photo_id: str):
+    url = storage_client.get_image_url(photo_id)
     return RedirectResponse(url)
 
 
@@ -268,11 +247,15 @@ async def fetch_user(
         user_service: UserService = Depends(),
         redis_user: RedisUserCacheService = Depends(),
         current_user_id: UUID = Depends(security.auth_user_id)):
-    # TODO cache
-    user = user_service.get_user(user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f'User {user_id} not found')
-    user_out: UserOut = UserOut.patched_from_orm(user)
+    user_out: UserOut = await redis_user.get_user(str(user_id))
+    if not user_out:
+        logger.debug(f"User {user_id} is not in user cache")
+        user = user_service.get_user(user_id)
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail=f'User {user_id} not found')
+
+        user_out = UserOut.from_orm(user)
+        await redis_user.cache_user(user_out)
 
     return user_out

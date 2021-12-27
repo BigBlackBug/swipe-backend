@@ -13,6 +13,7 @@ from swipe.swipe_server.chats.schemas import ChatOut, MultipleChatsOut, \
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc import security
 from swipe.swipe_server.misc.storage import storage_client
+from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.services.user_service import UserService
 
 router = APIRouter()
@@ -34,7 +35,7 @@ async def fetch_global_chat(
         user_id: UUID = Depends(security.auth_user_id)):
     messages: list[GlobalChatMessage] = \
         chat_service.fetch_global_chat(last_message_id)
-    users: list[Row] = \
+    users: list[User] = \
         user_service.get_global_chat_preview([
             message.sender_id for message in messages
         ])
@@ -75,8 +76,8 @@ async def fetch_chats(
         user_ids.add(chat.initiator_id)
         user_ids.add(chat.the_other_person_id)
 
-    users: list[Row] = \
-        user_service.get_user_chat_preview(list(user_ids), location=True)
+    users: list[User] = \
+        user_service.get_user_chat_preview(list(user_ids))
 
     # user needs to know the list of all chats in case some were deleted
     # while he's offline

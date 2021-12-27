@@ -241,6 +241,7 @@ async def test_user_fetch_gender(
     user_3.name = 'user3'
     user_3.date_of_birth = datetime.date.today().replace(year=2002)
     user_3.gender = Gender.MALE
+    user_3.photos = ['super_photo.png', ]
     await redis_online.add_to_online_caches(user_3)
     user_3.location.country = 'Russia'
 
@@ -272,7 +273,6 @@ async def test_user_fetch_gender(
     assert response.status_code == 200
     resp_data = response.json()
     assert [user['id'] for user in resp_data] == [str(user_3.id)]
-
     # fetch caches exist
     assert await fake_redis.exists(
         f'{redis_services.FETCH_REQUEST_KEY}:{default_user.id}:{session_id}')

@@ -11,7 +11,6 @@ from fastapi import Depends
 from jose import jwt
 from jose.constants import ALGORITHMS
 from sqlalchemy import select, cast, String, update, delete, func, desc
-from sqlalchemy.engine import Row
 from sqlalchemy.orm import Session, Load, joinedload, Bundle
 
 from swipe.settings import settings, constants
@@ -98,24 +97,20 @@ class UserService:
         return query.one_or_none()
 
     def get_user_chat_preview(
-            self, user_ids: Optional[IDList] = None,
-            location: bool = False) -> list[Row]:
+            self, user_ids: Optional[IDList] = None) -> list[User]:
         clause = True if user_ids is None else User.id.in_(user_ids)
-        if location:
-            # TODO load_only
-            return self.db.execute(
-                select(User.id, User.name, User.photos, User.date_of_birth,
-                       User.last_online, Location).
-                    join(Location).where(clause)).all()
-        else:
-            return self.db.execute(
-                select(User.id, User.name, User.photos).where(clause)).all()
+        return self.db.query(User).where(clause).options(
+            Load(User).load_only('id', 'name', 'photos', 'date_of_birth',
+                                 'last_online'),
+            joinedload(User.location)
+        ).all()
 
     def get_global_chat_preview(
-            self, user_ids: Optional[IDList] = None) -> list[Row]:
+            self, user_ids: Optional[IDList] = None) -> list[User]:
         clause = True if user_ids is None else User.id.in_(user_ids)
-        return self.db.execute(
-            select(User.id, User.name, User.avatar_id).where(clause)).all()
+        return self.db.query(User).where(clause).options(
+            Load(User).load_only('id', 'name', 'avatar_id')
+        ).all()
 
     def get_user_date_of_birth(self, user_id: UUID) -> Optional[User]:
         query = self.db.query(User).where(User.id == user_id).options(
@@ -230,9 +225,6 @@ class UserService:
                 returning(User.swipes)).scalar_one()
         self.db.commit()
         return new_swipes
-
-    def get_photo_url(self, image_id: str):
-        return storage_client.get_image_url(image_id)
 
     def delete_user(self, user: User):
         logger.info(f"Deleting user {user.id}")

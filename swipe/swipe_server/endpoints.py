@@ -5,12 +5,13 @@ from fastapi import APIRouter, Depends, Body, HTTPException
 from starlette import status
 from starlette.responses import Response
 
-from swipe.swipe_server.chats import schemas as chat_schemas
 from swipe.swipe_server.chats.models import GlobalChatMessage
-from swipe.swipe_server.chats.schemas import ChatORMSchema
+from swipe.swipe_server.chats.schemas import ChatORMSchema, ChatOut, \
+    ChatMessageORMSchema
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
-from swipe.swipe_server.users import schemas as user_schemas
+from swipe.swipe_server.users.schemas import UserOut, AuthenticationOut, \
+    AuthenticationIn
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
 from swipe.swipe_server.users.services.redis_services import \
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 @router.get('/generate_user',
             tags=['misc'],
-            response_model=user_schemas.UserOut)
+            response_model=UserOut)
 async def generate_random_user(user_service: UserService = Depends()):
     """
     All fields are generated randomly from respective enums or within reasonable
@@ -32,12 +33,12 @@ async def generate_random_user(user_service: UserService = Depends()):
     """
     randomizer = RandomEntityGenerator(user_service=user_service)
     new_user = randomizer.generate_random_user(generate_images=True)
-    return user_schemas.UserOut.patched_from_orm(new_user)
+    return UserOut.from_orm(new_user)
 
 
 @router.post('/generate_chat',
              tags=['misc'],
-             response_model=chat_schemas.ChatOut,
+             response_model=ChatOut,
              response_model_exclude_none=True)
 async def generate_random_chat(chat_service: ChatService = Depends(),
                                user_service: UserService = Depends(),
@@ -76,7 +77,7 @@ async def generate_random_chat(chat_service: ChatService = Depends(),
 
 @router.post('/generate_global_chat',
              tags=['misc'],
-             response_model=list[chat_schemas.ChatMessageORMSchema],
+             response_model=list[ChatMessageORMSchema],
              response_model_exclude_none=True)
 async def generate_global_chat(chat_service: ChatService = Depends(),
                                n_messages: int = Body(default=10, embed=True)):
@@ -93,14 +94,14 @@ async def generate_global_chat(chat_service: ChatService = Depends(),
     responses={
         200: {
             "description": "An existing user has been authenticated",
-            "model": user_schemas.AuthenticationOut
+            "model": AuthenticationOut
         },
         201: {
             "description": "A new user has been created",
-            "model": user_schemas.AuthenticationOut
+            "model": AuthenticationOut
         }
     })
-async def authenticate_user(auth_payload: user_schemas.AuthenticationIn,
+async def authenticate_user(auth_payload: AuthenticationIn,
                             response: Response,
                             user_service: UserService = Depends(),
                             redis_online: RedisOnlineUserService = Depends(),
@@ -131,5 +132,5 @@ async def authenticate_user(auth_payload: user_schemas.AuthenticationIn,
         await redis_swipe.reset_swipe_reap_timestamp(user.id)
 
     await redis_online.save_auth_token(str(user.id), new_token)
-    return user_schemas.AuthenticationOut(
+    return AuthenticationOut(
         user_id=user.id, access_token=new_token)

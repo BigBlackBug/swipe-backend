@@ -7,10 +7,7 @@ from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
 from pydantic import BaseModel, Field, root_validator
-from sqlalchemy.engine import Row
 
-from swipe.settings import settings
-from swipe.swipe_server.misc.storage import storage_client
 from .enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
     RecurrenceRate, NotificationTypes
 from .models import User
@@ -81,18 +78,6 @@ class UserCardPreviewOut(BaseModel):
     online: bool = False
     last_online: Optional[datetime.datetime] = None
 
-    @classmethod
-    def patched_from_orm(
-            cls: UserCardPreviewOut, obj: Any) -> UserCardPreviewOut:
-        schema_obj = cls.from_orm(obj)
-        patched_photos = []
-        for photo_id in schema_obj.photos:
-            patched_photos.append(storage_client.get_image_url(photo_id))
-        schema_obj.photo_urls = patched_photos
-        schema_obj.online = obj.last_online is None
-        schema_obj.last_online = obj.last_online
-        return schema_obj
-
     @staticmethod
     def sort_key(user: UserCardPreviewOut, current_user_dob: datetime.date):
         # offline dudes should come last
@@ -128,17 +113,6 @@ class UserOut(UserBase):
 
     online: bool = False
     last_online: Optional[datetime.datetime] = None
-
-    @classmethod
-    def patched_from_orm(cls: UserOut, obj: Any) -> UserOut:
-        schema_obj = cls.from_orm(obj)
-        patched_photos = []
-        for photo_id in schema_obj.photos:
-            patched_photos.append(storage_client.get_image_url(photo_id))
-        schema_obj.photo_urls = patched_photos
-        schema_obj.online = obj.last_online is None
-        schema_obj.last_online = obj.last_online
-        return schema_obj
 
     class Config:
         # allows Pydantic to read orm models and not just dicts
@@ -199,40 +173,26 @@ class OnlineFilterBody(BaseModel):
     limit: Optional[int] = 15
 
 
-class UserOutChatPreviewORM(BaseModel):
-    id: UUID
-    name: str
-    photos: list[str] = []
-    # None if he is online
-    last_online: Optional[datetime.datetime] = None
-    location: Optional[LocationSchema] = Field(None, alias='Location')
-
-    class Config:
-        # allows Pydantic to read orm models and not just dicts
-        orm_mode = True
-
-
 class UserOutGlobalChatPreviewORM(BaseModel):
     id: UUID
     name: str
     avatar_id: Optional[str] = None
     avatar_url: Optional[str] = None
 
-    @classmethod
-    def patched_from_orm(cls: UserOutGlobalChatPreviewORM,
-                         obj: User | Row) -> UserOutGlobalChatPreviewORM:
-        orm_schema = UserOutGlobalChatPreviewORM.from_orm(obj)
-        schema_obj = cls.parse_obj(orm_schema)
-        if schema_obj.avatar_id:
-            avatar_url = f'{settings.SWIPE_REST_SERVER_HOST}' \
-                         f'/v1/users/{schema_obj.id}/avatar'
-        else:
-            # TODO default
-            avatar_url = ''
-        schema_obj.avatar_url = avatar_url
-        return schema_obj
+    class Config:
+        orm_mode = True
+
+
+class UserOutChatPreviewORM(BaseModel):
+    id: UUID
+    name: str
+    photos: list[str] = []
+    # None if he is online
+    last_online: Optional[datetime.datetime] = None
+    location: Optional[LocationSchema] = None
 
     class Config:
+        # allows Pydantic to read orm models and not just dicts
         orm_mode = True
 
 
@@ -247,11 +207,10 @@ class UserOutChatPreview(BaseModel):
 
     @classmethod
     def patched_from_orm(cls: UserOutChatPreview,
-                         obj: User | Row) -> UserOutChatPreview:
+                         obj: User) -> UserOutChatPreview:
         orm_schema = UserOutChatPreviewORM.from_orm(obj)
         schema_obj = cls.parse_obj(orm_schema)
         if orm_schema.photos:
-            photo = orm_schema.photos[0]
-            schema_obj.photo_url = storage_client.get_image_url(photo)
-        schema_obj.online = schema_obj.last_online is None
+            photo_id = orm_schema.photos[0]
+            schema_obj.photo_url = obj.photo_url(photo_id)
         return schema_obj

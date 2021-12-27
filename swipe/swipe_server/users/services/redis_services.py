@@ -113,7 +113,7 @@ class RedisPopularService:
         for user in users:
             await self.redis.rpush(key, str(user.id))
             try:
-                json_data = UserCardPreviewOut.patched_from_orm(user).json()
+                json_data = UserCardPreviewOut.from_orm(user).json()
             except:
                 logger.error(f"{user.id} won't be added to the popular list "
                              f"because the model is broken")
@@ -348,7 +348,7 @@ class RedisUserCacheService:
 
     async def cache_user(self, user: Union[UserOut, User]):
         if isinstance(user, User):
-            user = UserOut.patched_from_orm(user)
+            user = UserOut.from_orm(user)
 
         logger.debug(f'Saving {user.id} to user cache')
         await self.redis.setex(f'{self.USER_CACHE_KEY}:{user.id}',

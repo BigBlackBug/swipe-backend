@@ -87,10 +87,6 @@ async def test_user_fetch_single(
     # cached
     assert await redis_user.get_user(str(default_user.id))
 
-    assert response.json()['avatar_url'] == \
-           f'{settings.SWIPE_REST_SERVER_HOST}/v1/users/' \
-           f'{default_user.id}/avatar'
-
 
 @pytest.mark.anyio
 async def test_user_fetch_deactivated(
