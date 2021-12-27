@@ -35,8 +35,8 @@ from swipe.swipe_server.users.services.redis_services import \
 if settings.SENTRY_SWIPE_SERVER_URL:
     sentry_sdk.init(
         settings.SENTRY_SWIPE_SERVER_URL,
-        # TODO change in prod
-        traces_sample_rate=settings.SENTRY_SAMPLE_RATE
+        traces_sample_rate=settings.SENTRY_SAMPLE_RATE,
+        release=settings.SWIPE_VERSION
     )
 logger = logging.getLogger(__name__)
 
@@ -172,8 +172,8 @@ if __name__ == '__main__':
     loop.run_until_complete(populate_popular_cache())
     loop.run_until_complete(update_recently_online_cache())
 
-    logger.info(f'Starting app at port 80')
+    logger.info(f'Starting app at port {settings.SWIPE_PORT}')
     uvicorn.run('bin.swipe_server:app', host='0.0.0.0',  # noqa
-                port=80,
+                port=settings.SWIPE_PORT,
                 workers=settings.SWIPE_SERVER_WORKER_NUMBER,
                 reload=settings.ENABLE_WEB_SERVER_AUTORELOAD)

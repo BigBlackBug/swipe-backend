@@ -13,8 +13,8 @@ from swipe.mm_chat_server import server as chat_server
 if settings.SENTRY_CHAT_SERVER_URL:
     sentry_sdk.init(
         settings.SENTRY_CHAT_SERVER_URL,
-        # TODO change in prod
-        traces_sample_rate=settings.SENTRY_SAMPLE_RATE
+        traces_sample_rate=settings.SENTRY_SAMPLE_RATE,
+        release=settings.SWIPE_VERSION
     )
 
 if __name__ == '__main__':

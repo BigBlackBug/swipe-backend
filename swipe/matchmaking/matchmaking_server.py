@@ -230,7 +230,7 @@ async def _process_payload(base_payload: MMBasePayload, user_data: MMUserData):
             matchmaking_data.remove_match(recipient_id)
 
             # a decline means we add them to each others blacklist
-            if settings.ENABLE_MATCHMAKING_BLACKLIST:
+            if settings.MATCHMAKING_BLACKLIST_ENABLED:
                 with dependencies.db_context() as session:
                     blacklist_service = BlacklistService(session, redis_client)
                     # even though we remove the graph edges,

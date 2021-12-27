@@ -34,7 +34,7 @@ def compress_image(image_source: bytes) -> bytes:
 
 
 def enable_blacklist(
-        enable: bool = settings.ENABLE_BLACKLIST,
+        enable: bool = settings.SWIPE_BLACKLIST_ENABLED,
         return_value_class: Type = None):
     def _decorator(func):
         @functools.wraps(func)

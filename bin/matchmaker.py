@@ -11,8 +11,8 @@ from swipe.settings import settings
 if settings.SENTRY_MATCHMAKER_URL:
     sentry_sdk.init(
         settings.SENTRY_MATCHMAKER_URL,
-        # TODO change in prod
-        traces_sample_rate=settings.SENTRY_SAMPLE_RATE
+        traces_sample_rate=settings.SENTRY_SAMPLE_RATE,
+        release=settings.SWIPE_VERSION
     )
 from swipe.matchmaking import matchmaker
 

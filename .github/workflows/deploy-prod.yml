@@ -24,7 +24,8 @@ jobs:
 
     - name: Build the Docker image
       run: |
-        docker build . --file Dockerfile --tag ${{ env.SWIPE_IMAGE }}
+        export SWIPE_VERSION=$(TZ=":Europe/Moscow" date +%D_%T | tr '/' '-')
+        docker build --file Dockerfile --tag ${{ env.SWIPE_IMAGE }} --build-arg SWIPE_VERSION=$SWIPE_VERSION .
         docker push ${{ env.SWIPE_IMAGE }}
 
     - name: Copy docker-compose

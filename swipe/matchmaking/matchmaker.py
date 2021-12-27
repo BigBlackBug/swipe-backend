@@ -300,7 +300,7 @@ class Matchmaker:
     def _process_decline_pairs(self, incoming_data: MMRoundData):
         for user_a_id, user_b_id in incoming_data.decline_pairs:
             logger.info(f"Processing pair: ['{user_a_id}', '{user_b_id}']")
-            if settings.ENABLE_MATCHMAKING_BLACKLIST:
+            if settings.MATCHMAKING_BLACKLIST_ENABLED:
                 # disconnect vertices
                 self._connection_graph[user_a_id].disconnect(user_b_id)
                 self._connection_graph[user_b_id].disconnect(user_a_id)

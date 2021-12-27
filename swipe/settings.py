@@ -32,8 +32,10 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/v1"
     SWIPE_SECRET_KEY: str
     SWIPE_LOGGING_LEVEL: str = 'INFO'
+    SWIPE_BLACKLIST_ENABLED: Optional[bool] = False
+    SWIPE_VERSION: str
 
-    SWIPE_PORT: Optional[int] = None
+    SWIPE_PORT: int = 80
     SWIPE_SERVER_WORKER_NUMBER: int = 4
 
     DATABASE_URL: Optional[PostgresDsn] = None
@@ -51,11 +53,10 @@ class Settings(BaseSettings):
     # TODO debug mode
     ENABLE_SQL_ECHO: Optional[bool] = True
     ENABLE_WEB_SERVER_AUTORELOAD: Optional[bool] = False
-    ENABLE_MATCHMAKING_BLACKLIST: Optional[bool] = False
-    ENABLE_BLACKLIST: Optional[bool] = False
 
     CHAT_SERVER_PORT: Optional[int]
     CHAT_SERVER_HOST: Optional[str]
+
     MATCHMAKING_SERVER_HOST: Optional[str]
     MATCHMAKING_SERVER_PORT: Optional[int]
     MATCHMAKING_TEXT_CHAT_SERVER_PORT: Optional[int]
@@ -63,6 +64,7 @@ class Settings(BaseSettings):
     MATCHMAKING_ROUND_LENGTH_SECS = 5
     MATCHMAKING_FETCH_LIMIT = 150
 
+    MATCHMAKING_BLACKLIST_ENABLED: Optional[bool] = False
     MATCHMAKING_DEFAULT_AGE_DIFF = 0
     MATCHMAKING_AGE_DIFF_STEP = 5
     MATCHMAKING_MAX_AGE_DIFF = 20
@@ -83,6 +85,7 @@ class Settings(BaseSettings):
 
     USER_MODEL_CACHE_TTL_SEC = 60 * 60
 
+    # TODO change in prod
     SENTRY_SAMPLE_RATE = 1.0
 
     class Config:

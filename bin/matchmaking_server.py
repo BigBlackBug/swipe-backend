@@ -13,8 +13,8 @@ from swipe.matchmaking import matchmaking_server
 if settings.SENTRY_MATCHMAKING_SERVER_URL:
     sentry_sdk.init(
         settings.SENTRY_MATCHMAKING_SERVER_URL,
-        # TODO change in prod
-        traces_sample_rate=settings.SENTRY_SAMPLE_RATE
+        traces_sample_rate=settings.SENTRY_SAMPLE_RATE,
+        release=settings.SWIPE_VERSION
     )
 
 if __name__ == '__main__':
