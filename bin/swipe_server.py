@@ -1,6 +1,9 @@
 import os
 import sys
 
+from prometheus_fastapi_instrumentator import Instrumentator
+from uvicorn import Config, Server
+
 sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 from swipe import config
@@ -16,7 +19,6 @@ import alembic.command
 import alembic.config
 import dateutil.parser
 import sentry_sdk
-import uvicorn
 from fastapi_utils.tasks import repeat_every
 from sqlalchemy import select
 
@@ -41,9 +43,6 @@ if settings.SENTRY_SWIPE_SERVER_URL:
 logger = logging.getLogger(__name__)
 
 app = swipe_app.init_app()
-
-
-# prometheus = Instrumentator().instrument(app).expose(app)
 
 
 async def run_migrations():
@@ -165,15 +164,20 @@ loop = asyncio.get_event_loop()
 if __name__ == '__main__':
     # That's kinda stupid but will work for now
     loop.run_until_complete(run_migrations())
-    loop.run_until_complete(init_storage_buckets())
+    # loop.run_until_complete(init_storage_buckets())
     loop.run_until_complete(drop_user_cache())
     loop.run_until_complete(populate_online_caches())
     loop.run_until_complete(populate_country_cache())
     loop.run_until_complete(populate_popular_cache())
     loop.run_until_complete(update_recently_online_cache())
 
+    Instrumentator().instrument(app).expose(
+        app, include_in_schema=False, tags=['misc', ])
     logger.info(f'Starting app at port {settings.SWIPE_PORT}')
-    uvicorn.run('bin.swipe_server:app', host='0.0.0.0',  # noqa
-                port=settings.SWIPE_PORT,
-                workers=settings.SWIPE_SERVER_WORKER_NUMBER,
-                reload=settings.ENABLE_WEB_SERVER_AUTORELOAD)
+    server_config = Config(app=app, host='0.0.0.0',
+                           port=settings.SWIPE_PORT,
+                           reload=settings.ENABLE_WEB_SERVER_AUTORELOAD,
+                           workers=settings.SWIPE_SERVER_WORKER_NUMBER,
+                           loop='asyncio')
+    server = Server(server_config)
+    loop.run_until_complete(server.serve())

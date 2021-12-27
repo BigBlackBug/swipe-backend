@@ -44,6 +44,8 @@ services:
     environment:
       - CHAT_SERVER_HOST=http://chat_server:80
     entrypoint: python bin/swipe_server.py
+    ports:
+      - '8000:8000'
     depends_on:
       - redis
 
