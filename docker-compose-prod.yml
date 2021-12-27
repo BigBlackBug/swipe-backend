@@ -6,6 +6,11 @@ volumes:
       name: letsencrypt_keys
 
 services:
+  redis:
+    image: redis
+    ports:
+      - "26379:6379"
+
   turn_server:
     image: coturn/coturn
     network_mode: host
@@ -39,6 +44,8 @@ services:
     environment:
       - CHAT_SERVER_HOST=http://chat_server:80
     entrypoint: python bin/swipe_server.py
+    depends_on:
+      - redis
 
   chat_server:
     image: ${SWIPE_IMAGE:?unset}
@@ -52,6 +59,7 @@ services:
     entrypoint: python bin/chat_server.py
     depends_on:
       - swipe_server
+      - redis
 
   video_matchmaking_server:
     image: ${SWIPE_IMAGE:?unset}
@@ -63,6 +71,7 @@ services:
     entrypoint: python bin/matchmaking_server.py
     depends_on:
       - turn_server
+      - redis
 
   video_matchmaker:
     image: ${SWIPE_IMAGE:?unset}
@@ -85,6 +94,7 @@ services:
     entrypoint: python bin/matchmaking_server.py
     depends_on:
       - turn_server
+      - redis
 
   audio_matchmaker:
     image: ${SWIPE_IMAGE:?unset}
@@ -107,6 +117,7 @@ services:
     entrypoint: python bin/matchmaking_server.py
     depends_on:
       - turn_server
+      - redis
 
   text_matchmaker:
     image: ${SWIPE_IMAGE:?unset}
@@ -127,3 +138,5 @@ services:
     environment:
       - CHAT_SERVER_HOST=http://chat_server:80
     entrypoint: python bin/matchmaking_chat_server.py
+    depends_on:
+      - redis
