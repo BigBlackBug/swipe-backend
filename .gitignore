@@ -1,6 +1,7 @@
 # swipe-specific
 _data
-_janus*
+.idea/
+landing/
 
 ### Python template
 # Byte-compiled / optimized / DLL files
