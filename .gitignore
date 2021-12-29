@@ -2,6 +2,7 @@
 _data
 .idea/
 landing/
+logs/
 
 ### Python template
 # Byte-compiled / optimized / DLL files

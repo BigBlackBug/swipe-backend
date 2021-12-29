@@ -8,6 +8,7 @@ volumes:
 services:
   redis:
     image: redis
+    restart: always
     ports:
       - "26379:6379"
 
@@ -38,7 +39,7 @@ services:
 
   swipe_server:
     image: ${SWIPE_IMAGE:?unset}
-    restart: on-failure
+    restart: always
     env_file:
       - swipe.env
     environment:
@@ -49,7 +50,7 @@ services:
 
   chat_server:
     image: ${SWIPE_IMAGE:?unset}
-    restart: on-failure
+    restart: always
     env_file:
       - swipe.env
     environment:
@@ -63,7 +64,7 @@ services:
 
   video_matchmaking_server:
     image: ${SWIPE_IMAGE:?unset}
-    restart: on-failure
+    restart: always
     env_file:
       - swipe.env
     environment:
@@ -86,7 +87,7 @@ services:
 
   audio_matchmaking_server:
     image: ${SWIPE_IMAGE:?unset}
-    restart: on-failure
+    restart: always
     env_file:
       - swipe.env
     environment:
@@ -109,7 +110,7 @@ services:
 
   text_matchmaking_server:
     image: ${SWIPE_IMAGE:?unset}
-    restart: on-failure
+    restart: always
     env_file:
       - swipe.env
     environment:
@@ -132,7 +133,7 @@ services:
 
   text_matchmaking_chat_server:
     image: ${SWIPE_IMAGE:?unset}
-    restart: on-failure
+    restart: always
     env_file:
       - swipe.env
     environment:
@@ -140,3 +141,19 @@ services:
     entrypoint: python bin/matchmaking_chat_server.py
     depends_on:
       - redis
+
+  logger:
+    image: umputun/docker-logger
+    restart: always
+    environment:
+      - LOG_FILES=true
+      - LOG_SYSLOG=false
+      - INCLUDE_PATTERN=(.*)_server
+      - MAX_FILES=9999
+      - MAX_SIZE=5000
+      - MAX_AGE=9999
+      - DEBUG=false
+
+    volumes:
+      - /mnt/logs:/srv/logs
+      - /var/run/docker.sock:/var/run/docker.sock
