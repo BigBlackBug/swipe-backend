@@ -20,7 +20,7 @@ from swipe.chat_server.schemas import BasePayload, GlobalMessagePayload, \
     MessagePayload, CreateChatPayload, \
     UserJoinEventPayload, GenericEventPayload, UserEventType, \
     DeclineChatPayload, MessageLikePayload, RatingChangedEventPayload, \
-    OutPayload, AckPayload, AckType
+    OutPayload, AckPayload, AckType, AcceptChatPayload
 from swipe.chat_server.services import ChatServerRequestProcessor
 from swipe.middlewares import CorrelationIdMiddleware
 from swipe.settings import settings
@@ -142,9 +142,7 @@ async def _send_response_to_recipient(base_payload: BasePayload):
         recipient_id = str(base_payload.recipient_id)
         # offline users receive a notification instead
         if not connection_manager.is_connected(recipient_id):
-            if type(base_payload.payload) \
-                    in {MessagePayload, CreateChatPayload}:
-                await _send_firebase_notification(base_payload)
+            await _send_firebase_notification(base_payload)
         else:
             out_payload = base_payload.dict(by_alias=True,
                                             exclude_unset=True)
@@ -260,6 +258,11 @@ async def _send_firebase_notification(base_payload: BasePayload):
     recipient_id = str(base_payload.recipient_id)
     sender_id = str(base_payload.sender_id)
     payload = base_payload.payload
+
+    if type(payload) \
+            not in {MessagePayload, CreateChatPayload, AcceptChatPayload}:
+        return
+
     logger.info(
         f"{recipient_id} is offline, sending push "
         f"notification for '{payload.type_}' payload")
@@ -291,12 +294,16 @@ async def _send_firebase_notification(base_payload: BasePayload):
 
     if isinstance(payload, MessagePayload):
         notification = firebase.Notification(
-            title=f'{user_data.name} наконец-то ответил{ending} ☺️',  # noqa
-            body='Переходи в приложение, чтобы продолжить диалог')
+            title=f'Вам написали сообщение!',
+            body=f'{user_data.name} написал{ending} вам сообщение 💬💬💬')  # noqa
     elif isinstance(payload, CreateChatPayload):
         notification = firebase.Notification(
-            title=f'{user_data.name} хочет с тобой пообщаться ☺️',
-            body='Переходи в приложение, чтобы начать диалог')
+            title=f'Вам предложили дружбу!',
+            body='У вас новый запрос на переписку 👋👋👋')
+    elif isinstance(payload, AcceptChatPayload):
+        notification = firebase.Notification(
+            title=f'Ваш запрос на переписку приняли!',
+            body=f'{user_data.name} принял{ending} запрос на переписку 😉😉😉')  # noqa
 
     logger.info(
         f"Sending firebase notification '{payload.type_}' "
