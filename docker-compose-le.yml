@@ -9,8 +9,6 @@ services:
       - letsencrypt:/etc/letsencrypt
     environment:
       - TERM=xterm
-    ports:
-      - "80:80"
 
 volumes:
   letsencrypt:
