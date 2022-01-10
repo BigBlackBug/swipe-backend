@@ -29,6 +29,7 @@ services:
       - ./landing:/home/landing:ro
     ports:
       - '443:443'
+      - '80:80'
     depends_on:
       - swipe_server
       - chat_server
