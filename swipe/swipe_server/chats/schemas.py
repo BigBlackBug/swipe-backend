@@ -109,7 +109,7 @@ class MultipleChatsOut(BaseModel):
 
     @classmethod
     async def parse_chats(
-            cls, chats: list[Chat], chat_ids: list[UUID],
+            cls, chats: list[Chat], chat_ids: set[UUID],
             users: list[User],
             current_user_id: UUID) -> MultipleChatsOut:
         result: dict[str, Any] = {

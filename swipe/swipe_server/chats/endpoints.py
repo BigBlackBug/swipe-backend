@@ -81,7 +81,7 @@ async def fetch_chats(
 
     # user needs to know the list of all chats in case some were deleted
     # while he's offline
-    chat_ids: list[UUID] = chat_service.fetch_chat_ids(user_id)
+    chat_ids: set[UUID] = chat_service.fetch_chat_ids(user_id)
 
     logger.info(f"Got {len(chats)} chats, total chats {len(chat_ids)}")
     resp_data: MultipleChatsOut = \
