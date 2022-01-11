@@ -197,8 +197,10 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
         # removing this user from all online caches
         user_id = str(user.id)
         for key in cache_params.online_keys():
+            logger.debug(f"Removing {user.id} from cache {key}")
             await self.redis.srem(key, user_id)
 
+        logger.debug(f"Removing {user.id} from online user cache")
         await self.redis.delete(f'{self.ONLINE_USER_KEY}:{user.id}')
 
     async def invalidate_online_user_cache(self):
@@ -207,6 +209,7 @@ class RedisOnlineUserService(OnlineUserCache[OnlineUserCacheParams]):
 
     async def update_recently_online_cache(
             self, recently_online_ttl=constants.RECENTLY_ONLINE_TTL_SEC):
+        logger.info("Removing recently online users from the online cache")
         # Should be run periodically to remove users from the online cache
         for key in await self.redis.keys(f'{self.RECENTLY_ONLINE_KEY}:*'):
             user_data = await self.redis.get(key)

@@ -35,11 +35,11 @@ class PopularUserService:
             country=country, city=city, gender=gender, users=users)
 
     async def populate_popular_cache(self):
-        logger.info("Populating popular cache")
+        logger.info("Fetching location cache")
         locations = self.redis_locations.fetch_locations()
 
         # global popular cache
-        logger.info("Populating global cache")
+        logger.info("Populating global popular cache")
         await self.populate_cache(gender=Gender.MALE)
         await self.populate_cache(gender=Gender.FEMALE)
         await self.populate_cache()

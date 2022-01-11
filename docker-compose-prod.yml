@@ -133,6 +133,15 @@ services:
     depends_on:
       - redis
 
+  cache_updater:
+    image: ${SWIPE_IMAGE:?unset}
+    restart: always
+    env_file:
+      - swipe.env
+    entrypoint: python bin/cache_updater.py
+    depends_on:
+      - swipe_server
+
   logger:
     image: umputun/docker-logger
     restart: always
