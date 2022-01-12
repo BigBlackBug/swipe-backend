@@ -1,10 +1,14 @@
 import logging
 from uuid import UUID
 
+import user_agents
 from fastapi import APIRouter, Depends, Body, HTTPException
 from starlette import status
-from starlette.responses import Response
+from starlette.requests import Request
+from starlette.responses import Response, RedirectResponse
+from user_agents.parsers import UserAgent
 
+from swipe.settings import settings
 from swipe.swipe_server.chats.models import GlobalChatMessage
 from swipe.swipe_server.chats.schemas import ChatORMSchema, ChatOut, \
     ChatMessageORMSchema
@@ -20,6 +24,21 @@ from swipe.swipe_server.users.services.user_service import UserService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+@router.get('/appstore', name='Appstore redirect link')
+async def appstore_link(request: Request):
+    headers = dict(request.headers)
+    ua_header = headers.get('user-agent')
+
+    url = 'https://dombo.cc'
+    if ua_header:
+        user_agent: UserAgent = user_agents.parse(ua_header)
+        if user_agent.os.family == 'iOS':
+            url = settings.SWIPE_STORE_APPLE_URL
+        elif user_agent.os.family == 'Android':
+            url = settings.SWIPE_STORE_ANDROID_URL
+    return RedirectResponse(url)
 
 
 @router.get('/generate_user',

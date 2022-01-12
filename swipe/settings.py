@@ -88,6 +88,10 @@ class Settings(BaseSettings):
     # TODO change in prod
     SENTRY_SAMPLE_RATE = 1.0
 
+    # TODO it should not be done this way, but I don't care anymore lol
+    SWIPE_STORE_ANDROID_URL = 'https://dombo.cc'
+    SWIPE_STORE_APPLE_URL = 'https://dombo.cc'
+
     class Config:
         case_sensitive = True
         env_file = os.environ.get('SWIPE_ENV_FILE', '.env')

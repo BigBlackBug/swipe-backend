@@ -1,7 +1,7 @@
 # swipe-specific
 _data
 .idea/
-landing/
+landing*/
 logs/
 
 ### Python template
