@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 
@@ -22,6 +23,7 @@ if settings.SENTRY_SWIPE_SERVER_URL:
         traces_sample_rate=settings.SENTRY_SAMPLE_RATE,
         release=settings.SWIPE_VERSION
     )
+logger = logging.getLogger(__name__)
 loop = asyncio.get_event_loop()
 
 
@@ -34,6 +36,7 @@ def update_recently_online_cache():
 
 
 if __name__ == '__main__':
+    logger.info("Starting the cache updater")
     schedule.every(constants.POPULAR_CACHE_POPULATE_JOB_TIMEOUT_SEC). \
         seconds.do(populate_popular_cache)
     schedule.every(constants.RECENTLY_ONLINE_CLEAR_JOB_TIMEOUT_SEC). \
