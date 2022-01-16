@@ -294,15 +294,15 @@ async def _send_firebase_notification(base_payload: BasePayload):
 
     if isinstance(payload, MessagePayload):
         notification = firebase.Notification(
-            title=f'Вам написали сообщение!',
+            title=f'Dombo',
             body=f'{user_data.name} написал{ending} вам сообщение 💬💬💬')  # noqa
     elif isinstance(payload, CreateChatPayload):
         notification = firebase.Notification(
-            title=f'Вам предложили дружбу!',
+            title=f'Dombo',
             body='У вас новый запрос на переписку 👋👋👋')
     elif isinstance(payload, AcceptChatPayload):
         notification = firebase.Notification(
-            title=f'Ваш запрос на переписку приняли!',
+            title=f'Dombo',
             body=f'{user_data.name} принял{ending} запрос на переписку 😉😉😉')  # noqa
 
     logger.info(
