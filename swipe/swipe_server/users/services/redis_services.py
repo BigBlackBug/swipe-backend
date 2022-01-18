@@ -100,8 +100,6 @@ class RedisPopularService:
                                  country: Optional[str] = None,
                                  gender: Optional[Gender] = None,
                                  city: Optional[str] = None):
-        if not users:
-            return
         gender = gender or 'ALL'
         city = city or 'ALL'
         country = country or 'ALL'
@@ -110,7 +108,11 @@ class RedisPopularService:
                     f"of {len(users)} users for {key}")
 
         await self.redis.delete(key)
+        if not users:
+            return
+
         for user in users:
+            # TODO use redis sorted sets you dummy
             await self.redis.rpush(key, str(user.id))
             try:
                 json_data = UserCardPreviewOut.from_orm(user).json()
