@@ -14,7 +14,7 @@ from swipe.settings import constants, settings
 from swipe.swipe_server.misc.database import ModelBase
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.enums import UserInterests, Gender, \
-    AuthProvider, ZodiacSign, RecurrenceRate, NotificationTypes
+    AuthProvider, ZodiacSign, RecurrenceRate, NotificationTypes, AccountStatus
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,9 @@ class User(ModelBase):
 
     # can not be updated
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # TODO ёбаный костыль, пощади
+    account_status = Column(Enum(AccountStatus), nullable=False,
+                            default=AccountStatus.REGISTRATION)
     registration_date = Column(
         DateTime, nullable=False,
         default=datetime.datetime.utcnow().replace(microsecond=0))

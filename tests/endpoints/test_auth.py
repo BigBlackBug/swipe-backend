@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from swipe.settings import settings
 from swipe.swipe_server.misc.randomizer import RandomEntityGenerator
 from swipe.swipe_server.users import models
+from swipe.swipe_server.users.enums import AccountStatus
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
@@ -34,6 +35,8 @@ async def test_auth_new_user(
     assert response.json().get('user_id')
 
     user = user_service.get_user(response.json().get('user_id'))
+    assert user.account_status == AccountStatus.REGISTRATION
+
     # free swipes cache is set
     assert await redis_swipes.get_swipe_reap_timestamp(user.id)
     assert await redis_online.get_online_user_token(str(user.id))

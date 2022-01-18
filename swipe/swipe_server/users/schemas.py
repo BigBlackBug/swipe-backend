@@ -9,7 +9,7 @@ from dateutil.relativedelta import relativedelta
 from pydantic import BaseModel, Field, root_validator
 
 from .enums import UserInterests, Gender, AuthProvider, ZodiacSign, \
-    RecurrenceRate, NotificationTypes
+    RecurrenceRate, NotificationTypes, AccountStatus
 from .models import User
 
 
@@ -39,6 +39,7 @@ class UserBase(BaseModel):
     bio: Optional[str] = Field(
         None, title="User's bio", max_length=200
     )
+    account_status: Optional[AccountStatus] = None
     height: Optional[int] = None
 
     interests: list[UserInterests] = []

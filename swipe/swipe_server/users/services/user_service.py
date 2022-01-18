@@ -19,7 +19,7 @@ from swipe.swipe_server.misc import dependencies
 from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users import schemas
-from swipe.swipe_server.users.enums import Gender
+from swipe.swipe_server.users.enums import Gender, AccountStatus
 from swipe.swipe_server.users.models import User, AuthInfo, Location, IDList, \
     blacklist_table
 from swipe.swipe_server.users.schemas import CallFeedback, RatingUpdateReason
@@ -236,7 +236,8 @@ class UserService:
         logger.info(f"Deactivating user {user.id}")
         self.db.execute(
             update(User).where(User.id == user.id)
-                .values(deactivation_date=datetime.datetime.now()))
+                .values(deactivation_date=datetime.datetime.now(),
+                        account_status=AccountStatus.DEACTIVATED))
         self.db.execute(delete(AuthInfo).where(AuthInfo.user_id == user.id))
         self.db.commit()
 

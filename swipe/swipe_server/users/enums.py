@@ -20,6 +20,12 @@ class Gender(str, enum.Enum):
     ATTACK_HELICOPTER = 'attack_helicopter'
 
 
+class AccountStatus(str, enum.Enum):
+    REGISTRATION = 'registration'
+    ACTIVE = 'active'
+    DEACTIVATED = 'deactivated'
+
+
 class AuthProvider(str, enum.Enum):
     GOOGLE = 'google'
     VK = 'vk'
