@@ -129,7 +129,14 @@ class UserService:
             self,
             user_object: User,
             user_update: schemas.UserUpdate) -> User:
-        for k, v in user_update.dict(exclude_defaults=True).items():
+        logger.debug(f'Got update body ex defaults: '
+                     f'{user_update.dict(exclude_defaults=True)}')
+        trimmed_data = user_update.dict(
+            exclude_defaults=True, exclude_none=True, exclude_unset=True)
+
+        logger.debug(f'Trimmed update data: {trimmed_data}')
+        for k, v in trimmed_data.items():
+            logger.debug(f'Updating field {k} with value {v}')
             if k == 'location':
                 user_object.set_location(v)
             else:

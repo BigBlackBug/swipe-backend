@@ -81,14 +81,14 @@ async def patch_user(
         redis_online: RedisOnlineUserService = Depends(),
         redis_user: RedisUserCacheService = Depends(),
         user_id: UUID = Depends(security.auth_user_id)):
+    logger.debug(f"Got patch with {user_body.dict()}")
+
     current_user = user_service.get_user(user_id)
     previous_location: Location = current_user.location
     current_user: User = user_service.update_user(current_user, user_body)
 
     # This method is a load of crap, thank you Andrew
     # Must be reworked
-    logger.debug(f"Got patch with "
-                 f"{user_body.dict(exclude_none=True, exclude_unset=True)}")
     # they are sending this patch on each login
     if user_body.account_status == AccountStatus.ACTIVE:
         logger.info("Registration finished")
