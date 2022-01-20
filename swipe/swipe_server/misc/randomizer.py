@@ -20,7 +20,7 @@ from swipe.swipe_server.misc.errors import SwipeError
 from swipe.swipe_server.misc.storage import storage_client
 from swipe.swipe_server.users.enums import AuthProvider, ZodiacSign, Gender, \
     UserInterests, \
-    RecurrenceRate, NotificationTypes
+    RecurrenceRate, NotificationTypes, AccountStatus
 from swipe.swipe_server.users.models import User
 from swipe.swipe_server.users.schemas import AuthenticationIn
 from swipe.swipe_server.users.services.user_service import UserService
@@ -42,6 +42,7 @@ class RandomEntityGenerator:
             auth_provider=AuthProvider.SNAPCHAT,
             provider_user_id=secrets.token_urlsafe(16)))
         new_user.name = names.get_full_name()[:30]
+        new_user.account_status = AccountStatus.ACTIVE
         new_user.bio = lorem.paragraph()[:200]
         new_user.height = random.randint(150, 195)
         new_user.interests = random.sample(list(UserInterests), 3)

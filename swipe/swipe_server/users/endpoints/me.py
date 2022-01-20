@@ -154,19 +154,12 @@ async def delete_user(
     await redis_blacklist.drop_blacklist_cache(str(user_id))
 
     logger.info(f"Deleting chats of {user_id}")
-    recipients = []
     # fetching only id and user ids
     chats: list[Chat] = chat_service.fetch_chat_members(user_id)
     for chat in chats:
-        if user_id == chat.initiator_id:
-            recipients.append(str(chat.the_other_person_id))
-        elif user_id == chat.the_other_person_id:
-            recipients.append(str(chat.initiator_id))
         # not relying on cascades because we need to delete images manually
         chat_service.delete_chat(chat.id)
 
-    # if the user has no messages in global chat, send event only
-    # to his chat partners
     chat_service.delete_global_chat_messages(user_id)
 
     events.send_user_deleted_event(str(user_id))

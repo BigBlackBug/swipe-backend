@@ -279,6 +279,7 @@ class UserService:
             join(User.location). \
             where(country_clause).where(city_clause).where(gender_clause). \
             where(User.deactivation_date == None). \
+            where(User.account_status == AccountStatus.ACTIVE). \
             options(
             Load(User).load_only('id', 'name', 'bio', 'zodiac_sign',
                                  'date_of_birth', 'rating', 'interests',

@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 from swipe.settings import constants
 from swipe.swipe_server.misc import dependencies
+from swipe.swipe_server.users.enums import AccountStatus
 from swipe.swipe_server.users.models import User, Location
 from swipe.swipe_server.users.services.online_cache import \
     RedisOnlineUserService
@@ -79,6 +80,7 @@ async def populate_online_caches():
         last_online_users = \
             db.execute(select(User).where(
                 (User.deactivation_date == None) &
+                (User.account_status == AccountStatus.ACTIVE) &
                 (User.last_online > last_online) &
                 (User.last_online != None)  # noqa
             )).scalars().all()
