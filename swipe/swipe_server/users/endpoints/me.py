@@ -12,6 +12,7 @@ from swipe.swipe_server.chats.models import Chat
 from swipe.swipe_server.chats.services import ChatService
 from swipe.swipe_server.misc import security
 from swipe.swipe_server.users import swipe_bg_tasks
+from swipe.swipe_server.users.enums import AccountStatus
 from swipe.swipe_server.users.models import User, Location
 from swipe.swipe_server.users.schemas import RatingUpdateReason, UserOut, \
     UserUpdate
@@ -84,7 +85,17 @@ async def patch_user(
     previous_location: Location = current_user.location
     current_user: User = user_service.update_user(current_user, user_body)
 
+    # This method is a load of crap, thank you Andrew
+    # Must be reworked
+    logger.debug(f"Got patch with "
+                 f"{user_body.dict(exclude_none=True, exclude_unset=True)}")
     # they are sending this patch on each login
+    if user_body.account_status == AccountStatus.ACTIVE:
+        logger.info("Registration finished")
+        background_tasks.add_task(
+            swipe_bg_tasks.update_location_caches, current_user,
+            previous_location)
+
     if user_body.location:
         # it's a location update
         # so we have to repopulate respective online/popular caches
@@ -97,19 +108,22 @@ async def patch_user(
                 swipe_bg_tasks.update_location_caches, current_user,
                 previous_location)
         elif not previous_location:
+            # first patch with location during registration
             logger.info(f"{user_id} set his location, updating country cache")
             await redis_location.add_cities(
                 user_body.location.country, [user_body.location.city])
-    else:
-        # a regular update
-        if previous_location:
-            # TODO whyyy is it possible?
-            logger.info(f"Updating online user cache for {user_id}")
+
+    # a regular update
+    if previous_location:
+        logger.info(f"Updating online user cache for {user_id}")
+        try:
             await redis_online.cache_user(current_user)
             await redis_user.cache_user(current_user)
-        else:
-            logger.warning(
-                f"No location set on user {user_id}, not updating cache")
+        except:
+            logger.exception("Error updating online user cache")
+    else:
+        logger.warning(
+            f"No location set on user {user_id}, not updating cache")
 
     return UserOut.from_orm(current_user)
 

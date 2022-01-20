@@ -142,8 +142,9 @@ async def authenticate_user(auth_payload: AuthenticationIn,
         response.status_code = status.HTTP_200_OK
     else:
         logger.info(
-            f"Unable to find a user id:'{auth_payload.provider_user_id}' "
-            f"authorized with '{auth_payload.auth_provider}', creating a user")
+            f"Unable to find a user "
+            f"authorized with '{auth_payload.auth_provider}',"
+            f"id:'{auth_payload.provider_user_id}'. Creating a user")
         user = user_service.create_user(auth_payload)
         new_token = user_service.create_access_token(user, auth_payload)
 

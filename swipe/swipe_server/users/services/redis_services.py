@@ -112,6 +112,7 @@ class RedisPopularService:
             return
 
         for user in users:
+            logger.debug(f'Adding {user.id} to {key}')
             # TODO use redis sorted sets you dummy
             await self.redis.rpush(key, str(user.id))
             try:
