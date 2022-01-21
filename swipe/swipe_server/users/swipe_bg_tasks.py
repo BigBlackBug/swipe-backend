@@ -24,6 +24,9 @@ async def update_location_caches(user: User, old_location: Location):
         popular_service = PopularUserService(db, redis)
         redis_location = RedisLocationService(redis)
         redis_user = RedisUserCacheService(redis)
+
+        logger.debug(f"Updating caches of {user.id}")
+
         await redis_location.add_cities(
             user.location.country, [user.location.city])
 
